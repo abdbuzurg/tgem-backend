@@ -21,6 +21,7 @@ type IMaterialLocationRepository interface {
 	GetPaginated(page, limit int) ([]model.MaterialLocation, error)
 	GetPaginatedFiltered(page, limit int, filter model.MaterialLocation) ([]model.MaterialLocation, error)
 	GetByID(id uint) (model.MaterialLocation, error)
+	GetByMaterialCostIDOrCreate(materialCostID uint, locationType string, locationTypeID uint) (model.MaterialLocation, error)
 	Create(data model.MaterialLocation) (model.MaterialLocation, error)
 	Update(data model.MaterialLocation) (model.MaterialLocation, error)
 	Delete(id uint) error
@@ -44,11 +45,11 @@ func (repo *materialLocationRepository) GetPaginatedFiltered(page, limit int, fi
 	err := repo.db.
 		Raw(`SELECT * FROM materials WHERE
 			(nullif(?, '') IS NULL OR material_cost_id = ?) AND
-			(nullif(?, '') IS NULL OR material_detail_location_id = ?) AND
+			(nullif(?, '') IS NULL OR location_id = ?) AND
 			(nullif(?, '') IS NULL OR location_type = ?) AND
 			(nullif(?, '') IS NULL OR amount = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
 			filter.MaterialCostID, filter.MaterialCostID,
-			filter.MaterialDetailLocationID, filter.MaterialDetailLocationID,
+			filter.LocationID, filter.LocationID,
 			filter.LocationType, filter.LocationType,
 			filter.Amount, filter.Amount,
 			limit, (page-1)*limit,
@@ -61,6 +62,12 @@ func (repo *materialLocationRepository) GetPaginatedFiltered(page, limit int, fi
 func (repo *materialLocationRepository) GetByID(id uint) (model.MaterialLocation, error) {
 	data := model.MaterialLocation{}
 	err := repo.db.Find(&data, "id = ?", id).Error
+	return data, err
+}
+
+func (repo *materialLocationRepository) GetByMaterialCostIDOrCreate(materialCostID uint, locationType string, locationID uint) (model.MaterialLocation, error) {
+	data := model.MaterialLocation{}
+	err := repo.db.FirstOrCreate(&data, model.MaterialLocation{LocationType: locationType, LocationID: locationID}).Error
 	return data, err
 }
 

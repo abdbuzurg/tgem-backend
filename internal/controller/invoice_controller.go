@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
+	"backend-v2/pkg/utils"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -31,7 +33,13 @@ type IInvoiceController interface {
 }
 
 func (controller *invoiceController) GetAll(c *gin.Context) {
-	data, err := controller.invoiceService.GetAll()
+	invoiceType := c.Param("invoiceType")
+	if !utils.IsCorrectInvoiceType(invoiceType) {
+		response.ResponseError(c, "Incorrect invoice type provided")
+		return
+	}
+
+	data, err := controller.invoiceService.GetAll(invoiceType)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get Invoice data: %v", err))
 		return
@@ -41,6 +49,12 @@ func (controller *invoiceController) GetAll(c *gin.Context) {
 }
 
 func (controller *invoiceController) GetPaginated(c *gin.Context) {
+	invoiceType := c.Param("invoiceType")
+	if !utils.IsCorrectInvoiceType(invoiceType) {
+		response.ResponseError(c, "Incorrect invoice type provided")
+		return
+	}
+
 	pageStr := c.DefaultQuery("page", "1")
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page <= 0 {
@@ -145,13 +159,6 @@ func (controller *invoiceController) GetPaginated(c *gin.Context) {
 		}
 	}
 
-	invoiceType := c.DefaultQuery("invoiceType", "")
-	invoiceType, err = url.QueryUnescape(invoiceType)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for invoiceType: %v", err))
-		return
-	}
-
 	deliveryCode := c.DefaultQuery("deliveryCode", "")
 	deliveryCode, err = url.QueryUnescape(deliveryCode)
 	if err != nil {
@@ -183,19 +190,18 @@ func (controller *invoiceController) GetPaginated(c *gin.Context) {
 		OperatorAddWorkerID:      uint(operatorAddWorkerID),
 		OperatorEditWorkerID:     uint(operatorEditWorkerID),
 		ObjectID:                 uint(objectID),
-		Type:                     invoiceType,
 		DeliveryCode:             deliveryCode,
 		District:                 district,
 		CarNumber:                carNumber,
 	}
 
-	data, err := controller.invoiceService.GetPaginated(page, limit, filter)
+	data, err := controller.invoiceService.GetPaginated(invoiceType, page, limit, filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of Invoice: %v", err))
 		return
 	}
 
-	dataCount, err := controller.invoiceService.Count()
+	dataCount, err := controller.invoiceService.Count(invoiceType)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the total amount of Invoice: %v", err))
 		return
@@ -222,7 +228,7 @@ func (controller *invoiceController) GetByID(c *gin.Context) {
 }
 
 func (controller *invoiceController) Create(c *gin.Context) {
-	var createData model.Invoice
+	var createData dto.InvoiceDataUpdateOrCreate
 	if err := c.ShouldBindJSON(&createData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
@@ -238,7 +244,7 @@ func (controller *invoiceController) Create(c *gin.Context) {
 }
 
 func (controller *invoiceController) Update(c *gin.Context) {
-	var updateData model.Invoice
+	var updateData dto.InvoiceDataUpdateOrCreate
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return

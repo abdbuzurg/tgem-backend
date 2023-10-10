@@ -13,7 +13,7 @@ type Invoice struct {
 	OperatorAddWorkerID      uint      `json:"operatorAddWorkerID"`
 	OperatorEditWorkerID     uint      `json:"operatorEditWorkerID"`
 	ObjectID                 uint      `json:"objectID"`
-	Type                     string    `json:"type" gorm:"tinyText"`
+	InvoiceType              string    `json:"invoiceType" gorm:"tinyText"`
 	DeliveryCode             string    `json:"deliveryCode" gorm:"tinyText"`
 	District                 string    `json:"district" gorm:"tinyText"`
 	CarNumber                string    `json:"carNumber" gorm:"tinyText"`

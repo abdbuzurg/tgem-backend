@@ -4,6 +4,8 @@ import (
 	"backend-v2/model"
 	"fmt"
 
+	"github.com/casbin/casbin/v2"
+	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -36,7 +38,19 @@ func InitDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
+	a, err := gormadapter.NewAdapterByDB(db)
+	if err != nil {
+		return nil, err
+	}
+	gormadapter.TurnOffAutoMigrate(db)
+
+	_, err = casbin.NewEnforcer("./pkg/database/acl_model.conf", a)
+	if err != nil {
+		return nil, err
+	}
+
 	AutoMigrate(db)
+	InitialMigration(db)
 
 	return db, nil
 

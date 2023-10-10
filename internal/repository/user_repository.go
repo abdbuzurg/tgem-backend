@@ -25,6 +25,8 @@ type IUserRepository interface {
 	Update(data model.User) (model.User, error)
 	Delete(id uint) error
 	Count() (int64, error)
+	GetByUsername(username string) (model.User, error)
+	GetPermissions(userID uint) ([]model.CasbinRule, error)
 }
 
 func (repo *userRepository) GetAll() ([]model.User, error) {
@@ -77,4 +79,16 @@ func (repo *userRepository) Count() (int64, error) {
 	var count int64
 	err := repo.db.Model(&model.User{}).Count(&count).Error
 	return count, err
+}
+
+func (repo *userRepository) GetByUsername(username string) (model.User, error) {
+	var data model.User
+	err := repo.db.First(&data, "username = ?", username).Error
+	return data, err
+}
+
+func (repo *userRepository) GetPermissions(userID uint) ([]model.CasbinRule, error) {
+	var data []model.CasbinRule
+	err := repo.db.Find(data, "v0 = ?", userID).Error
+	return data, err
 }

@@ -25,6 +25,7 @@ type IInvoiceMaterialsRepository interface {
 	Update(data model.InvoiceMaterials) (model.InvoiceMaterials, error)
 	Delete(id uint) error
 	Count() (int64, error)
+	GetByInvoiceID(invoiceID uint) ([]model.InvoiceMaterials, error)
 }
 
 func (repo *invoiceMaterialsRepository) GetAll() ([]model.InvoiceMaterials, error) {
@@ -80,4 +81,10 @@ func (repo *invoiceMaterialsRepository) Count() (int64, error) {
 	var count int64
 	err := repo.db.Model(&model.InvoiceMaterials{}).Count(&count).Error
 	return count, err
+}
+
+func (repo *invoiceMaterialsRepository) GetByInvoiceID(invoiceID uint) ([]model.InvoiceMaterials, error) {
+	data := []model.InvoiceMaterials{}
+	err := repo.db.Find(&data, "invoice_id = ?", invoiceID).Error
+	return data, err
 }

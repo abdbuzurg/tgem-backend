@@ -1,12 +1,15 @@
 package controller
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
 	"backend-v2/model"
+	"backend-v2/pkg/jwt"
 	"backend-v2/pkg/response"
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +31,9 @@ type IUserController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	Login(c *gin.Context)
+	IsAuthenticated(c *gin.Context)
+	GetPermissions(c *gin.Context)
 }
 
 func (controller *userController) GetAll(c *gin.Context) {
@@ -156,4 +162,61 @@ func (controller *userController) Delete(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, "deleted")
+}
+
+func (controller *userController) Login(c *gin.Context) {
+	var data dto.LoginData
+	if err := c.ShouldBindJSON(&data); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect data recieved by server: %v", err))
+		return
+	}
+
+	token, err := controller.userService.Login(data)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not perform login operation: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, token)
+}
+
+func (controller *userController) IsAuthenticated(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if len(authHeader) == 0 {
+		response.ResponseError(c, "not authenticated based on first-level check")
+		return
+	}
+
+	fields := strings.Fields(authHeader)
+	if len(fields) < 2 {
+		response.ResponseError(c, "not authenticated based on second-level check")
+		return
+	}
+
+	authType := strings.ToLower(fields[0])
+	if authType != "bearer" {
+		response.ResponseError(c, "not authenticated based on third-level check")
+		return
+	}
+
+	accessToken := fields[1]
+	_, err := jwt.VerifyToken(accessToken)
+	if err != nil {
+		response.ResponseError(c, "not authenticated based on forth-level check")
+		return
+	}
+
+	response.ResponseSuccess(c, "authenticated")
+}
+
+func (controller *userController) GetPermissions(c *gin.Context) {
+	username := c.GetString("username")
+
+	userPermissions, err := controller.userService.GetPermissions(username)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not get user permissions: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, userPermissions)
 }

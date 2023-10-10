@@ -17,29 +17,29 @@ func InitInvoiceRepository(db *gorm.DB) IInvoiceRepository {
 }
 
 type IInvoiceRepository interface {
-	GetAll() ([]model.Invoice, error)
-	GetPaginated(page, limit int) ([]model.Invoice, error)
-	GetPaginatedFiltered(page, limit int, filter model.Invoice) ([]model.Invoice, error)
+	GetAll(invoiceType string) ([]model.Invoice, error)
+	GetPaginated(invoiceType string, page, limit int) ([]model.Invoice, error)
+	GetPaginatedFiltered(invoiceType string, page, limit int, filter model.Invoice) ([]model.Invoice, error)
 	GetByID(id uint) (model.Invoice, error)
 	Create(data model.Invoice) (model.Invoice, error)
 	Update(data model.Invoice) (model.Invoice, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(invoiceType string) (int64, error)
 }
 
-func (repo *invoiceRepository) GetAll() ([]model.Invoice, error) {
+func (repo *invoiceRepository) GetAll(invoiceType string) ([]model.Invoice, error) {
 	data := []model.Invoice{}
-	err := repo.db.Order("id desc").Find(&data).Error
+	err := repo.db.Order("id desc").Find(&data, "invoice_type = ?", invoiceType).Error
 	return data, err
 }
 
-func (repo *invoiceRepository) GetPaginated(page, limit int) ([]model.Invoice, error) {
+func (repo *invoiceRepository) GetPaginated(invoiceType string, page, limit int) ([]model.Invoice, error) {
 	data := []model.Invoice{}
-	err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data).Error
+	err := repo.db.Order("id desc").Offset((page-1)*limit).Limit(limit).Find(&data, "invoice_type = ?", invoiceType).Error
 	return data, err
 }
 
-func (repo *invoiceRepository) GetPaginatedFiltered(page, limit int, filter model.Invoice) ([]model.Invoice, error) {
+func (repo *invoiceRepository) GetPaginatedFiltered(invoiceType string, page, limit int, filter model.Invoice) ([]model.Invoice, error) {
 	data := []model.Invoice{}
 	err := repo.db.
 		Raw(`SELECT * FROM invoices WHERE
@@ -52,7 +52,7 @@ func (repo *invoiceRepository) GetPaginatedFiltered(page, limit int, filter mode
 			(nullif(?, '') IS NULL OR operator_add_worker_id = ?) AND
 			(nullif(?, '') IS NULL OR operator_edit_worker_id = ?) AND
 			(nullif(?, '') IS NULL OR object_id = ?) AND
-			(nullif(?, '') IS NULL OR type = ?) AND
+			(nullif(?, '') IS NULL OR invoice_type = ?) AND
 			(nullif(?, '') IS NULL OR delivery_code = ?) AND
 			(nullif(?, '') IS NULL OR district = ?) AND
 			(nullif(?, '') IS NULL OR car_number = ?) AND
@@ -66,7 +66,7 @@ func (repo *invoiceRepository) GetPaginatedFiltered(page, limit int, filter mode
 			filter.OperatorAddWorkerID, filter.OperatorAddWorkerID,
 			filter.OperatorEditWorkerID, filter.OperatorEditWorkerID,
 			filter.ObjectID, filter.ObjectID,
-			filter.Type, filter.Type,
+			invoiceType, invoiceType,
 			filter.DeliveryCode, filter.DeliveryCode,
 			filter.District, filter.District,
 			filter.CarNumber, filter.CarNumber,
@@ -98,8 +98,8 @@ func (repo *invoiceRepository) Delete(id uint) error {
 	return repo.db.Delete(&model.Invoice{}, "id = ?", id).Error
 }
 
-func (repo *invoiceRepository) Count() (int64, error) {
+func (repo *invoiceRepository) Count(invoiceType string) (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.Invoice{}).Count(&count).Error
+	err := repo.db.Raw("SELECT COUNT(*) FROM invoices WHERE invoice_type = ?", invoiceType).Scan(&count).Error
 	return count, err
 }
