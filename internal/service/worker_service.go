@@ -20,6 +20,7 @@ type IWorkerService interface {
 	GetAll() ([]model.Worker, error)
 	GetPaginated(page, limit int, data model.Worker) ([]model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
+	GetByJobTitle(jobTitle string) ([]model.Worker, error)
 	Create(data model.Worker) (model.Worker, error)
 	Update(data model.Worker) (model.Worker, error)
 	Delete(id uint) error
@@ -40,6 +41,10 @@ func (service *workerService) GetPaginated(page, limit int, data model.Worker) (
 
 func (service *workerService) GetByID(id uint) (model.Worker, error) {
 	return service.workerRepo.GetByID(id)
+}
+
+func (service *workerService) GetByJobTitle(jobTitle string) ([]model.Worker, error) {
+	return service.workerRepo.GetByJobTitle(jobTitle)
 }
 
 func (service *workerService) Create(data model.Worker) (model.Worker, error) {

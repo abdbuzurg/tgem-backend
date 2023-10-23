@@ -65,12 +65,12 @@ func (controller *materialLocationController) GetPaginated(c *gin.Context) {
 		}
 	}
 
-	materialDetailLocationIDStr := c.DefaultQuery("materialDetailLocationIDStr", "")
-	materialDetailLocationID := 0
-	if materialDetailLocationIDStr != "" {
-		materialDetailLocationID, err = strconv.Atoi(materialCostIDStr)
+	locationIDStr := c.DefaultQuery("locationID", "")
+	locationID := 0
+	if locationIDStr != "" {
+		locationID, err = strconv.Atoi(materialCostIDStr)
 		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode materialDetailLocationID parameter: %v", err))
+			response.ResponseError(c, fmt.Sprintf("Cannot decode locationID parameter: %v", err))
 			return
 		}
 	}
@@ -99,10 +99,10 @@ func (controller *materialLocationController) GetPaginated(c *gin.Context) {
 	}
 
 	filter := model.MaterialLocation{
-		MaterialCostID:           uint(materialCostID),
-		MaterialDetailLocationID: uint(materialDetailLocationID),
-		LocationType:             locationType,
-		Amount:                   amount,
+		MaterialCostID: uint(materialCostID),
+		LocationID:     uint(locationID),
+		LocationType:   locationType,
+		Amount:         amount,
 	}
 
 	data, err := controller.materialLocationService.GetPaginated(page, limit, filter)

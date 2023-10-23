@@ -25,6 +25,7 @@ type IWorkerController interface {
 	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	GetByID(c *gin.Context)
+	GetByJobTitle(c *gin.Context)
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
@@ -108,6 +109,17 @@ func (controller *workerController) GetByID(c *gin.Context) {
 	data, err := controller.workerService.GetByID(uint(id))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the data with ID(%d): %v", id, err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *workerController) GetByJobTitle(c *gin.Context) {
+	jobTitle := c.Param("jobTitle")
+	data, err := controller.workerService.GetByJobTitle(jobTitle)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Cannot get workers by the job title: %v", err))
 		return
 	}
 

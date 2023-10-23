@@ -71,7 +71,7 @@ func (repo *workerRepository) Create(data model.Worker) (model.Worker, error) {
 }
 
 func (repo *workerRepository) Update(data model.Worker) (model.Worker, error) {
-	err := repo.db.Model(&model.Worker{}).Select("*").Updates(&data).Error
+	err := repo.db.Model(&model.Worker{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
 	return data, err
 }
 

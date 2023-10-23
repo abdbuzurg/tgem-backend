@@ -66,7 +66,7 @@ func (repo *teamRepository) Create(data model.Team) (model.Team, error) {
 }
 
 func (repo *teamRepository) Update(data model.Team) (model.Team, error) {
-	err := repo.db.Model(&model.Team{}).Select("*").Updates(&data).Error
+	err := repo.db.Model(&model.Team{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
 	return data, err
 }
 

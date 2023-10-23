@@ -66,7 +66,7 @@ func (repo *materialRepository) Create(data model.Material) (model.Material, err
 }
 
 func (repo *materialRepository) Update(data model.Material) (model.Material, error) {
-	err := repo.db.Model(&model.Material{}).Select("*").Updates(&data).Error
+	err := repo.db.Model(&model.Material{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
 	return data, err
 }
 

@@ -77,7 +77,7 @@ func (repo *materialLocationRepository) Create(data model.MaterialLocation) (mod
 }
 
 func (repo *materialLocationRepository) Update(data model.MaterialLocation) (model.MaterialLocation, error) {
-	err := repo.db.Model(&model.MaterialLocation{}).Select("*").Updates(&data).Error
+	err := repo.db.Model(&model.MaterialLocation{}).Select("*").Updates(&data).Where("id = ?", data.ID).Error
 	return data, err
 }
 

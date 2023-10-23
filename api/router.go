@@ -5,7 +5,9 @@ import (
 	"backend-v2/internal/controller"
 	"backend-v2/internal/repository"
 	"backend-v2/internal/service"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -16,7 +18,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	router.Use(gin.Recovery())
 
-	router.Use(middleware.CORSMiddleware())
+	router.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin, Content-Type, Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	//Initialization of Repositories
 	invoiceMaterialRepo := repository.InitInvoiceMaterialsRepository(db)
@@ -55,36 +64,40 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// materialCostService := service.InitMaterialCostService(materialCostRepo)
 	// materialForProjectService := service.InitMaterialForProjectService(materialForProjectRepo)
 	// materialLocationService := service.InitMaterialLocationService(materialLocationRepo)
-	// materialService := service.InitMaterialService(materialRepo)
+	materialService := service.InitMaterialService(materialRepo)
 	// mjdObjectService := service.InitMJDObjectService(mjdObjectRepo)
 	// objectOperationService := service.InitObjectOperationService(objectOperationRepo)
-	// objectService := service.InitObjectService(objectRepo)
+	objectService := service.InitObjectService(objectRepo)
 	// operationService := service.InitOperationService(operationRepo)
 	// projectService := service.InitProjectService(projectRepo)
 	// sipObjectService := service.InitSIPObjectService(sipObjectRepo)
 	// stvtObjectService := service.InitSTVTObjectService(stvtObjectRepo)
-	// teamService := service.InitTeamService(teamRepo)
+	teamService := service.InitTeamService(teamRepo)
 	// tpObjctService := service.InitTPObjectService(tpObjectRepo)
 	userService := service.InitUserService(userRepo)
-	// workerService := service.InitWorkerService(workerRepo)
+	workerService := service.InitWorkerService(workerRepo)
 
 	//Initialization of Controllers
 	invoiceController := controller.InitInvoiceController(invoiceService)
 	// invoiceMaterialController := controller.InitInvoiceMaterialsController(invoiceMaterialsService)
-	// materialController := controller.InitMaterialController(materialService)
+	materialController := controller.InitMaterialController(materialService)
 	// materialCostController := controller.InitMaterialCostController(materialCostService)
 	// materialForProjectController := controller.InitMaterialForProjectController(materialForProjectService)
 	// materialLocationController := controller.InitMaterialLocationController(materialLocationService)
-	// objectController := controller.InitObjectController(objectService)
+	objectController := controller.InitObjectController(objectService)
 	// objectOperationController := controller.InitObjectOperationController(objectOperationService)
 	// operationController := controller.InitOperationController(operationService)
 	// projectController := controller.InitProjectController(projectService)
-	// teamController := controller.InitTeamController(teamService)
+	teamController := controller.InitTeamController(teamService)
 	userController := controller.InitUserController(userService)
-	// workerController := controller.InitWorkerController(workerService)
+	workerController := controller.InitWorkerController(workerService)
 
 	//Initialization of Routes
 	InitInvoiceRoutes(router, invoiceController)
+	InitMaterialRoutes(router, materialController)
+	InitTeamRoutes(router, teamController)
+	InitObjectRoutes(router, objectController)
+	InitWorkerRoutes(router, workerController)
 	InitUserRoutes(router, userController)
 
 	return router
@@ -94,11 +107,52 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 func InitInvoiceRoutes(router *gin.Engine, controller controller.IInvoiceController) {
 	invoiceRoutes := router.Group("/invoice")
 	invoiceRoutes.GET("/:invoiceType/all", controller.GetAll)
-	invoiceRoutes.GET("/:invoiceType/pagniated", controller.GetPaginated)
-	invoiceRoutes.GET("/:id", controller.GetByID)
+	invoiceRoutes.GET("/:invoiceType/paginated", controller.GetPaginated)
+	invoiceRoutes.GET("/:invoiceType/:id", controller.GetByID)
 	invoiceRoutes.POST("/", controller.Create)
 	invoiceRoutes.PATCH("/", controller.Update)
 	invoiceRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitMaterialRoutes(router *gin.Engine, controller controller.IMaterialController) {
+	materialRoutes := router.Group("/material")
+	materialRoutes.GET("/all", controller.GetAll)
+	materialRoutes.GET("/paginated", controller.GetPaginated)
+	materialRoutes.GET("/:id", controller.GetAll)
+	materialRoutes.POST("/", controller.Create)
+	materialRoutes.PATCH("/", controller.Update)
+	materialRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitTeamRoutes(router *gin.Engine, controller controller.ITeamController) {
+	teamRoutes := router.Group("/team")
+	teamRoutes.GET("/all", controller.GetAll)
+	teamRoutes.GET("/paginated", controller.GetPaginated)
+	teamRoutes.GET("/:id", controller.GetByID)
+	teamRoutes.POST("/", controller.Create)
+	teamRoutes.PATCH("/", controller.Update)
+	teamRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitObjectRoutes(router *gin.Engine, controller controller.IObjectController) {
+	objectRoutes := router.Group("/object")
+	objectRoutes.GET("/all", controller.GetAll)
+	objectRoutes.GET("/paginated", controller.GetPaginated)
+	objectRoutes.GET("/:id", controller.GetByID)
+	objectRoutes.POST("/", controller.Create)
+	objectRoutes.PATCH("/", controller.Update)
+	objectRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitWorkerRoutes(router *gin.Engine, controller controller.IWorkerController) {
+	workerRoutes := router.Group("/worker")
+	workerRoutes.GET("/all", controller.GetAll)
+	workerRoutes.GET("/paginated", controller.GetPaginated)
+	workerRoutes.GET("/:id", controller.GetByID)
+	workerRoutes.GET("/job-title/:jobTitle", controller.GetByJobTitle)
+	workerRoutes.POST("/", controller.Create)
+	workerRoutes.PATCH("/", controller.Update)
+	workerRoutes.DELETE("/:id", controller.Delete)
 }
 
 func InitUserRoutes(router *gin.Engine, controller controller.IUserController) {
@@ -107,7 +161,7 @@ func InitUserRoutes(router *gin.Engine, controller controller.IUserController) {
 	userRoutes.GET("/:id", controller.GetByID)
 	userRoutes.GET("/paginated", controller.GetPaginated)
 	userRoutes.GET("/is-authenticated", controller.IsAuthenticated)
-	userRoutes.GET("/permissions", controller.GetPermissions)
+	userRoutes.GET("/permissions", middleware.Authentication(), controller.GetPermissions)
 	userRoutes.POST("/", controller.Create)
 	userRoutes.POST("/login", controller.Login)
 	userRoutes.PATCH("/", controller.Update)

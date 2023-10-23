@@ -90,11 +90,11 @@ func (service *invoiceService) GetPaginated(invoiceType string, page, limit int,
 		}
 
 		data = append(data, dto.InvoicePaginatedData{
-			ID:               invoice.ID,
-			WarehouseManager: warehouseManager.Name,
-			Released:         released.Name,
-			ObjectName:       object.Name,
-			DateOfInvoice:    invoice.DateOfInvoice.Format("2006-01-02"),
+			ID:                   invoice.ID,
+			WarehouseManagerName: warehouseManager.Name,
+			ReleasedName:         released.Name,
+			ObjectName:           object.Name,
+			DateOfInvoice:        invoice.DateOfInvoice.Format("2006-01-02"),
 		})
 	}
 

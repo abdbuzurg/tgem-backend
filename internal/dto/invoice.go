@@ -3,11 +3,12 @@ package dto
 import "backend-v2/model"
 
 type InvoicePaginatedData struct {
-	ID               uint   `json:"id"`
-	WarehouseManager string `json:"warehouseManager"`
-	Released         string `json:"released"`
-	ObjectName       string `json:"objectName"`
-	DateOfInvoice    string `json:"dateOfInvoice"`
+	ID                   uint   `json:"id"`
+	DeliveryCode         string `json:"deliveryCode"`
+	WarehouseManagerName string `json:"warehouseManagerName"`
+	ReleasedName         string `json:"releasedName"`
+	ObjectName           string `json:"objectName"`
+	DateOfInvoice        string `json:"dateOfInvoice"`
 }
 
 type InvoiceDetails struct {

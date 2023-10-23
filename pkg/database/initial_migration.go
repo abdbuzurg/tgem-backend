@@ -2,6 +2,7 @@ package database
 
 import (
 	"backend-v2/model"
+	"backend-v2/pkg/security"
 
 	"github.com/casbin/casbin/v2"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
@@ -20,10 +21,14 @@ func InitialMigration(db *gorm.DB) {
 		panic("Не удалось проверить наличие главного администратора как работника системы")
 	}
 
+	superadmin_userPassword, err := security.Hash("password")
+	if err != nil {
+		panic("Не удалось создать пароль для главного администратора")
+	}
 	superadmin_user := model.User{
 		WorkerID: superadmin_worker.ID,
 		Username: "superadmin",
-		Password: "$2a$14$75La.40gx4wYayHcyDb/NOFXffp.S9tKFs1j29mNPMoIuRl1xNbrK",
+		Password: string(superadmin_userPassword),
 	}
 
 	err = db.Table("users").FirstOrCreate(&superadmin_user, model.User{Username: "superadmin"}).Error

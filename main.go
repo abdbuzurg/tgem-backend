@@ -21,8 +21,10 @@ func main() {
 		return
 	}
 
-	port := fmt.Sprintf(":%d", viper.GetInt("App.Port"))
+	port := fmt.Sprintf("127.0.0.1:%d", viper.GetInt("App.Port"))
 
 	app := api.SetupRouter(db)
-	app.Run(port)
+	if err := app.Run(port); err != nil {
+		panic(err)
+	}
 }

@@ -2,7 +2,10 @@ package repository
 
 import (
 	"backend-v2/model"
+	"fmt"
 
+	"github.com/casbin/casbin/v2"
+	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"gorm.io/gorm"
 )
 
@@ -88,7 +91,29 @@ func (repo *userRepository) GetByUsername(username string) (model.User, error) {
 }
 
 func (repo *userRepository) GetPermissions(userID uint) ([]model.CasbinRule, error) {
-	var data []model.CasbinRule
-	err := repo.db.Find(data, "v0 = ?", userID).Error
-	return data, err
+	result := []model.CasbinRule{}
+
+	a, err := gormadapter.NewAdapterByDB(repo.db)
+	if err != nil {
+		return result, fmt.Errorf("cannot get the gorm adapter for casbin: %v", err)
+	}
+	gormadapter.TurnOffAutoMigrate(repo.db)
+
+	e, err := casbin.NewEnforcer("./pkg/database/acl_model.conf", a)
+	if err != nil {
+		return result, fmt.Errorf("cannot initiate casbin-enforcer: %v", err)
+	}
+
+	allPolicies := e.GetPolicy()
+	userIDStr := fmt.Sprint(userID)
+	for _, policy := range allPolicies {
+		if policy[0] == userIDStr {
+			result = append(result, model.CasbinRule{
+				V0: policy[0],
+				V1: policy[1],
+				V2: policy[2],
+			})
+		}
+	}
+	return result, nil
 }
