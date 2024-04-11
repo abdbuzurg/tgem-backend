@@ -4,8 +4,6 @@ import (
 	"backend-v2/model"
 	"fmt"
 
-	"github.com/casbin/casbin/v2"
-	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -38,17 +36,6 @@ func InitDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	a, err := gormadapter.NewAdapterByDB(db)
-	if err != nil {
-		return nil, err
-	}
-	gormadapter.TurnOffAutoMigrate(db)
-
-	_, err = casbin.NewEnforcer("./pkg/database/acl_model.conf", a)
-	if err != nil {
-		return nil, err
-	}
-
 	AutoMigrate(db)
 	InitialMigration(db)
 
@@ -58,20 +45,36 @@ func InitDB() (*gorm.DB, error) {
 
 func AutoMigrate(db *gorm.DB) {
 	db.AutoMigrate(
+		model.District{},
+		model.Role{},
 		model.Project{},
 		model.Worker{},
 		model.User{},
+		model.UserAction{},
+		model.UserInProject{},
 		model.Material{},
-		model.MaterialForProject{},
+		model.MaterialCost{},
+		model.MaterialLocation{},
+		model.MaterialDefect{},
 		model.Object{},
+		model.SupervisorObjects{},
+		model.Operation{},
+		model.ObjectOperation{},
+		model.Permission{},
+		model.SerialNumber{},
 		model.Team{},
-		model.Invoice{},
+		model.TeamObjects{},
 		model.InvoiceMaterials{},
+		model.InvoiceInput{},
+		model.InvoiceOutput{},
+		model.InvoiceReturn{},
+		model.InvoiceObject{},
+		model.InvoiceWriteOff{},
+		model.OperatorErrorFound{},
+		model.KL04KV_Object{},
+		model.MJD_Object{},
+		model.SIP_Object{},
+		model.STVT_Object{},
+		model.TP_Object{},
 	)
-
-	db.Table("kl04kv_objects").AutoMigrate(model.KL04KV_Object{})
-	db.Table("mjd_objects").AutoMigrate(model.MJD_Object{})
-	db.Table("sip_objects").AutoMigrate(model.SIP_Object{})
-	db.Table("stvt_objects").AutoMigrate(model.STVT_Object{})
-	db.Table("tp_objects").AutoMigrate(model.TP_Object{})
 }

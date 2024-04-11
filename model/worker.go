@@ -6,13 +6,21 @@ type Worker struct {
 	JobTitle     string `json:"jobTitle" gorm:"tinyText"`
 	MobileNumber string `json:"mobileNumber" gorm:"tinyText"`
 
-	User                     User      `json:"-" gorm:"foreignKey:WorkerID"`
-	Teams                    []Team    `json:"-" gorm:"foreignKey:LeaderWorkerID"`
-	Objects                  []Object  `json:"-" gorm:"foreignKey:SupervisorWorkerID"`
-	WarehouseManagerInvoices []Invoice `json:"-" gorm:"foreignKey:WarehouseManagerWorkerID"`
-	ReleasedInvoices         []Invoice `json:"-" gorm:"foreignKey:ReleasedWorkerID"`
-	DriverInvoices           []Invoice `json:"-" gorm:"foreignKey:DriverWorkerID"`
-	RecipientInvoices        []Invoice `json:"-" gorm:"foreignKey:RecipientWorkerID"`
-	OperatorAddInvoices      []Invoice `json:"-" gorm:"foreignKey:OperatorAddWorkerID"`
-	OperatorEditInvoices     []Invoice `json:"-" gorm:"foreignKey:OperatorEditWorkerID"`
+	User    User     `json:"-" gorm:"foreignKey:WorkerID"`
+	Teams   []Team   `json:"-" gorm:"foreignKey:LeaderWorkerID"`
+
+  //Object Workers
+  SupervisorObjectss []SupervisorObjects `json:"-" gorm:"foreignKey:SupervisorWorkerID"`
+
+	//Invoice Input Workers
+	InvoiceInputsWarehouseManager []InvoiceInput `json:"-" gorm:"foreignKey:WarehouseManagerWorkerID"`
+	InvoiceInputsReleased         []InvoiceInput `json:"-" gorm:"foreignKey:ReleasedWorkerID"`
+
+	//Invoice Object
+	InvoiceObjectsSupervisor []InvoiceObject `json:"-" gorm:"foreignKey:SupervisorWorkerID"`
+
+	//Invoice Output
+	InvoiceOutputsWarehouseManager []InvoiceOutput `json:"-" gorm:"foreignKey:WarehouseManagerWorkerID"`
+	InvoiceOutputsReleased         []InvoiceOutput `json:"-" gorm:"foreignKey:ReleasedWorkerID"`
+	InvoiceOutputsRecipient        []InvoiceOutput `json:"-" gorm:"foreignKey:RecipientWorkerID"`
 }

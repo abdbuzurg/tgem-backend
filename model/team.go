@@ -7,6 +7,8 @@ type Team struct {
 	MobileNumber   string `json:"mobileNumber" gorm:"tinyText"`
 	Company        string `json:"company" gorm:"tinyText"`
 
-	Invoices         []Invoice         `json:"-" gorm:"foreignKey:TeamID"`
+	TeamObjectss     []TeamObjects     `json:"-" gorm:"foreignKey:TeamID"`
 	ObjectOperations []ObjectOperation `json:"-" gorm:"foreignKey:TeamID"`
+	InvoiceOutputs   []InvoiceOutput   `json:"-" gorm:"foreignKey:TeamID"`
+	InvoiceObject    []InvoiceObject   `json:"-" gorm:"foreignKey:TeamID"`
 }

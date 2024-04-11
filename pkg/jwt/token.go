@@ -11,18 +11,24 @@ import (
 
 type Payload struct {
 	jwt.StandardClaims
-	Username string `json:"username"`
+	UserID    uint `json:"userID"`
+	WorkerID  uint `json:"workerID"`
+	RoleID    uint `json:"roleID"`
+	ProjectID uint `json:"projectID"`
 }
 
 var SUPER_SECRET_KEY string = viper.GetString("Jwt.Secret")
 
-func CreateToken(username string) (string, error) {
+func CreateToken(userID, workerID, roleID, projectID uint) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &Payload{
 		jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(10 * time.Hour).Unix(),
 			IssuedAt:  time.Now().Unix(),
 		},
-		username,
+		userID,
+		workerID,
+		roleID,
+		projectID,
 	})
 
 	tokenString, err := token.SignedString([]byte(SUPER_SECRET_KEY))

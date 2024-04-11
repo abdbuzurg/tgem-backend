@@ -21,6 +21,7 @@ type IWorkerRepository interface {
 	GetPaginated(page, limit int) ([]model.Worker, error)
 	GetPaginatedFiltered(page, limit int, filter model.Worker) ([]model.Worker, error)
 	GetByJobTitle(jobTitle string) ([]model.Worker, error)
+  GetByName(name string) (model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
 	Create(data model.Worker) (model.Worker, error)
 	Update(data model.Worker) (model.Worker, error)
@@ -51,6 +52,12 @@ func (repo *workerRepository) GetPaginatedFiltered(page, limit int, filter model
 		).Scan(&data).Error
 
 	return data, err
+}
+
+func(repo *workerRepository) GetByName(name string) (model.Worker, error) {
+  data := model.Worker{}
+  err := repo.db.First(&data, "name = ?", name).Error
+  return data, err
 }
 
 func (repo *workerRepository) GetByJobTitle(jobTitle string) ([]model.Worker, error) {

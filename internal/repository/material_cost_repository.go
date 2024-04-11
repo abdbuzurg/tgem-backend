@@ -21,7 +21,8 @@ type IMaterialCostRepository interface {
 	GetPaginated(page, limit int) ([]model.MaterialCost, error)
 	GetPaginatedFiltered(page, limit int, filter model.MaterialCost) ([]model.MaterialCost, error)
 	GetByID(id uint) (model.MaterialCost, error)
-	GetByMaterialID(materialID uint) (model.MaterialCost, error)
+	GetByMaterialID(materialID uint) ([]model.MaterialCost, error)
+  GetByMaterialIDSorted(materialID uint) ([]model.MaterialCost, error)
 	Create(data model.MaterialCost) (model.MaterialCost, error)
 	Update(data model.MaterialCost) (model.MaterialCost, error)
 	Delete(id uint) error
@@ -65,10 +66,18 @@ func (repo *materialCostRepository) GetByID(id uint) (model.MaterialCost, error)
 	return data, err
 }
 
-func (repo *materialCostRepository) GetByMaterialID(materialID uint) (model.MaterialCost, error) {
-	data := model.MaterialCost{}
+func (repo *materialCostRepository) GetByMaterialID(materialID uint) ([]model.MaterialCost, error) {
+	data := []model.MaterialCost{}
 	err := repo.db.Find(&data, "material_id = ?", materialID).Error
 	return data, err
+}
+
+func(repo *materialCostRepository)   GetByMaterialIDSorted(materialID uint) ([]model.MaterialCost, error) {
+  data := []model.MaterialCost{}
+  err := repo.db.Raw(`
+    SELECT * FROM material_costs WHERE material_id = ? ORDER BY cost_m19 DESC
+  `, materialID).Scan(&data).Error
+  return data, err
 }
 
 func (repo *materialCostRepository) Create(data model.MaterialCost) (model.MaterialCost, error) {

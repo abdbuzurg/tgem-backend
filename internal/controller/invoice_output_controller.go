@@ -106,29 +106,9 @@ func (controller *invoiceOutputController) GetPaginated(c *gin.Context) {
 		}
 	}
 
-	operatorAddWorkerIDStr := c.DefaultQuery("operatorAddWorkerID", "")
-	operatorAddWorkerID := 0
-	if operatorAddWorkerIDStr != "" {
-		operatorAddWorkerID, err = strconv.Atoi(operatorAddWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode operatorAddWorkerID parameter: %v", err))
-			return
-		}
-	}
-
-	operatorEditWorkerIDStr := c.DefaultQuery("operatorEditWorkerID", "")
-	operatorEditWorkerID := 0
-	if operatorEditWorkerIDStr != "" {
-		operatorEditWorkerID, err = strconv.Atoi(operatorEditWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode operatorEditWorkerID parameter: %v", err))
-			return
-		}
-	}
-
 	teamIDStr := c.DefaultQuery("teamID", "")
 	teamID := 0
-	if operatorEditWorkerIDStr != "" {
+	if teamIDStr != "" {
 		teamID, err = strconv.Atoi(teamIDStr)
 		if err != nil {
 			response.ResponseError(c, fmt.Sprintf("Cannot decode teamID parameter: %v", err))
@@ -160,8 +140,6 @@ func (controller *invoiceOutputController) GetPaginated(c *gin.Context) {
 		WarehouseManagerWorkerID: uint(warehouseManagerWorkerID),
 		RecipientWorkerID:        uint(recipientWorkerID),
 		ReleasedWorkerID:         uint(releasedWorkerID),
-		OperatorAddWorkerID:      uint(operatorAddWorkerID),
-		OperatorEditWorkerID:     uint(operatorEditWorkerID),
 		TeamID:                   uint(teamID),
 		ObjectID:                 uint(objectID),
 		DeliveryCode:             deliveryCode,
@@ -190,9 +168,8 @@ func (controller *invoiceOutputController) Create(c *gin.Context) {
 	}
 
 	workerID := c.GetUint("workerID")
-	createData.Details.OperatorAddWorkerID = workerID
-	createData.Details.OperatorEditWorkerID = workerID
 	createData.Details.ReleasedWorkerID = workerID
+
 	projectID := c.GetUint("projectID")
 	createData.Details.ProjectID = projectID
 

@@ -49,7 +49,7 @@ type IInvoiceWriteOffService interface {
 	Create(data dto.InvoiceWriteOff) (dto.InvoiceWriteOff, error)
 	// Create( data dto.InvoiceWriteOff) (dto.InvoiceWriteOff, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(projectID uint) (int64, error)
 }
 
 func (service *invoiceWriteOffService) GetAll() ([]model.InvoiceWriteOff, error) {
@@ -71,24 +71,11 @@ func (service *invoiceWriteOffService) GetPaginated(page, limit int, data model.
 	}
 
 	for _, invoiceWriteOff := range invoiceWriteOffs {
-		operatorAdd, err := service.workerRepo.GetByID(invoiceWriteOff.OperatorAddWorkerID)
-		if err != nil {
-			return []dto.InvoiceWriteOffPaginated{}, err
-		}
-
-		operatorEdit, err := service.workerRepo.GetByID(invoiceWriteOff.OperatorEditWorkerID)
-		if err != nil {
-			return []dto.InvoiceWriteOffPaginated{}, err
-		}
 
 		one := dto.InvoiceWriteOffPaginated{
-			DateOfAdd:        invoiceWriteOff.DateOfAdd,
-			DateOfEdit:       invoiceWriteOff.DateOfEdit,
 			DateOfInvoice:    invoiceWriteOff.DateOfInvoice,
 			ID:               invoiceWriteOff.ID,
 			Notes:            invoiceWriteOff.Notes,
-			OperatorAddName:  operatorAdd.Name,
-			OperatorEditName: operatorEdit.Name,
 			DeliveryCode:     invoiceWriteOff.DeliveryCode,
 			WriteOffType:     invoiceWriteOff.WriteOffType,
 		}
@@ -99,13 +86,14 @@ func (service *invoiceWriteOffService) GetPaginated(page, limit int, data model.
 }
 
 func (service *invoiceWriteOffService) Create(data dto.InvoiceWriteOff) (dto.InvoiceWriteOff, error) {
-	invoiceWriteOff, err := service.invoiceWriteOffRepo.Create(data.Details)
-	if err != nil {
-		return dto.InvoiceWriteOff{}, err
-	}
+  
+  count, err := service.invoiceWriteOffRepo.Count(data.Details.ProjectID)
+  if err != nil {
+    return dto.InvoiceWriteOff{}, err
+  }
 
-	invoiceWriteOff.DeliveryCode = utils.UniqueCodeGeneration("C", invoiceWriteOff.ID)
-	invoiceWriteOff, err = service.invoiceWriteOffRepo.Update(invoiceWriteOff)
+	data.Details.DeliveryCode = utils.UniqueCodeGeneration("С", count, data.Details.ProjectID)
+  invoiceWriteOff, err := service.invoiceWriteOffRepo.Create(data.Details)
 	if err != nil {
 		return dto.InvoiceWriteOff{}, err
 	}
@@ -603,6 +591,6 @@ func (service *invoiceWriteOffService) Delete(id uint) error {
 	return service.invoiceWriteOffRepo.Delete(id)
 }
 
-func (service *invoiceWriteOffService) Count() (int64, error) {
-	return service.invoiceWriteOffRepo.Count()
+func (service *invoiceWriteOffService) Count(projectID uint) (int64, error) {
+	return service.invoiceWriteOffRepo.Count(projectID)
 }

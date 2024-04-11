@@ -7,7 +7,6 @@ import (
 	"backend-v2/pkg/utils"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -109,16 +108,6 @@ func (service *invoiceOutputService) GetPaginated(page, limit int, data model.In
 			return []dto.InvoiceOutputPaginated{}, err
 		}
 
-		operatorAdd, err := service.workerRepo.GetByID(invoiceOutput.OperatorAddWorkerID)
-		if err != nil {
-			return []dto.InvoiceOutputPaginated{}, err
-		}
-
-		operatorEdit, err := service.workerRepo.GetByID(invoiceOutput.OperatorEditWorkerID)
-		if err != nil {
-			return []dto.InvoiceOutputPaginated{}, err
-		}
-
 		team, err := service.teamRepo.GetByID(invoiceOutput.TeamID)
 		if err != nil {
 			return []dto.InvoiceOutputPaginated{}, err
@@ -139,15 +128,11 @@ func (service *invoiceOutputService) GetPaginated(page, limit int, data model.In
 			WarehouseManagerName: warehouseManager.Name,
 			ReceivedName:         released.Name,
 			RecipientName:        recipient.Name,
-			OperatorAddName:      operatorAdd.Name,
-			OperatorEditName:     operatorEdit.Name,
 			TeamName:             team.Number,
 			ObjectName:           object.Name,
 			DeliveryCode:         invoiceOutput.DeliveryCode,
 			Notes:                invoiceOutput.Notes,
 			DateOfInvoice:        invoiceOutput.DateOfInvoice,
-			DateOfAdd:            invoiceOutput.DateOfAdd,
-			DateOfEdit:           invoiceOutput.DateOfEdit,
 			DistrictName:         district.Name,
 			Confirmation:         invoiceOutput.Confirmation,
 		})
@@ -157,16 +142,17 @@ func (service *invoiceOutputService) GetPaginated(page, limit int, data model.In
 }
 
 func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.InvoiceOutput, error) {
-	data.Details.DateOfAdd = time.Now()
+	count, err := service.invoiceOutputRepo.Count(data.Details.ProjectID)
+	if err != nil {
+		return dto.InvoiceOutput{}, err
+	}
+
+	data.Details.DeliveryCode = utils.UniqueCodeGeneration("О", count, data.Details.ProjectID)
 	invoiceOutput, err := service.invoiceOutputRepo.Create(data.Details)
 	if err != nil {
 		return dto.InvoiceOutput{}, err
 	}
-	invoiceOutput.DeliveryCode = utils.UniqueCodeGeneration("О", invoiceOutput.ID)
-	invoiceOutput, err = service.invoiceOutputRepo.Update(invoiceOutput)
-	if err != nil {
-		return dto.InvoiceOutput{}, err
-	}
+
 	data.Details = invoiceOutput
 
 	for _, invoiceMaterial := range data.Items {
@@ -229,7 +215,11 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 				return dto.InvoiceOutput{}, err
 			}
 
-			invoiceMaterial, err := service.invoiceMaterialRepo.GetByMaterialCostID(serialNumber.MaterialCostID, "output", invoiceOutput.ID)
+			invoiceMaterial, err := service.invoiceMaterialRepo.GetByMaterialCostID(
+				serialNumber.MaterialCostID,
+				"output",
+				invoiceOutput.ID,
+			)
 			if err != nil {
 				return dto.InvoiceOutput{}, err
 			}
@@ -427,7 +417,6 @@ func (service *invoiceOutputService) ConfirmByObject(id uint) error {
 		return err
 	}
 
-	invoiceOutput.ObjectConfirmation = true
 	invoiceOutput, err = service.invoiceOutputRepo.Update(invoiceOutput)
 	if err != nil {
 		return err

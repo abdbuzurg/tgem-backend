@@ -1,8 +1,27 @@
 package dto
 
-import "backend-v2/model"
-
 type ObjectPaginated struct {
-	model.Object   `json:"object"`
-	SupervisorName string `json:"supervisorName"`
+	ID          uint     `json:"id"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type" gorm:"tinyText"`
+	Status      string   `json:"status"`
+	Supervisors []string `json:"supervisors"`
+}
+
+type ObjectCreate struct {
+	Type   string `json:"type" gorm:"tinyText"`
+	Name   string `json:"name" gorm:"tinyText"`
+	Status string `json:"status" gorm:"tinyText"`
+
+	Model          string  `json:"model" gorm:"tinyText"`
+	AmountStores   uint    `json:"amountStores"`
+	AmountEntraces uint    `json:"amountEntraces"`
+	HasBasement    bool    `json:"hasBasement"`
+	VoltageClass   string  `json:"voltageClass" gorm:"tinyText"`
+	Nourashes      string  `json:"nourashes" gorm:"tinyText"`
+	TTCoefficient  string  `json:"ttCoefficient" gorm:"tinyText"`
+	AmountFeeders  uint    `json:"amountFeeders"`
+	Length         float64 `json:"length"`
+
+  Supervisors []uint `json:"supervisors"`
 }

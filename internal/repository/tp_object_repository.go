@@ -43,10 +43,10 @@ func (repo *tpObjectRepository) GetPaginatedFiltered(page, limit int, filter mod
 	data := []model.TP_Object{}
 	err := repo.db.
 		Raw(`SELECT * FROM tp_objects WHERE
-			(nullif(?, '') IS NULL OR type = ?) AND
+			(nullif(?, '') IS NULL OR model = ?) AND
 			(nullif(?, '') IS NULL OR voltage_class = ?) AND
 			(nullif(?, '') IS NULL OR nourashes = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.Type, filter.Type, filter.VoltageClass, filter.VoltageClass, filter.Nourashes, filter.Nourashes, limit, (page-1)*limit,
+			filter.Model, filter.Model, filter.VoltageClass, filter.VoltageClass, filter.Nourashes, filter.Nourashes, limit, (page-1)*limit,
 		).
 		Scan(&data).Error
 

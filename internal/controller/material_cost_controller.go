@@ -28,6 +28,7 @@ type IMaterialCostController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+GetAllMaterialCostByMaterialID(c *gin.Context) 
 }
 
 func (controller *materialCostController) GetAll(c *gin.Context) {
@@ -119,6 +120,23 @@ func (controller *materialCostController) GetByID(c *gin.Context) {
 	data, err := controller.materialCostService.GetByID(uint(id))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the data with ID(%d): %v", id, err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *materialCostController) GetAllMaterialCostByMaterialID(c *gin.Context) {
+	materialIDRaw := c.Param("materialID")
+	materialID, err := strconv.ParseUint(materialIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	data, err := controller.materialCostService.GetByMaterialID(uint(materialID))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return
 	}
 

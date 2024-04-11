@@ -9,13 +9,9 @@ type InvoiceReturnPaginated struct {
 	ID               uint      `json:"id"`
 	DeliveryCode     string    `json:"deliveryCode"`
 	ProjectName      string    `json:"projectName"`
-	OperatorAddName  string    `json:"operatorAddName"`
-	OperatorEditName string    `json:"operatorEditName"`
 	ReturnerType     string    `json:"returnerType"`
 	ReturnerName     string    `json:"returnerName"`
 	DateOfInvoice    time.Time `json:"dateOfInvoice"`
-	DateOfAdd        time.Time `json:"dateOfAdd"`
-	DateOfEdit       time.Time `json:"dateOfEdit"`
 	Notes            string    `json:"notes"`
 	Confirmation     bool      `json:"confirmation"`
 }

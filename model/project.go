@@ -16,6 +16,13 @@ type Project struct {
 	DateStart            time.Time       `json:"dateStart"`
 	DateEnd              time.Time       `json:"dateEnd"`
 
-	MaterialsForProject []MaterialForProject `json:"-" gorm:"foreignKey:ProjectID"`
-	Invoices            []Invoice            `json:"-" gorm:"foreignKey:ProjectID"`
+	UserActions       []UserAction       `json:"-" gorm:"foreignKey:ProjectID"`
+	UserInProjects    []UserInProject    `json:"-" gorm:"foreignKey:ProjectID"`
+	Materials         []Material         `json:"-" gorm:"foreignKey:ProjectID"`
+	MaterialLocations []MaterialLocation `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceInputs     []InvoiceInput     `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceOutputs    []InvoiceOutput    `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceReturns    []InvoiceReturn    `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceObject     []InvoiceObject    `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceWriteOffs  []InvoiceWriteOff  `json:"-" gorm:"foreignKey:ProjectID"`
 }

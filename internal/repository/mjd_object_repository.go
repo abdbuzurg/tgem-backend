@@ -47,7 +47,7 @@ func (repo *mjdObjectRepository) GetPaginatedFiltered(page, limit int, filter mo
 			(nullif(?, '') IS NULL OR amount_stores = ?) AND
 			(nullif(?, '') IS NULL OR amount_entrances = ?) AND
 			(nullif(?, '') IS NULL OR has_basement = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.Type, filter.Type, filter.AmountStores, filter.AmountStores, filter.AmountEntraces, filter.HasBasement, filter.HasBasement, limit, (page-1)*limit,
+			filter.Model, filter.Model, filter.AmountStores, filter.AmountStores, filter.AmountEntraces, filter.HasBasement, filter.HasBasement, limit, (page-1)*limit,
 		).
 		Scan(&data).Error
 

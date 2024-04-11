@@ -7,7 +7,6 @@ import (
 	"backend-v2/pkg/utils"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -86,27 +85,13 @@ func (service *invoiceInputService) GetPaginated(page, limit int, data model.Inv
 			return []dto.InvoiceInputPaginated{}, err
 		}
 
-		operatorAdd, err := service.workerRepo.GetByID(invoiceInput.OperatorAddWorkerID)
-		if err != nil {
-			return []dto.InvoiceInputPaginated{}, err
-		}
-
-		operatorEdit, err := service.workerRepo.GetByID(invoiceInput.OperatorEditWorkerID)
-		if err != nil {
-			return []dto.InvoiceInputPaginated{}, err
-		}
-
 		result = append(result, dto.InvoiceInputPaginated{
 			ID:                   invoiceInput.ID,
 			WarehouseManagerName: warehouseManager.Name,
 			ReleasedName:         released.Name,
-			OperatorAddName:      operatorAdd.Name,
-			OperatorEditName:     operatorEdit.Name,
 			DeliveryCode:         invoiceInput.DeliveryCode,
 			Notes:                invoiceInput.Notes,
 			DateOfInvoice:        invoiceInput.DateOfInvoice,
-			DateOfAdd:            invoiceInput.DateOfAdd,
-			DateOfEdit:           invoiceInput.DateOfEdit,
 			Confirmation:         invoiceInput.Confirmed,
 		})
 	}
@@ -119,23 +104,26 @@ func (service *invoiceInputService) GetByID(id uint) (model.InvoiceInput, error)
 }
 
 func (service *invoiceInputService) Create(data dto.InvoiceInput) (dto.InvoiceInput, error) {
-	data.Details.DateOfAdd = time.Now()
+
+	count, err := service.invoiceInputRepo.Count(data.Details.ProjectID)
+	if err != nil {
+		return dto.InvoiceInput{}, err
+	}
+
+	code := utils.UniqueCodeGeneration("П", count, data.Details.ProjectID)
+	data.Details.DeliveryCode = code
+
 	invoiceInput, err := service.invoiceInputRepo.Create(data.Details)
 	if err != nil {
 		return dto.InvoiceInput{}, err
 	}
-	invoiceInput.DeliveryCode = utils.UniqueCodeGeneration("П", invoiceInput.ID)
-	invoiceInput, err = service.invoiceInputRepo.Update(invoiceInput)
-	if err != nil {
-		return dto.InvoiceInput{}, err
-	}
-	data.Details = invoiceInput
+  data.Details = invoiceInput
 
 	for _, item := range data.Items {
 		invoiceMaterial, err := service.invoiceMaterialRepo.Create(model.InvoiceMaterials{
 			MaterialCostID: item.MaterialData.MaterialCostID,
 			InvoiceID:      invoiceInput.ID,
-			IsDefected:     false,
+			IsDefected:     item.MaterialData.IsDefected,
 			InvoiceType:    item.MaterialData.InvoiceType,
 			Amount:         item.MaterialData.Amount,
 			Notes:          item.MaterialData.Notes,

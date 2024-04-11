@@ -81,24 +81,10 @@ func (service *invoiceReturnService) GetPaginated(page, limit int, data model.In
 	}
 
 	for _, invoiceReturn := range invoiceReturns {
-		operatorAdd, err := service.workerRepo.GetByID(invoiceReturn.OperatorAddWorkerID)
-		if err != nil {
-			return []dto.InvoiceReturnPaginated{}, err
-		}
-
-		operatorEdit, err := service.workerRepo.GetByID(invoiceReturn.OperatorEditWorkerID)
-		if err != nil {
-			return []dto.InvoiceReturnPaginated{}, err
-		}
-
 		one := dto.InvoiceReturnPaginated{
-			DateOfAdd:        invoiceReturn.DateOfAdd,
-			DateOfEdit:       invoiceReturn.DateOfEdit,
 			DateOfInvoice:    invoiceReturn.DateOfInvoice,
 			ID:               invoiceReturn.ID,
 			Notes:            invoiceReturn.Notes,
-			OperatorAddName:  operatorAdd.Name,
-			OperatorEditName: operatorEdit.Name,
 			DeliveryCode:     invoiceReturn.DeliveryCode,
 			ProjectName:      "",
 			Confirmation:     invoiceReturn.Confirmation,
@@ -127,16 +113,19 @@ func (service *invoiceReturnService) GetPaginated(page, limit int, data model.In
 }
 
 func (service *invoiceReturnService) Create(data dto.InvoiceReturn) (dto.InvoiceReturn, error) {
+  
+  count, err := service.invoiceReturnRepo.Count(data.Details.ProjectID)
+  if err != nil {
+    return dto.InvoiceReturn{}, err
+  }
+  
+  data.Details.DeliveryCode = utils.UniqueCodeGeneration("В", count, data.Details.ProjectID)
 	invoiceReturn, err := service.invoiceReturnRepo.Create(data.Details)
 	if err != nil {
 		return dto.InvoiceReturn{}, err
 	}
-	deliveryCode := utils.UniqueCodeGeneration("В", invoiceReturn.ID)
-	invoiceReturn.DeliveryCode = deliveryCode
-	invoiceReturn, err = service.invoiceReturnRepo.Update(invoiceReturn)
-	if err != nil {
-		return data, nil
-	}
+
+  data.Details = invoiceReturn
 
 	for _, invoiceMaterial := range data.Items {
 		_, err = service.invoiceMaterialsRepo.Create(model.InvoiceMaterials{

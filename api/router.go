@@ -24,94 +24,234 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		AllowHeaders:     []string{"Origin, Content-Type, Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
+		AllowFiles:       true,
 		MaxAge:           12 * time.Hour,
 	}))
 
 	//Initialization of Repositories
+	invoiceInputRepo := repository.InitInvoiceInputRepository(db)
+	invoiceOutputRepo := repository.InitInvoiceOutputRepository(db)
+	invoiceReturnRepo := repository.InitInvoiceReturnRepository(db)
 	invoiceMaterialRepo := repository.InitInvoiceMaterialsRepository(db)
-	invoiceRepo := repository.InitInvoiceRepository(db)
-	// kl04kvObjectRepo := repository.InitKL04KVObjectRepository(db)
+	kl04kvObjectRepo := repository.InitKL04KVObjectRepository(db)
 	materialCostRepo := repository.InitMaterialCostRepository(db)
-	// materialForProjectRepo := repository.InitMaterialForProjectRepository(db)
 	materialLocationRepo := repository.InitMaterialLocationRepository(db)
 	materialRepo := repository.InitMaterialRepository(db)
-	// mjdObjectRepo := repository.InitMJDObjectRepository(db)
+	mjdObjectRepo := repository.InitMJDObjectRepository(db)
 	// objectOperationRepo := repository.InitObjectOperationRepository(db)
 	objectRepo := repository.InitObjectRepository(db)
 	// operationRepo := repository.InitOperationRepository(db)
 	projectRepo := repository.InitProjectRepository(db)
-	// sipObjectRepo := repository.InitSIPObjectRepository(db)
-	// stvtObjectRepo := repository.InitSTVTObjectRepository(db)
+	sipObjectRepo := repository.InitSIPObjectRepository(db)
+	stvtObjectRepo := repository.InitSTVTObjectRepository(db)
 	teamRepo := repository.InitTeamRepostory(db)
-	// tpObjectRepo := repository.InitTPObjectRepository(db)
+	tpObjectRepo := repository.InitTPObjectRepository(db)
 	userRepo := repository.InitUserRepository(db)
+	userInProjects := repository.InitUserInProjectRepository(db)
 	workerRepo := repository.InitWorkerRepository(db)
+	serialNumberRepo := repository.InitSerialNumberRepository(db)
+	districtRepo := repository.InitDistrictRepository(db)
+	permissionRepo := repository.InitPermissionRepository(db)
+	roleRepo := repository.InitRoleRepository(db)
+  materialDefect := repository.InitMaterialDefectRepository(db)
+  userActionRepo := repository.InitUserActionRepository(db)
+  supervisorObjectsRepo := repository.InitSupervisorObjectsRepository(db)
 
 	//Initialization of Services
-	// invoiceMaterialsService := service.InitInvoiceMaterialsService(invoiceMaterialRepo)
-	invoiceService := service.InitInvoiceService(
-		projectRepo,
-		invoiceRepo,
+	invoiceInputService := service.InitInvoiceInputService(
+		invoiceInputRepo,
 		invoiceMaterialRepo,
+		materialLocationRepo,
+		workerRepo,
+		materialCostRepo,
+		materialRepo,
+		serialNumberRepo,
+	)
+	invoiceOutputService := service.InitInvoiceOutputService(
+		invoiceOutputRepo,
+		invoiceMaterialRepo,
+		workerRepo,
+		teamRepo,
 		objectRepo,
 		materialCostRepo,
 		materialLocationRepo,
 		materialRepo,
-		workerRepo,
-		teamRepo,
+		districtRepo,
+		serialNumberRepo,
 	)
+	invoiceReturnService := service.InitInvoiceReturnService(
+		invoiceReturnRepo,
+		workerRepo,
+		objectRepo,
+		teamRepo,
+		materialLocationRepo,
+		invoiceMaterialRepo,
+		materialRepo,
+		materialCostRepo,
+	)
+	// invoiceMaterialsService := service.InitInvoiceMaterialsService(invoiceMaterialRepo)
 	// kl04kvObjectService := service.InitKL04KVObjectService(kl04kvObjectRepo)
-	// materialCostService := service.InitMaterialCostService(materialCostRepo)
+	materialCostService := service.InitMaterialCostService(materialCostRepo)
 	// materialForProjectService := service.InitMaterialForProjectService(materialForProjectRepo)
-	// materialLocationService := service.InitMaterialLocationService(materialLocationRepo)
+	materialLocationService := service.InitMaterialLocationService(
+		materialLocationRepo,
+		materialCostRepo,
+		materialRepo,
+    teamRepo,
+    objectRepo,
+	  materialDefect,
+  )
+
 	materialService := service.InitMaterialService(materialRepo)
 	// mjdObjectService := service.InitMJDObjectService(mjdObjectRepo)
 	// objectOperationService := service.InitObjectOperationService(objectOperationRepo)
-	objectService := service.InitObjectService(objectRepo)
+	objectService := service.InitObjectService(
+    objectRepo, 
+    supervisorObjectsRepo,
+    kl04kvObjectRepo,
+		mjdObjectRepo,
+		sipObjectRepo,
+		stvtObjectRepo,
+		tpObjectRepo,
+  )
 	// operationService := service.InitOperationService(operationRepo)
-	// projectService := service.InitProjectService(projectRepo)
+	projectService := service.InitProjectService(projectRepo)
 	// sipObjectService := service.InitSIPObjectService(sipObjectRepo)
 	// stvtObjectService := service.InitSTVTObjectService(stvtObjectRepo)
 	teamService := service.InitTeamService(teamRepo)
 	// tpObjctService := service.InitTPObjectService(tpObjectRepo)
-	userService := service.InitUserService(userRepo)
+	userService := service.InitUserService(
+		userRepo,
+		userInProjects,
+		workerRepo,
+		roleRepo,
+    userInProjects,
+	)
 	workerService := service.InitWorkerService(workerRepo)
+	districtService := service.InitDistrictService(districtRepo)
+	permissionService := service.InitPermissionService(
+		permissionRepo,
+		roleRepo,
+	)
+	roleService := service.InitRoleService(roleRepo)
+  userActionService := service.InitUserActionService(userActionRepo, userRepo)
 
 	//Initialization of Controllers
-	invoiceController := controller.InitInvoiceController(invoiceService)
+	invoiceInputController := controller.InitInvoiceInputController(invoiceInputService, userActionService)
+	invoiceOutputController := controller.InitInvoiceOutputController(invoiceOutputService)
+	invoiceReturnController := controller.InitInvoiceReturnController(invoiceReturnService)
 	// invoiceMaterialController := controller.InitInvoiceMaterialsController(invoiceMaterialsService)
 	materialController := controller.InitMaterialController(materialService)
-	// materialCostController := controller.InitMaterialCostController(materialCostService)
+	materialCostController := controller.InitMaterialCostController(materialCostService)
 	// materialForProjectController := controller.InitMaterialForProjectController(materialForProjectService)
-	// materialLocationController := controller.InitMaterialLocationController(materialLocationService)
+	materialLocationController := controller.InitMaterialLocationController(materialLocationService)
 	objectController := controller.InitObjectController(objectService)
 	// objectOperationController := controller.InitObjectOperationController(objectOperationService)
 	// operationController := controller.InitOperationController(operationService)
-	// projectController := controller.InitProjectController(projectService)
+	projectController := controller.InitProjectController(projectService)
 	teamController := controller.InitTeamController(teamService)
 	userController := controller.InitUserController(userService)
 	workerController := controller.InitWorkerController(workerService)
+	districtController := controller.InitDistrictController(districtService, userActionService)
+	permissionController := controller.InitPermissionController(permissionService)
+	roleController := controller.InitRoleController(roleService)
 
 	//Initialization of Routes
-	InitInvoiceRoutes(router, invoiceController)
+	InitInvoiceInputRoutes(router, invoiceInputController, db)
+	InitInvoiceOutputRoutes(router, invoiceOutputController)
+	InitInvoiceReturnRoutes(router, invoiceReturnController, db)
+	InitProjectRoutes(router, projectController)
 	InitMaterialRoutes(router, materialController)
+	InitMaterialLocationRoutes(router, materialLocationController)
 	InitTeamRoutes(router, teamController)
 	InitObjectRoutes(router, objectController)
 	InitWorkerRoutes(router, workerController)
 	InitUserRoutes(router, userController)
+	InitDistrictRoutes(router, districtController)
+	InitMaterialCostRoutes(router, materialCostController)
+	InitPermissionRoutes(router, permissionController)
+	InitRoleRoutes(router, roleController)
 
 	return router
 
 }
 
-func InitInvoiceRoutes(router *gin.Engine, controller controller.IInvoiceController) {
-	invoiceRoutes := router.Group("/invoice")
-	invoiceRoutes.GET("/:invoiceType/all", controller.GetAll)
-	invoiceRoutes.GET("/:invoiceType/paginated", controller.GetPaginated)
-	invoiceRoutes.GET("/:invoiceType/:id", controller.GetByID)
-	invoiceRoutes.POST("/", controller.Create)
-	invoiceRoutes.PATCH("/", controller.Update)
-	invoiceRoutes.DELETE("/:id", controller.Delete)
+func InitInvoiceReturnRoutes(router *gin.Engine, controller controller.IInvoiceReturnController, db *gorm.DB) {
+	invoiceReturnRoutes := router.Group("/return")
+	invoiceReturnRoutes.Use(
+    middleware.Authentication(),
+    middleware.Permission(db),
+  )
+	invoiceReturnRoutes.GET("/paginated", controller.GetPaginated)
+	invoiceReturnRoutes.GET("/unique/code", controller.UniqueCode)
+	invoiceReturnRoutes.GET("/unique/team", controller.UniqueTeam)
+	invoiceReturnRoutes.GET("/unique/object", controller.UniqueObject)
+  invoiceReturnRoutes.GET("/document/:deliveryCode", controller.GetDocument)
+  invoiceReturnRoutes.POST("/confirm/:id", controller.Confirmation)
+	invoiceReturnRoutes.POST("/", controller.Create)
+  invoiceReturnRoutes.POST("/report", controller.Report)
+	invoiceReturnRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitInvoiceOutputRoutes(router *gin.Engine, controller controller.IInvoiceOutputController) {
+	invoiceOutputRoutes := router.Group("/output")
+	invoiceOutputRoutes.Use(middleware.Authentication())
+	invoiceOutputRoutes.GET("/paginated", controller.GetPaginated)
+	invoiceOutputRoutes.GET("/unique/district", controller.UniqueDistrict)
+	invoiceOutputRoutes.GET("/unique/code", controller.UniqueCode)
+	invoiceOutputRoutes.GET("/unique/recieved", controller.UniqueRecieved)
+	invoiceOutputRoutes.GET("/unique/warehouse-manager", controller.UniqueRecieved)
+	invoiceOutputRoutes.GET("/unique/object", controller.UniqueObject)
+	invoiceOutputRoutes.GET("/unique/team", controller.UniqueTeam)
+  invoiceOutputRoutes.GET("/document/:deliveryCode", controller.GetDocument)
+  invoiceOutputRoutes.POST("/report", controller.Report)
+  invoiceOutputRoutes.POST("/confirm/:id", controller.Confirmation)
+	invoiceOutputRoutes.POST("/", controller.Create)
+	invoiceOutputRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitInvoiceInputRoutes(router *gin.Engine, controller controller.IInvoiceInputController, db *gorm.DB) {
+	invoiceInputRoutes := router.Group("/input")
+	invoiceInputRoutes.Use(
+    middleware.Authentication(),
+    middleware.Permission(db),
+  )
+
+	invoiceInputRoutes.GET("/paginated", controller.GetPaginated)
+	invoiceInputRoutes.GET("/unique/code", controller.UniqueCode)
+	invoiceInputRoutes.GET("/unique/warehouse-manager", controller.UniqueWarehouseManager)
+	invoiceInputRoutes.GET("/unique/released", controller.UniqueReleased)
+  invoiceInputRoutes.GET("/document/:deliveryCode")
+	invoiceInputRoutes.POST("/", controller.Create)
+  invoiceInputRoutes.POST("/report", controller.Report)
+  invoiceInputRoutes.POST("/confirm/:id", controller.Confirmation)
+	invoiceInputRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitProjectRoutes(router *gin.Engine, controller controller.IProjectController) {
+	projectRoutes := router.Group("/project")
+	projectRoutes.GET("/all", controller.GetAll)
+}
+
+func InitMaterialLocationRoutes(router *gin.Engine, controller controller.IMaterialLocationController) {
+	materialLocationRoutes := router.Group("/material-location")
+	materialLocationRoutes.Use(middleware.Authentication())
+	materialLocationRoutes.GET("/total-amount/:materialID", controller.GetTotalAmountByMaterialID)
+	materialLocationRoutes.GET("/available/:locationType/:locationID", controller.GetMaterialInLocation)
+  materialLocationRoutes.GET("/unique/team", controller.UniqueTeams)
+  materialLocationRoutes.GET("/unique/object", controller.UniqueObjects)
+  materialLocationRoutes.POST("/report/balance", controller.ReportBalance)
+}
+
+func InitMaterialCostRoutes(router *gin.Engine, controller controller.IMaterialCostController) {
+	materialCostRoutes := router.Group("/material-cost")
+	materialCostRoutes.Use(middleware.Authentication())
+	materialCostRoutes.GET("/paginated", controller.GetPaginated)
+	materialCostRoutes.GET("/material-id/:materialID", controller.GetAllMaterialCostByMaterialID)
+	materialCostRoutes.POST("/", controller.Create)
+	materialCostRoutes.PATCH("/", controller.Update)
+	materialCostRoutes.DELETE("/:id", controller.Delete)
+
 }
 
 func InitMaterialRoutes(router *gin.Engine, controller controller.IMaterialController) {
@@ -122,6 +262,12 @@ func InitMaterialRoutes(router *gin.Engine, controller controller.IMaterialContr
 	materialRoutes.POST("/", controller.Create)
 	materialRoutes.PATCH("/", controller.Update)
 	materialRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitDistrictRoutes(router *gin.Engine, controller controller.IDistictController) {
+	districtRoutes := router.Group("/district")
+	districtRoutes.Use(middleware.Authentication())
+	districtRoutes.GET("/all", controller.GetAll)
 }
 
 func InitTeamRoutes(router *gin.Engine, controller controller.ITeamController) {
@@ -157,13 +303,36 @@ func InitWorkerRoutes(router *gin.Engine, controller controller.IWorkerControlle
 
 func InitUserRoutes(router *gin.Engine, controller controller.IUserController) {
 	userRoutes := router.Group("/user")
+	// userRoutes.Use(middleware.)
 	userRoutes.GET("/all", controller.GetAll)
 	userRoutes.GET("/:id", controller.GetByID)
 	userRoutes.GET("/paginated", controller.GetPaginated)
 	userRoutes.GET("/is-authenticated", controller.IsAuthenticated)
-	userRoutes.GET("/permissions", middleware.Authentication(), controller.GetPermissions)
 	userRoutes.POST("/", controller.Create)
 	userRoutes.POST("/login", controller.Login)
 	userRoutes.PATCH("/", controller.Update)
 	userRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitPermissionRoutes(router *gin.Engine, controller controller.IPermissionController) {
+	permissionRoutes := router.Group("/permission")
+	permissionRoutes.Use(middleware.Authentication())
+
+	permissionRoutes.GET("/all", controller.GetAll)
+	permissionRoutes.GET("/role/name/:roleName", controller.GetByRoleName)
+  permissionRoutes.GET("/role/url/:resourceURL", controller.GetByResourceURL)
+	permissionRoutes.POST("/", controller.Create)
+	permissionRoutes.POST("/batch", controller.CreateBatch)
+	permissionRoutes.PATCH("/", controller.Update)
+	permissionRoutes.DELETE("/:id", controller.Delete)
+}
+
+func InitRoleRoutes(router *gin.Engine, controller controller.IRoleController) {
+	roleRoutes := router.Group("/role")
+	roleRoutes.Use(middleware.Authentication())
+
+	roleRoutes.GET("/all", controller.GetAll)
+	roleRoutes.POST("/", controller.Create)
+	roleRoutes.PATCH("/", controller.Update)
+	roleRoutes.DELETE("/:id", controller.Delete)
 }

@@ -61,26 +61,6 @@ func (controller *invoiceReturnController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	operatorAddWorkerIDStr := c.DefaultQuery("operatorAddWorkerID", "")
-	operatorAddWorkerID := 0
-	if operatorAddWorkerIDStr != "" {
-		operatorAddWorkerID, err = strconv.Atoi(operatorAddWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode operatorAddWorkerID parameter: %v", err))
-			return
-		}
-	}
-
-	operatorEditWorkerIDStr := c.DefaultQuery("operatorEditWorkerID", "")
-	operatorEditWorkerID := 0
-	if operatorEditWorkerIDStr != "" {
-		operatorEditWorkerID, err = strconv.Atoi(operatorEditWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode operatorEditWorkerID parameter: %v", err))
-			return
-		}
-	}
-
 	returnerIDStr := c.DefaultQuery("returnerID", "")
 	returnerID := 0
 	if returnerIDStr != "" {
@@ -110,8 +90,6 @@ func (controller *invoiceReturnController) GetPaginated(c *gin.Context) {
 		ProjectID:            projectID,
 		ReturnerType:         returnerType,
 		ReturnerID:           uint(returnerID),
-		OperatorAddWorkerID:  uint(operatorAddWorkerID),
-		OperatorEditWorkerID: uint(operatorEditWorkerID),
 		DeliveryCode:         deliveryCode,
 	}
 
@@ -136,11 +114,6 @@ func (controller *invoiceReturnController) Create(c *gin.Context) {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
 	}
-
-	workerID := c.GetUint("workerID")
-	fmt.Println(workerID)
-	createData.Details.OperatorAddWorkerID = workerID
-	createData.Details.OperatorEditWorkerID = workerID
 
 	data, err := controller.invoiceReturnService.Create(createData)
 	if err != nil {

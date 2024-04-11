@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
@@ -22,17 +23,23 @@ func InitMaterialLocationController(materialLocationService service.IMaterialLoc
 }
 
 type IMaterialLocationController interface {
+	GetTotalAmountByMaterialID(c *gin.Context)
 	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	GetByID(c *gin.Context)
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	GetMaterialInLocation(c *gin.Context)
+	UniqueObjects(c *gin.Context)
+	UniqueTeams(c *gin.Context)
+  ReportBalance(c *gin.Context)
 }
 
 func (controller *materialLocationController) GetAll(c *gin.Context) {
 	data, err := controller.materialLocationService.GetAll()
 	if err != nil {
+
 		response.ResponseError(c, fmt.Sprintf("Could not get MaterialLocation data: %v", err))
 		return
 	}
@@ -83,10 +90,6 @@ func (controller *materialLocationController) GetPaginated(c *gin.Context) {
 	}
 
 	amountStr := c.DefaultQuery("amount", "")
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for amount: %v", err))
-		return
-	}
 	var amount float64
 	if amountStr != "" {
 		amount, err = strconv.ParseFloat(amountStr, 64)
@@ -153,6 +156,25 @@ func (controller *materialLocationController) Create(c *gin.Context) {
 	response.ResponseSuccess(c, data)
 }
 
+func (controller *materialLocationController) GetTotalAmountByMaterialID(c *gin.Context) {
+
+	materilIDRaw := c.Param("materialID")
+	materialID, err := strconv.ParseUint(materilIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	totalAmount, err := controller.materialLocationService.GetTotalAmountByMaterialID(uint(materialID))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error"))
+		return
+	}
+
+	response.ResponseSuccess(c, totalAmount)
+
+}
+
 func (controller *materialLocationController) Update(c *gin.Context) {
 	var updateData model.MaterialLocation
 	if err := c.ShouldBindJSON(&updateData); err != nil {
@@ -184,4 +206,65 @@ func (controller *materialLocationController) Delete(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, "deleted")
+}
+
+func (controller *materialLocationController) GetMaterialInLocation(c *gin.Context) {
+
+	locationType := c.Param("locationType")
+
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.ParseUint(locationIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid Query parameters: %v", err))
+		return
+	}
+
+	data, err := controller.materialLocationService.GetMaterialsInLocation(locationType, uint(locationID))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *materialLocationController) UniqueTeams(c *gin.Context) {
+
+	data, err := controller.materialLocationService.UniqueTeams()
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
+}
+
+func (controller *materialLocationController) UniqueObjects(c *gin.Context) {
+
+	data, err := controller.materialLocationService.UniqueObjects()
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
+}
+
+func (controller *materialLocationController) ReportBalance(c *gin.Context) {
+
+  var data dto.ReportBalanceFilterRequest
+  if err := c.ShouldBindJSON(&data); err != nil {
+    response.ResponseError(c, fmt.Sprintf("Invalid body request: %v", err))
+    return
+  }
+
+  fileName, err := controller.materialLocationService.BalanceReport(data)
+  if err != nil {
+    response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+    return
+  }
+
+	c.FileAttachment("./pkg/excels/report/"+fileName, fileName)
 }

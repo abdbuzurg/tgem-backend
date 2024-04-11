@@ -2,10 +2,7 @@ package repository
 
 import (
 	"backend-v2/model"
-	"fmt"
 
-	"github.com/casbin/casbin/v2"
-	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"gorm.io/gorm"
 )
 
@@ -29,7 +26,6 @@ type IUserRepository interface {
 	Delete(id uint) error
 	Count() (int64, error)
 	GetByUsername(username string) (model.User, error)
-	GetPermissions(userID uint) ([]model.CasbinRule, error)
 }
 
 func (repo *userRepository) GetAll() ([]model.User, error) {
@@ -49,9 +45,10 @@ func (repo *userRepository) GetPaginatedFiltered(page, limit int, filter model.U
 	err := repo.db.
 		Raw(`SELECT * FROM users WHERE
 			(nullif(?, '') IS NULL OR worker_id = ?) AND
-			(nullif(?, '') IS NULL OR username = ?) AND
-			(nullif(?, '') IS NULL OR password = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.WorkerID, filter.WorkerID, filter.Username, filter.Username, filter.Password, filter.Password, limit, (page-1)*limit,
+			(nullif(?, '') IS NULL OR username = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
+			filter.WorkerID, filter.WorkerID, 
+      filter.Username, filter.Username, 
+      limit, (page-1)*limit,
 		).
 		Scan(&data).Error
 
@@ -88,32 +85,4 @@ func (repo *userRepository) GetByUsername(username string) (model.User, error) {
 	var data model.User
 	err := repo.db.First(&data, "username = ?", username).Error
 	return data, err
-}
-
-func (repo *userRepository) GetPermissions(userID uint) ([]model.CasbinRule, error) {
-	result := []model.CasbinRule{}
-
-	a, err := gormadapter.NewAdapterByDB(repo.db)
-	if err != nil {
-		return result, fmt.Errorf("cannot get the gorm adapter for casbin: %v", err)
-	}
-	gormadapter.TurnOffAutoMigrate(repo.db)
-
-	e, err := casbin.NewEnforcer("./pkg/database/acl_model.conf", a)
-	if err != nil {
-		return result, fmt.Errorf("cannot initiate casbin-enforcer: %v", err)
-	}
-
-	allPolicies := e.GetPolicy()
-	userIDStr := fmt.Sprint(userID)
-	for _, policy := range allPolicies {
-		if policy[0] == userIDStr {
-			result = append(result, model.CasbinRule{
-				V0: policy[0],
-				V1: policy[1],
-				V2: policy[2],
-			})
-		}
-	}
-	return result, nil
 }

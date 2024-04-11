@@ -33,7 +33,6 @@ type IUserController interface {
 	Delete(c *gin.Context)
 	Login(c *gin.Context)
 	IsAuthenticated(c *gin.Context)
-	GetPermissions(c *gin.Context)
 }
 
 func (controller *userController) GetAll(c *gin.Context) {
@@ -116,19 +115,19 @@ func (controller *userController) GetByID(c *gin.Context) {
 }
 
 func (controller *userController) Create(c *gin.Context) {
-	var createData model.User
+	var createData dto.NewUserData
 	if err := c.ShouldBindJSON(&createData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
 	}
 
-	data, err := controller.userService.Create(createData)
+	err := controller.userService.Create(createData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could perform the creation of User: %v", err))
 		return
 	}
 
-	response.ResponseSuccess(c, data)
+	response.ResponseSuccess(c, true)
 }
 
 func (controller *userController) Update(c *gin.Context) {
@@ -207,16 +206,4 @@ func (controller *userController) IsAuthenticated(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, "authenticated")
-}
-
-func (controller *userController) GetPermissions(c *gin.Context) {
-	username := c.GetString("username")
-
-	userPermissions, err := controller.userService.GetPermissions(username)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Could not get user permissions: %v", err))
-		return
-	}
-
-	response.ResponseSuccess(c, userPermissions)
 }

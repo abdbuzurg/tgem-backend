@@ -56,26 +56,6 @@ func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	operatorAddWorkerIDStr := c.DefaultQuery("operatorAddWorkerID", "")
-	operatorAddWorkerID := 0
-	if operatorAddWorkerIDStr != "" {
-		operatorAddWorkerID, err = strconv.Atoi(operatorAddWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode operatorAddWorkerID parameter: %v", err))
-			return
-		}
-	}
-
-	operatorEditWorkerIDStr := c.DefaultQuery("operatorEditWorkerID", "")
-	operatorEditWorkerID := 0
-	if operatorEditWorkerIDStr != "" {
-		operatorEditWorkerID, err = strconv.Atoi(operatorEditWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode operatorEditWorkerID parameter: %v", err))
-			return
-		}
-	}
-
 	deliveryCode := c.DefaultQuery("deliveryCode", "")
 	deliveryCode, err = url.QueryUnescape(deliveryCode)
 	if err != nil {
@@ -90,10 +70,10 @@ func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
 		return
 	}
 
+  projectID := c.GetUint("projectID")
 	filter := model.InvoiceWriteOff{
+    ProjectID: projectID,
 		WriteOffType:         writeOffType,
-		OperatorAddWorkerID:  uint(operatorAddWorkerID),
-		OperatorEditWorkerID: uint(operatorEditWorkerID),
 		DeliveryCode:         deliveryCode,
 	}
 
@@ -103,7 +83,7 @@ func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	dataCount, err := controller.invoiceWriteOffService.Count()
+	dataCount, err := controller.invoiceWriteOffService.Count(projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the total amount of Invoice: %v", err))
 		return
@@ -118,11 +98,6 @@ func (controller *invoiceWriteOffController) Create(c *gin.Context) {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
 	}
-
-	workerID := c.GetUint("workerID")
-	fmt.Println(workerID)
-	createData.Details.OperatorAddWorkerID = workerID
-	createData.Details.OperatorEditWorkerID = workerID
 
 	data, err := controller.invoiceWriteOffService.Create(createData)
 	if err != nil {

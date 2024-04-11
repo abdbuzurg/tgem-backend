@@ -51,15 +51,11 @@ func (repo *invoiceReturnRepository) GetPaginatedFiltered(page, limit int, filte
 			project_id = ? AND
 			(nullif(?, '') IS NULL OR delivery_code = ?) AND
 			(nullif(?, '') IS NULL OR returner_type = ?) AND
-			(nullif(?, 0) IS NULL OR returner_id = ?) AND
-			(nullif(?, 0) IS NULL OR operator_add_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR operator_edit_worker_id = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
+			(nullif(?, 0) IS NULL OR returner_id = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
 			filter.ProjectID,
 			filter.DeliveryCode, filter.DeliveryCode,
 			filter.ReturnerType, filter.ReturnerType,
 			filter.ReturnerID, filter.ReturnerID,
-			filter.OperatorAddWorkerID, filter.OperatorAddWorkerID,
-			filter.OperatorEditWorkerID, filter.OperatorEditWorkerID,
 			limit, (page-1)*limit,
 		).
 		Scan(&data).Error

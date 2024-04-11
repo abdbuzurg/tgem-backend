@@ -26,6 +26,10 @@ type IMaterialLocationRepository interface {
 	Update(data model.MaterialLocation) (model.MaterialLocation, error)
 	Delete(id uint) error
 	Count() (int64, error)
+	GetUniqueMaterialCostsByLocation(locationType string, locationID uint) ([]uint, error)
+	UniqueObjectIDs() ([]uint, error)
+	UniqueTeamIDs() ([]uint, error)
+	GetByLocationTypeAndID(locationType string, locationID uint) ([]model.MaterialLocation, error)
 }
 
 func (repo *materialLocationRepository) GetAll() ([]model.MaterialLocation, error) {
@@ -89,4 +93,45 @@ func (repo *materialLocationRepository) Count() (int64, error) {
 	var count int64
 	err := repo.db.Model(&model.MaterialLocation{}).Count(&count).Error
 	return count, err
+}
+
+func (repo *materialLocationRepository) GetUniqueMaterialCostsByLocation(
+	locationType string,
+	locationID uint,
+) ([]uint, error) {
+	var data []uint
+	err := repo.db.Raw(`
+    SELECT DISTINCT(material_cost_id) FROM material_locations WHERE location_type = ? and location_id = ?
+    `, locationType, locationID).Scan(&data).Error
+
+	return data, err
+}
+
+func (repo *materialLocationRepository) UniqueObjectIDs() ([]uint, error) {
+	var data []uint
+	err := repo.db.Raw("SELECT DISTINCT(location_id) FROM material_locations WHERE location_type='objects'").Scan(&data).Error
+	return data, err
+}
+
+func (repo *materialLocationRepository) UniqueTeamIDs() ([]uint, error) {
+	var data []uint
+	err := repo.db.Raw("SELECT DISTINCT(location_id) FROM material_locations WHERE location_type='teams'").Scan(&data).Error
+	return data, err
+}
+
+func (repo *materialLocationRepository) GetByLocationTypeAndID(
+	locationType string,
+	locationID uint,
+) ([]model.MaterialLocation, error) {
+
+	var data []model.MaterialLocation
+	err := repo.db.Raw(`
+    SELECT * 
+    FROM material_locations 
+    WHERE 
+      location_type = ? AND
+      (nullif(?, 0) IS NULL OR location_id = ?)
+  `, locationType, locationID, locationID).Scan(&data).Error
+
+	return data, err
 }

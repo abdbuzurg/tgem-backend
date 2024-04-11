@@ -21,6 +21,8 @@ type ITeamRepository interface {
 	GetPaginated(page, limit int) ([]model.Team, error)
 	GetPaginatedFiltered(page, limit int, filter model.Team) ([]model.Team, error)
 	GetByID(id uint) (model.Team, error)
+  GetByRangeOfIDs(ids []uint) ([]model.Team, error)
+  GetByNumber(number string) (model.Team, error)
 	Create(data model.Team) (model.Team, error)
 	Update(data model.Team) (model.Team, error)
 	Delete(id uint) error
@@ -76,6 +78,21 @@ func (repo *teamRepository) Delete(id uint) error {
 
 func (repo *teamRepository) Count() (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.Project{}).Count(&count).Error
+	err := repo.db.Model(&model.Team{}).Count(&count).Error
 	return count, err
 }
+
+func (repo *teamRepository)   GetByNumber(number string) (model.Team, error) {
+  data := model.Team{}
+  err := repo.db.
+    Raw(`SELECT * FROM teams WHERE number = ?`, number).
+    Error
+  return data, err
+}
+
+func (repo *teamRepository) GetByRangeOfIDs(ids []uint) ([]model.Team, error) {
+  var data []model.Team
+  err := repo.db.Model(model.Team{}).Select("*").Where("id IN ?", ids).Scan(&data).Error
+  return data, err
+}
+

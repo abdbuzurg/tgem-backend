@@ -40,7 +40,11 @@ func Authentication() gin.HandlerFunc {
 			return
 		}
 
-		c.Set("username", payload.Username)
+    c.Set("userID", payload.UserID)
+		c.Set("projectID", payload.ProjectID)
+		c.Set("workerID", payload.WorkerID)
+		c.Set("roleID", payload.RoleID)
+
 		c.Next()
 	}
 }

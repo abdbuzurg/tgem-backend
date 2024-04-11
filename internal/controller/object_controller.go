@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
@@ -65,16 +66,6 @@ func (controller *objectController) GetPaginated(c *gin.Context) {
 		}
 	}
 
-	supervisorWorkerIDStr := c.DefaultQuery("supervisorWorkerID", "")
-	supervisorWorkerID := 0
-	if supervisorWorkerIDStr != "" {
-		supervisorWorkerID, err = strconv.Atoi(supervisorWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode supervisorWorkerID parameter: %v", err))
-			return
-		}
-	}
-
 	objectType := c.DefaultQuery("objectType", "")
 	objectType, err = url.QueryUnescape(objectType)
 	if err != nil {
@@ -98,7 +89,6 @@ func (controller *objectController) GetPaginated(c *gin.Context) {
 
 	filter := model.Object{
 		ObjectDetailedID:   uint(objectDetailedID),
-		SupervisorWorkerID: uint(supervisorWorkerID),
 		Type:               objectType,
 		Name:               name,
 		Status:             status,
@@ -137,7 +127,7 @@ func (controller *objectController) GetByID(c *gin.Context) {
 }
 
 func (controller *objectController) Create(c *gin.Context) {
-	var createData model.Object
+	var createData dto.ObjectCreate
 	if err := c.ShouldBindJSON(&createData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return

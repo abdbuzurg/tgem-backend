@@ -10,21 +10,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type invoiceObjectSubmissionController struct {
-	invoiceObjectSubmissionService service.IInvoiceObjectSubmissionService
+type invoiceObjectController struct {
+	invoiceObjectService service.IInvoiceObjectService
 }
 
-func InitInvoiceObjectSubmissionController(
-	invoiceObjectSubmissionService service.IInvoiceObjectSubmissionService,
-) IInvoiceObjectSubmissionController {
-	return &invoiceObjectSubmissionController{
-		invoiceObjectSubmissionService: invoiceObjectSubmissionService,
+func InitInvoiceObjectController(
+	invoiceObjectService service.IInvoiceObjectService,
+) IInvoiceObjectController {
+	return &invoiceObjectController{
+		invoiceObjectService: invoiceObjectService,
 	}
 }
 
-type IInvoiceObjectSubmissionController interface{}
+type IInvoiceObjectController interface{}
 
-func (controller *invoiceObjectSubmissionController) GetPaginated(c *gin.Context) {
+func (controller *invoiceObjectController) GetPaginated(c *gin.Context) {
 	pageStr := c.DefaultQuery("page", "1")
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page <= 0 {
@@ -40,8 +40,10 @@ func (controller *invoiceObjectSubmissionController) GetPaginated(c *gin.Context
 	}
 
 	projectID := c.GetUint("projectID")
+  roleID := c.GetUint("roleID")
+  workerID := c.GetUint("workerID")
 
-	data, err := controller.invoiceObjectSubmissionService.GetPaginated(limit, page, projectID)
+	data, err := controller.invoiceObjectService.GetPaginated(limit, page, projectID, roleID, workerID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return
@@ -50,14 +52,17 @@ func (controller *invoiceObjectSubmissionController) GetPaginated(c *gin.Context
 	response.ResponseSuccess(c, data)
 }
 
-func (controller *invoiceObjectSubmissionController) Create(c *gin.Context) {
-	var data model.InvoiceObjectSubmission
+func (controller *invoiceObjectController) Create(c *gin.Context) {
+	var data model.InvoiceObject
 	if err := c.ShouldBindJSON(&data); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Incorrect body request: %v", err))
 		return
 	}
 
-	data, err := controller.invoiceObjectSubmissionService.Create(data)
+  projectID := c.GetUint("projectID")
+  data.ProjectID = projectID
+
+	data, err := controller.invoiceObjectService.Create(data)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return
@@ -66,7 +71,7 @@ func (controller *invoiceObjectSubmissionController) Create(c *gin.Context) {
 	response.ResponseSuccess(c, data)
 }
 
-func (controller *invoiceObjectSubmissionController) Delete(c *gin.Context) {
+func (controller *invoiceObjectController) Delete(c *gin.Context) {
 	idRaw := c.Param("id")
 	id, err := strconv.ParseUint(idRaw, 10, 64)
 	if err != nil {
@@ -74,7 +79,7 @@ func (controller *invoiceObjectSubmissionController) Delete(c *gin.Context) {
 		return
 	}
 
-	err = controller.invoiceObjectSubmissionService.Delete(uint(id))
+	err = controller.invoiceObjectService.Delete(uint(id))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return

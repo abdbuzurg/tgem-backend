@@ -12,14 +12,10 @@ type InvoiceOutputPaginated struct {
 	RecipientName        string    `json:"recipientName"`
 	TeamName             string    `json:"teamName"`
 	ObjectName           string    `json:"objectName"`
-	OperatorAddName      string    `json:"operatorAddName"`
 	DistrictName         string    `json:"districtName"`
-	OperatorEditName     string    `json:"operatorEditName"`
 	DeliveryCode         string    `json:"deliveryCode"`
 	Notes                string    `json:"notes"`
 	DateOfInvoice        time.Time `json:"dateOfInvoice"`
-	DateOfAdd            time.Time `json:"dateOfAdd"`
-	DateOfEdit           time.Time `json:"dateOfEdit"`
 	Confirmation         bool      `json:"confirmation"`
 	ObjectConfirmation   bool      `json:"objectConfirmation"`
 }

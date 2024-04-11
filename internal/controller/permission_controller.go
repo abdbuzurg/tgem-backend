@@ -23,7 +23,10 @@ func InitPermissionController(permissionService service.IPermissionService) IPer
 type IPermissionController interface {
   GetAll(c *gin.Context)
   GetByRoleID(c *gin.Context)
+  GetByRoleName(c *gin.Context)
+  GetByResourceURL(c *gin.Context)
   Create(c *gin.Context)
+  CreateBatch(c *gin.Context)
   Update(c *gin.Context)
   Delete(c *gin.Context)
 }
@@ -71,6 +74,21 @@ func(controller *permissionController) Create(c *gin.Context) {
   response.ResponseSuccess(c, data)
 }
 
+func(controller *permissionController) CreateBatch(c *gin.Context) {
+  var requestData []model.Permission
+  if err := c.ShouldBindJSON(&requestData); err != nil {
+    response.ResponseError(c, fmt.Sprintf("Invalid request body: %v", err))
+    return
+  }
+
+  err := controller.permissionService.CreateBatch(requestData)
+  if err != nil {
+    response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+    return
+  }
+
+  response.ResponseSuccess(c, true)
+}
 
 func (controller *permissionController) Update(c *gin.Context) {
 	var requestData model.Permission
@@ -103,4 +121,33 @@ func (controller *permissionController) Delete(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, true)
+}
+
+func (controller *permissionController) GetByRoleName(c *gin.Context) {
+  
+  roleName := c.Param("roleName")
+
+  permissions, err := controller.permissionService.GetByRoleName(roleName)
+  if err != nil {
+    response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+  }
+
+  response.ResponseSuccess(c, permissions)
+
+}
+
+func(controller *permissionController) GetByResourceURL(c *gin.Context) {
+
+  roleID := c.GetUint("roleID")
+
+  resourceURL := c.Param("resourceURL")
+
+  err := controller.permissionService.GetByResourceURL(resourceURL, roleID)
+  if err != nil {
+    response.ResponseSuccess(c, false) 
+    return
+  }
+
+  response.ResponseSuccess(c, true)
 }

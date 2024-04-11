@@ -59,9 +59,7 @@ func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filte
 			(nullif(?, 0) IS NULL OR recipient_worker_id = ?) AND
 			(nullif(?, 0) IS NULL OR team_id = ?) AND
 			(nullif(?, 0) IS NULL OR object_id = ?) AND
-			(nullif(?, '') IS NULL OR delivery_code = ?) AND
-			(nullif(?, 0) IS NULL OR operator_add_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR operator_edit_worker_id = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
+			(nullif(?, '') IS NULL OR delivery_code = ?)  ORDER BY id DESC LIMIT ? OFFSET ?`,
 			filter.ProjectID, filter.ProjectID,
 			filter.DistrictID, filter.DistrictID,
 			filter.WarehouseManagerWorkerID, filter.WarehouseManagerWorkerID,
@@ -70,8 +68,6 @@ func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filte
 			filter.TeamID, filter.TeamID,
 			filter.ObjectID, filter.ObjectID,
 			filter.DeliveryCode, filter.DeliveryCode,
-			filter.OperatorAddWorkerID, filter.OperatorAddWorkerID,
-			filter.OperatorEditWorkerID, filter.OperatorEditWorkerID,
 			limit, (page-1)*limit,
 		).
 		Scan(&data).Error

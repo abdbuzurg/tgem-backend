@@ -24,6 +24,7 @@ type IMaterialCostService interface {
 	Update(data model.MaterialCost) (model.MaterialCost, error)
 	Delete(id uint) error
 	Count() (int64, error)
+  GetByMaterialID(materialID uint) ([]model.MaterialCost, error)
 }
 
 func (service *materialCostService) GetAll() ([]model.MaterialCost, error) {
@@ -56,4 +57,8 @@ func (service *materialCostService) Delete(id uint) error {
 
 func (service *materialCostService) Count() (int64, error) {
 	return service.materialCostRepo.Count()
+}
+
+func (service *materialCostService) GetByMaterialID(materialID uint) ([]model.MaterialCost, error) {
+  return service.materialCostRepo.GetByMaterialIDSorted(materialID) 
 }

@@ -1,0 +1,10 @@
+Invoice SUpervisor:
+  - View only the data related to that supervisor (not all of them)
+  - Addition on material on separete page
+    - Addition must have serial number(checking, adding), but not showing the actual SN
+
+Invoice Correction:
+  - View
+  - Changing the data send by supervisor should show the status of being CHECKED or NOT
+  - Multiple корректировщик
+

@@ -5,19 +5,21 @@ type Object struct {
 
 	//Custom field that references different type of Object tables in the database
 	//The type will be determined by type filed on the application level not database
-	ObjectDetailedID   uint   `json:"objectDetailedID"`
-	SupervisorWorkerID uint   `json:"supervisorWorkerID"`
-	Type               string `json:"type" gorm:"tinyText"`
-	Name               string `json:"name" gorm:"tinyText"`
-	Status             string `json:"status" gorm:"tinyText"`
+	ObjectDetailedID uint   `json:"objectDetailedID"`
+	Type             string `json:"type" gorm:"tinyText"`
+	Name             string `json:"name" gorm:"tinyText"`
+	Status           string `json:"status" gorm:"tinyText"`
 
-	Invoices         []Invoice         `json:"-" gorm:"foreignKey:ObjectID"`
-	ObjectOperations []ObjectOperation `json:"-" gorm:"foreignKey:ObjectID"`
+	SupervisorObjectss []SupervisorObjects `json:"-" gorm:"foreignKey:ObjectID"`
+	TeamObjectss       []TeamObjects       `json:"-" gorm:"foreignKey:ObjectID"`
+	ObjectOperations   []ObjectOperation   `json:"-" gorm:"foreignKey:ObjectID"`
+	InvoiceOutputs     []InvoiceOutput     `json:"-" gorm:"foreignKey:ObjectID"`
+	InvoiceObject      []InvoiceObject     `json:"-" gorm:"foreignKey:ObjectID"`
 }
 
 type MJD_Object struct {
 	ID             uint   `json:"id" gorm:"primaryKey"`
-	Type           string `json:"type" gorm:"tinyText"`
+	Model          string `json:"model" gorm:"tinyText"`
 	AmountStores   uint   `json:"amountStores"`
 	AmountEntraces uint   `json:"amountEntraces"`
 	HasBasement    bool   `json:"hasBasement"`
@@ -25,7 +27,7 @@ type MJD_Object struct {
 
 type TP_Object struct {
 	ID           uint   `json:"id" gorm:"primaryKey"`
-	Type         string `json:"type" gorm:"tinyText"`
+	Model        string `json:"model" gorm:"tinyText"`
 	VoltageClass string `json:"voltageClass" gorm:"tinyText"`
 	Nourashes    string `json:"nourashes" gorm:"tinyText"`
 }

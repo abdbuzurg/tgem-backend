@@ -3,13 +3,14 @@ package database
 import (
 	"backend-v2/model"
 	"backend-v2/pkg/security"
+	"fmt"
+	"os"
 
-	"github.com/casbin/casbin/v2"
-	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"gorm.io/gorm"
 )
 
 func InitialMigration(db *gorm.DB) {
+
 	superadmin_worker := model.Worker{
 		Name:         "Суперадмин",
 		JobTitle:     "Главный администратор сисетмы",
@@ -21,13 +22,20 @@ func InitialMigration(db *gorm.DB) {
 		panic("Не удалось проверить наличие главного администратора как работника системы")
 	}
 
+	err = execSeedFile(db, "./pkg/database/seed/role.sql")
+	if err != nil {
+		panic(err)
+	}
+
 	superadmin_userPassword, err := security.Hash("password")
 	if err != nil {
 		panic("Не удалось создать пароль для главного администратора")
 	}
+
 	superadmin_user := model.User{
 		WorkerID: superadmin_worker.ID,
 		Username: "superadmin",
+		RoleID:   1,
 		Password: string(superadmin_userPassword),
 	}
 
@@ -36,30 +44,38 @@ func InitialMigration(db *gorm.DB) {
 		panic("Не удалось проверить наличие главного администратора как пользователя системы")
 	}
 
-	err = db.Raw("DELETE FROM casbin_ruler WHERE v0 = ?", superadmin_user.ID).Error
-	if err != nil {
-		panic("Не удалось попрабить доступы администратора так как они не совпадают с преждевнесенными доступами")
+  err = execSeedFile(db, "./pkg/database/seed/project_dev.sql")
+
+	superAdminInProject := model.UserInProject{
+		ProjectID: 1,
+		UserID:    superadmin_user.ID,
 	}
 
-	a, err := gormadapter.NewAdapterByDB(db)
+	err = db.Table("user_in_projects").FirstOrCreate(&superAdminInProject, model.UserInProject{UserID: 1, ProjectID: 1}).Error
+	if err != nil {
+		panic("Не удалось привязать администратора к проекту номер 1")
+	}
+
+	err = execSeedFile(db, "./pkg/database/seed/permission.sql")
 	if err != nil {
 		panic(err)
 	}
-	gormadapter.TurnOffAutoMigrate(db)
 
-	e, err := casbin.NewEnforcer("./pkg/database/acl_model.conf", a)
+}
+
+func execSeedFile(db *gorm.DB, filepath string) error {
+
+	file, err := os.ReadFile(filepath)
 	if err != nil {
-		panic(err)
+    return fmt.Errorf("не удалось найти файл permission.sql: %v", err)
 	}
 
-	allPolicies := e.GetPolicy()
-	if len(allPolicies) < len(SUPERADMIN_ACL_POLICIES) {
-		for _, policy := range SUPERADMIN_ACL_POLICIES {
-			_, err := e.AddPolicy(policy[0], policy[1], policy[2])
-			if err != nil {
-				panic("Не удалось добавить доступ к администартору")
-			}
-		}
+	sql := string(file)
+
+	err = db.Exec(sql).Error
+	if err != nil {
+    return fmt.Errorf("не удалось запустить изначальный скрипт seed для доступов: %v", err)
 	}
 
+	return nil
 }

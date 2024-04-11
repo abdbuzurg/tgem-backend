@@ -24,7 +24,7 @@ type IInvoiceWriteOffRepository interface {
 	Create(data model.InvoiceWriteOff) (model.InvoiceWriteOff, error)
 	Update(data model.InvoiceWriteOff) (model.InvoiceWriteOff, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(projectID uint) (int64, error)
 }
 
 func (repo *invoiceWriteOffRepository) GetAll() ([]model.InvoiceWriteOff, error) {
@@ -44,13 +44,9 @@ func (repo *invoiceWriteOffRepository) GetPaginatedFiltered(page, limit int, fil
 	err := repo.db.
 		Raw(`SELECT * FROM invoice_write_offs WHERE
 			nullif(?, '') IS NULL OR delivery_code = ?) AND
-			(nullif(?, '') IS NULL OR type = ?) AND
-			(nullif(?, 0) IS NULL OR operator_add_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR operator_edit_worker_id = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
+			(nullif(?, '') IS NULL OR type = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
 			filter.DeliveryCode, filter.DeliveryCode,
 			filter.WriteOffType, filter.WriteOffType,
-			filter.OperatorAddWorkerID, filter.OperatorAddWorkerID,
-			filter.OperatorEditWorkerID, filter.OperatorEditWorkerID,
 			limit, (page-1)*limit,
 		).
 		Scan(&data).Error
@@ -78,8 +74,8 @@ func (repo *invoiceWriteOffRepository) Delete(id uint) error {
 	return repo.db.Delete(&model.InvoiceWriteOff{}, "id = ?", id).Error
 }
 
-func (repo *invoiceWriteOffRepository) Count() (int64, error) {
+func (repo *invoiceWriteOffRepository) Count(projectID uint) (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.InvoiceWriteOff{}).Count(&count).Error
+	err := repo.db.Model(&model.InvoiceWriteOff{ProjectID: projectID}).Count(&count).Error
 	return count, err
 }

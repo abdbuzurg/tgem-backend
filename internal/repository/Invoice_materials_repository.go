@@ -25,7 +25,8 @@ type IInvoiceMaterialsRepository interface {
 	Update(data model.InvoiceMaterials) (model.InvoiceMaterials, error)
 	Delete(id uint) error
 	Count() (int64, error)
-	GetByInvoiceID(invoiceID uint) ([]model.InvoiceMaterials, error)
+	GetByInvoice(invoiceID uint, invoceType string) ([]model.InvoiceMaterials, error)
+  GetByMaterialCostID(materialCostID uint, invoiceType string, invoiceID uint) (model.InvoiceMaterials, error)
 }
 
 func (repo *invoiceMaterialsRepository) GetAll() ([]model.InvoiceMaterials, error) {
@@ -83,8 +84,20 @@ func (repo *invoiceMaterialsRepository) Count() (int64, error) {
 	return count, err
 }
 
-func (repo *invoiceMaterialsRepository) GetByInvoiceID(invoiceID uint) ([]model.InvoiceMaterials, error) {
+func (repo *invoiceMaterialsRepository) GetByInvoice(invoiceID uint, invoiceType string) ([]model.InvoiceMaterials, error) {
 	data := []model.InvoiceMaterials{}
 	err := repo.db.Find(&data, "invoice_id = ?", invoiceID).Error
 	return data, err
+}
+
+func(repo *invoiceMaterialsRepository) GetByMaterialCostID(
+  materialCostID uint, 
+  invoiceType string, 
+  invoiceID uint,
+) (model.InvoiceMaterials, error) {
+  var data model.InvoiceMaterials
+  err := repo.db.Raw(`
+    SELECT * FROM invoice_materials WHERE material_cost_id = ? AND invoice_type = ? AND invoice_id = ?
+    `, materialCostID, invoiceType, invoiceID).Scan(&data).Error
+  return data, err
 }

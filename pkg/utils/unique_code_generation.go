@@ -2,16 +2,25 @@ package utils
 
 import "fmt"
 
-func UniqueCodeGeneration(codeIdentifier string, id uint) string {
+func UniqueCodeGeneration(codeIdentifier string, count int64, projectID uint) string {
 	code := codeIdentifier + "-"
-	idStr := fmt.Sprint(id)
-	idLength := len(idStr)
-	amountOfZeroes := 4 - idLength
+	projectIDStr := fmt.Sprint(projectID)
+	projectIDLength := len(projectIDStr)
+	amountOfZeroes := 2 - projectIDLength
+	for amountOfZeroes != 0 {
+		code += "0"
+		amountOfZeroes--
+	}
+	code += projectIDStr + "-"
+
+	countStr := fmt.Sprint(count)
+	countlength := len(countStr)
+	amountOfZeroes = 5 - countlength
 	for amountOfZeroes != 0 {
 		code += "0"
 		amountOfZeroes--
 	}
 
-	code += idStr
+	code += countStr
 	return code
 }
