@@ -20,9 +20,11 @@ type Project struct {
 	UserInProjects    []UserInProject    `json:"-" gorm:"foreignKey:ProjectID"`
 	Materials         []Material         `json:"-" gorm:"foreignKey:ProjectID"`
 	MaterialLocations []MaterialLocation `json:"-" gorm:"foreignKey:ProjectID"`
+	Objects           []Object           `json:"-" gorm:"foreignKey: ProjectID"`
 	InvoiceInputs     []InvoiceInput     `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceOutputs    []InvoiceOutput    `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceReturns    []InvoiceReturn    `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceObject     []InvoiceObject    `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceWriteOffs  []InvoiceWriteOff  `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceMaterials  []InvoiceMaterials `json:"-" gorm:"foreignKey:ProjectID"`
 }

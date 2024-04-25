@@ -26,6 +26,8 @@ type ISerialNumberRepository interface {
 	CreateInBatches(data []model.SerialNumber) ([]model.SerialNumber, error)
 	Update(data model.SerialNumber) (model.SerialNumber, error)
 	Delete(id uint) error
+	GetCodesByMaterialID(projectID, materialID uint, status string) ([]string, error)
+	GetCodesByMaterialIDAndStatus(projectID, materialID uint, status string) ([]string, error)
 }
 
 func (repo *serialNumberRepository) GetAll() ([]model.SerialNumber, error) {
@@ -76,4 +78,37 @@ func (repo *serialNumberRepository) Update(data model.SerialNumber) (model.Seria
 func (repo *serialNumberRepository) Delete(id uint) error {
 	err := repo.db.Delete(model.SerialNumber{}, "id = ?", id).Error
 	return err
+}
+
+func (repo *serialNumberRepository) GetCodesByMaterialID(projectID, materialID uint, status string) ([]string, error) {
+	var data []string
+	err := repo.db.Raw(`
+    SELECT serial_numbers.code
+    FROM serial_numbers
+      INNER JOIN material_costs ON material_costs.id = serial_numbers.material_cost_id
+      INNER JOIN materials ON materials.id = material_costs.material_id
+    WHERE
+      materials.project_id = ? AND
+      materials.id = ? AND
+      serial_numbers.status = ?
+    `, projectID, materialID, status).Scan(&data).Error
+	return data, err
+}
+
+func (repo *serialNumberRepository) GetCodesByMaterialIDAndStatus(projectID, materialID uint, status string) ([]string, error) {
+	var data []string
+	err := repo.db.Raw(`
+    SELECT serial_numbers.code
+    FROM serial_numbers
+      INNER JOIN material_locations ON serial_numbers.status_id = material_locations.id
+      INNER JOIN material_costs ON material_costs.id = material_locations.material_cost_id
+      INNER JOIN materials ON materials.id = material_costs.material_id
+    WHERE
+      materials.project_id = ? AND
+      materials.id = ? AND
+      material_locations.location_type = ? AND
+      serial_numbers.status = ?;
+    `, projectID, materialID, status, status).Scan(&data).Error
+
+	return data, err
 }

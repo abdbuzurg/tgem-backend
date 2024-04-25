@@ -1,8 +1,8 @@
 package repository
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/model"
-	"fmt"
 
 	"gorm.io/gorm"
 )
@@ -20,7 +20,7 @@ func InitObjectRepository(db *gorm.DB) IObjectRepository {
 type IObjectRepository interface {
 	GetAll() ([]model.Object, error)
 	GetPaginated(page, limit int) ([]model.Object, error)
-	GetPaginatedFiltered(page, limit int, filter model.Object) ([]model.Object, error)
+	GetPaginatedFiltered(page, limit int, filter model.Object) ([]dto.ObjectPaginatedQuery, error)
 	GetByID(id uint) (model.Object, error)
 	GetByRangeOfIDs(ids []uint) ([]model.Object, error)
 	Create(data model.Object) (model.Object, error)
@@ -42,11 +42,15 @@ func (repo *objectRepository) GetPaginated(page, limit int) ([]model.Object, err
 	return data, err
 }
 
-func (repo *objectRepository) GetPaginatedFiltered(page, limit int, filter model.Object) ([]model.Object, error) {
-	data := []model.Object{}
-  fmt.Println(filter)
+func (repo *objectRepository) GetPaginatedFiltered(page, limit int, filter model.Object) ([]dto.ObjectPaginatedQuery, error) {
+	var data []dto.ObjectPaginatedQuery
 	err := repo.db.
-		Raw(`SELECT objects.type, objects.name, objects.status, workers.name
+		Raw(`SELECT
+          objects.id AS id,
+          objects.type AS object_type, 
+          objects.name AS object_name, 
+          objects.status AS object_status, 
+          workers.name AS  supervisor_name
         FROM supervisor_objects
         INNER JOIN objects ON objects.id = supervisor_objects.object_id 
         INNER JOIN workers ON workers.id = supervisor_objects.supervisor_worker_id
@@ -54,11 +58,11 @@ func (repo *objectRepository) GetPaginatedFiltered(page, limit int, filter model
           (nullif(?, 0) IS NULL OR objects.object_detailed_id = ?) AND
           (nullif(?, '') IS NULL OR objects.type = ?) AND
           (nullif(?, '') IS NULL OR objects.name = ?) AND
-          (nullif(?, '') IS NULL OR objects.status = ?) ORDER BY objects.id DESC LIMIT 10 OFFSET 0`,
-			filter.ObjectDetailedID, filter.ObjectDetailedID,  
-      filter.Type, filter.Type, 
-      filter.Name, filter.Name, 
-      filter.Status, filter.Status, limit, (page-1)*limit,
+          (nullif(?, '') IS NULL OR objects.status = ?) ORDER BY objects.id DESC LIMIT ? OFFSET ?`,
+			filter.ObjectDetailedID, filter.ObjectDetailedID,
+			filter.Type, filter.Type,
+			filter.Name, filter.Name,
+			filter.Status, filter.Status, limit, (page-1)*limit,
 		).
 		Scan(&data).Error
 

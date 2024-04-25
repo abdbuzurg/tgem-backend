@@ -60,7 +60,6 @@ type IInvoiceOutputService interface {
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
 	Confirmation(id uint) error
-	ConfirmByObject(id uint) error
 	UniqueCode(projectID uint) ([]string, error)
 	UniqueWarehouseManager(projectID uint) ([]string, error)
 	UniqueRecieved(projectID uint) ([]string, error)
@@ -68,6 +67,8 @@ type IInvoiceOutputService interface {
 	UniqueObject(projectID uint) ([]string, error)
 	UniqueTeam(projectID uint) ([]string, error)
 	Report(filter dto.InvoiceOutputReportFilterRequest, projectID uint) (string, error)
+	GetTotalMaterialAmount(projectID, materialID uint) (float64, error)
+	GetSerialNumbersByMaterial(projectID, materialID uint) ([]string, error)
 }
 
 func (service *invoiceOutputService) GetAll() ([]model.InvoiceOutput, error) {
@@ -79,66 +80,7 @@ func (service *invoiceOutputService) GetByID(id uint) (model.InvoiceOutput, erro
 }
 
 func (service *invoiceOutputService) GetPaginated(page, limit int, data model.InvoiceOutput) ([]dto.InvoiceOutputPaginated, error) {
-	result := []dto.InvoiceOutputPaginated{}
-	invoiceOutputs := []model.InvoiceOutput{}
-	var err error
-	if !utils.IsEmptyFields(data) {
-		invoiceOutputs, err = service.invoiceOutputRepo.GetPaginatedFiltered(page, limit, data)
-	} else {
-		invoiceOutputs, err = service.invoiceOutputRepo.GetPaginated(page, limit)
-	}
-
-	if err != nil {
-		return []dto.InvoiceOutputPaginated{}, err
-	}
-
-	for _, invoiceOutput := range invoiceOutputs {
-		warehouseManager, err := service.workerRepo.GetByID(invoiceOutput.WarehouseManagerWorkerID)
-		if err != nil {
-			return []dto.InvoiceOutputPaginated{}, err
-		}
-
-		released, err := service.workerRepo.GetByID(invoiceOutput.ReleasedWorkerID)
-		if err != nil {
-			return []dto.InvoiceOutputPaginated{}, err
-		}
-
-		recipient, err := service.workerRepo.GetByID(invoiceOutput.RecipientWorkerID)
-		if err != nil {
-			return []dto.InvoiceOutputPaginated{}, err
-		}
-
-		team, err := service.teamRepo.GetByID(invoiceOutput.TeamID)
-		if err != nil {
-			return []dto.InvoiceOutputPaginated{}, err
-		}
-
-		object, err := service.objectRepo.GetByID(invoiceOutput.ObjectID)
-		if err != nil {
-			return []dto.InvoiceOutputPaginated{}, err
-		}
-
-		district, err := service.districtRepo.GetByID(invoiceOutput.DistrictID)
-		if err != nil {
-			return []dto.InvoiceOutputPaginated{}, err
-		}
-
-		result = append(result, dto.InvoiceOutputPaginated{
-			ID:                   invoiceOutput.ID,
-			WarehouseManagerName: warehouseManager.Name,
-			ReceivedName:         released.Name,
-			RecipientName:        recipient.Name,
-			TeamName:             team.Number,
-			ObjectName:           object.Name,
-			DeliveryCode:         invoiceOutput.DeliveryCode,
-			Notes:                invoiceOutput.Notes,
-			DateOfInvoice:        invoiceOutput.DateOfInvoice,
-			DistrictName:         district.Name,
-			Confirmation:         invoiceOutput.Confirmation,
-		})
-	}
-
-	return result, nil
+	return service.invoiceOutputRepo.GetPaginatedFiltered(page, limit, data)
 }
 
 func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.InvoiceOutput, error) {
@@ -147,7 +89,7 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 		return dto.InvoiceOutput{}, err
 	}
 
-	data.Details.DeliveryCode = utils.UniqueCodeGeneration("О", count, data.Details.ProjectID)
+	data.Details.DeliveryCode = utils.UniqueCodeGeneration("О", count+1, data.Details.ProjectID)
 	invoiceOutput, err := service.invoiceOutputRepo.Create(data.Details)
 	if err != nil {
 		return dto.InvoiceOutput{}, err
@@ -164,7 +106,7 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 		materialLocations := []model.MaterialLocation{}
 
 		for _, materialCost := range materialCosts {
-			materialLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(materialCost.ID, "warehouse", 0)
+			materialLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceOutput.ProjectID, materialCost.ID, "warehouse", 0)
 			if err != nil {
 				return dto.InvoiceOutput{}, err
 			}
@@ -175,6 +117,7 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 		index := 0
 		for invoiceMaterial.Amount > 0 {
 			invoiceMaterialCreate := model.InvoiceMaterials{
+				ProjectID:      invoiceOutput.ProjectID,
 				ID:             0,
 				MaterialCostID: materialCosts[index].ID,
 				InvoiceID:      invoiceOutput.ID,
@@ -184,9 +127,6 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 				Notes:          "",
 			}
 			if materialLocations[index].Amount <= invoiceMaterial.Amount {
-				if err != nil {
-					return dto.InvoiceOutput{}, err
-				}
 				invoiceMaterialCreate.Amount = materialLocations[index].Amount
 				invoiceMaterial.Amount -= materialLocations[index].Amount
 				materialLocations[index].Amount = 0
@@ -196,12 +136,11 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 				invoiceMaterial.Amount = 0
 			}
 
-			if materialLocations[index].Amount != 0 {
-				invoiceMaterialCreate, err = service.invoiceMaterialRepo.Create(invoiceMaterialCreate)
-				if err != nil {
-					return dto.InvoiceOutput{}, err
-				}
+			invoiceMaterialCreate, err = service.invoiceMaterialRepo.Create(invoiceMaterialCreate)
+			if err != nil {
+				return dto.InvoiceOutput{}, err
 			}
+
 			index++
 		}
 
@@ -215,7 +154,7 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 				return dto.InvoiceOutput{}, err
 			}
 
-			invoiceMaterial, err := service.invoiceMaterialRepo.GetByMaterialCostID(
+			invoiceMaterialSaved, err := service.invoiceMaterialRepo.GetByMaterialCostID(
 				serialNumber.MaterialCostID,
 				"output",
 				invoiceOutput.ID,
@@ -225,7 +164,7 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 			}
 
 			serialNumber.Status = "pending"
-			serialNumber.StatusID = invoiceMaterial.ID
+			serialNumber.StatusID = invoiceMaterialSaved.ID
 			_, err = service.serialNumberRepo.Update(serialNumber)
 			if err != nil {
 				return dto.InvoiceOutput{}, err
@@ -239,7 +178,7 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 	}
 	sheetName := "Отпуск"
 	startingRow := 5
-	currentInvoiceMaterails, err := service.invoiceMaterialRepo.GetByInvoice(invoiceOutput.ID, "output")
+	currentInvoiceMaterails, err := service.invoiceMaterialRepo.GetByInvoice(invoiceOutput.ProjectID, invoiceOutput.ID, "output")
 	f.InsertRows(sheetName, startingRow, len(currentInvoiceMaterails))
 
 	defaultStyle, _ := f.NewStyle(&excelize.Style{
@@ -329,18 +268,18 @@ func (service *invoiceOutputService) Confirmation(id uint) error {
 		return err
 	}
 
-	invoiceMaterails, err := service.invoiceMaterialRepo.GetByInvoice(invoiceOutput.ID, "output")
+	invoiceMaterails, err := service.invoiceMaterialRepo.GetByInvoice(invoiceOutput.ProjectID, invoiceOutput.ID, "output")
 	if err != nil {
 		return err
 	}
 
 	for _, invoiceMaterial := range invoiceMaterails {
-		oldLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceMaterial.MaterialCostID, "warehouse", 0)
+		oldLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceOutput.ProjectID, invoiceMaterial.MaterialCostID, "warehouse", 0)
 		if err != nil {
 			return err
 		}
 
-		newLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceMaterial.MaterialCostID, "teams", invoiceOutput.TeamID)
+		newLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceOutput.ProjectID, invoiceMaterial.MaterialCostID, "teams", invoiceOutput.TeamID)
 		if err != nil {
 			return err
 		}
@@ -409,50 +348,6 @@ func (service *invoiceOutputService) GetUnconfirmedByObjectInvoices() ([]dto.Inv
 	}
 
 	return result, nil
-}
-
-func (service *invoiceOutputService) ConfirmByObject(id uint) error {
-	invoiceOutput, err := service.invoiceOutputRepo.GetByID(id)
-	if err != nil {
-		return err
-	}
-
-	invoiceOutput, err = service.invoiceOutputRepo.Update(invoiceOutput)
-	if err != nil {
-		return err
-	}
-
-	invoiceMaterialRepo, err := service.invoiceMaterialRepo.GetByInvoice(invoiceOutput.ID, "output")
-	if err != nil {
-		return err
-	}
-
-	for _, invoiceMaterial := range invoiceMaterialRepo {
-		oldLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceMaterial.MaterialCostID, "teams", invoiceOutput.TeamID)
-		if err != nil {
-			return err
-		}
-
-		newLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceMaterial.MaterialCostID, "objects", invoiceOutput.ObjectID)
-		if err != nil {
-			return err
-		}
-
-		oldLocation.Amount -= invoiceMaterial.Amount
-		newLocation.Amount += invoiceMaterial.Amount
-
-		_, err = service.materialLocationRepo.Update(oldLocation)
-		if err != nil {
-			return err
-		}
-
-		_, err = service.materialLocationRepo.Update(newLocation)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (service *invoiceOutputService) UniqueCode(projectID uint) ([]string, error) {
@@ -635,13 +530,12 @@ func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilter
 
 	rowCount := 2
 	for _, invoice := range invoices {
-		invoiceMaterialRepo, err := service.invoiceMaterialRepo.GetByInvoice(invoice.ID, "output")
+		invoiceMaterialRepo, err := service.invoiceMaterialRepo.GetByInvoice(projectID, invoice.ID, "output")
 		if err != nil {
 			return "", err
 		}
 
-		fmt.Println(invoiceMaterialRepo)
-		for index, invoiceMaterial := range invoiceMaterialRepo {
+		for _, invoiceMaterial := range invoiceMaterialRepo {
 			materialCost, err := service.materialCostRepo.GetByID(invoiceMaterial.MaterialCostID)
 			if err != nil {
 				return "", nil
@@ -652,45 +546,35 @@ func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilter
 				return "", nil
 			}
 
-			fmt.Println(materialCost, material)
-			if index == 0 {
-				f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
+			f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
 
-				warehouseManager, err := service.workerRepo.GetByID(invoice.WarehouseManagerWorkerID)
-				if err != nil {
-					return "", err
-				}
-				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), warehouseManager.Name)
-
-				recieved, err := service.workerRepo.GetByID(invoice.RecipientWorkerID)
-				if err != nil {
-					return "", err
-				}
-				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), recieved.Name)
-
-				object, err := service.objectRepo.GetByID(invoice.ObjectID)
-				if err != nil {
-					return "", err
-				}
-				f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), object.Name)
-
-				team, err := service.teamRepo.GetByID(invoice.TeamID)
-				if err != nil {
-					return "", err
-				}
-				f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), team.Number)
-
-				dateOfInvoice := invoice.DateOfInvoice.String()
-				dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
-				f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), dateOfInvoice)
-			} else {
-				f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), "-")
+			warehouseManager, err := service.workerRepo.GetByID(invoice.WarehouseManagerWorkerID)
+			if err != nil {
+				return "", err
 			}
+			f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), warehouseManager.Name)
+
+			recieved, err := service.workerRepo.GetByID(invoice.RecipientWorkerID)
+			if err != nil {
+				return "", err
+			}
+			f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), recieved.Name)
+
+			object, err := service.objectRepo.GetByID(invoice.ObjectID)
+			if err != nil {
+				return "", err
+			}
+			f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), object.Name)
+
+			team, err := service.teamRepo.GetByID(invoice.TeamID)
+			if err != nil {
+				return "", err
+			}
+			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), team.Number)
+
+			dateOfInvoice := invoice.DateOfInvoice.String()
+			dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
+			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), dateOfInvoice)
 
 			f.SetCellValue(sheetName, "G"+fmt.Sprint(rowCount), material.Name)
 			f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), material.Unit)
@@ -708,4 +592,12 @@ func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilter
 	}
 
 	return fileName, nil
+}
+
+func (service *invoiceOutputService) GetTotalMaterialAmount(projectID, materialID uint) (float64, error) {
+	return service.materialLocationRepo.GetTotalAmountInWarehouse(projectID, materialID)
+}
+
+func (service *invoiceOutputService) GetSerialNumbersByMaterial(projectID, materialID uint) ([]string, error) {
+	return service.serialNumberRepo.GetCodesByMaterialID(projectID, materialID, "warehouse")
 }

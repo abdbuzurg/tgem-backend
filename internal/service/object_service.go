@@ -4,7 +4,6 @@ import (
 	"backend-v2/internal/dto"
 	"backend-v2/internal/repository"
 	"backend-v2/model"
-	"backend-v2/pkg/utils"
 	"fmt"
 )
 
@@ -54,30 +53,44 @@ func (service *objectService) GetAll() ([]model.Object, error) {
 
 func (service *objectService) GetPaginated(page, limit int, filter model.Object) ([]dto.ObjectPaginated, error) {
 
-	var data []model.Object
-	var err error
-	if !(utils.IsEmptyFields(data)) {
-		data, err = service.objectRepo.GetPaginatedFiltered(page, limit, filter)
-	} else {
-		data, err = service.objectRepo.GetPaginated(page, limit)
-	}
+	data, err := service.objectRepo.GetPaginatedFiltered(page, limit, filter)
 	if err != nil {
 		return []dto.ObjectPaginated{}, err
 	}
 
 	result := []dto.ObjectPaginated{}
-	for _, object := range data {
-		_, err := service.supervisorObjectsRepo.GetByObjectID(object.ID)
-		if err != nil {
-			return []dto.ObjectPaginated{}, err
+	latestEntry := dto.ObjectPaginated{}
+	for index, object := range data {
+		if index == 0 {
+			latestEntry = dto.ObjectPaginated{
+				ID:          object.ID,
+				Type:        object.ObjectType,
+				Name:        object.ObjectName,
+				Status:      object.ObjectStatus,
+				Supervisors: []string{},
+			}
 		}
 
-		result = append(result, dto.ObjectPaginated{
-			ID:     object.ID,
-			Type:   object.Type,
-			Name:   object.Name,
-			Status: object.Status,
-		})
+		if latestEntry.ID == object.ID {
+			latestEntry.Supervisors = append(latestEntry.Supervisors, object.SupervisorName)
+		} else {
+
+			result = append(result, latestEntry)
+			latestEntry = dto.ObjectPaginated{
+				ID:     object.ID,
+				Type:   object.ObjectType,
+				Name:   object.ObjectName,
+				Status: object.ObjectStatus,
+				Supervisors: []string{
+					object.SupervisorName,
+				},
+			}
+
+		}
+	}
+
+	if len(data) != 0 {
+		result = append(result, latestEntry)
 	}
 
 	return result, nil
@@ -96,75 +109,10 @@ func (service *objectService) Create(data dto.ObjectCreate) (model.Object, error
 		Type:             data.Type,
 		Name:             data.Name,
 		Status:           data.Status,
+		ProjectID:        data.ProjectID,
 	}
 
 	switch data.Type {
-	case "kl04kv_objects":
-
-		objectDetail, err := service.kl04kvObjectRepo.Create(model.KL04KV_Object{
-			Length:    data.Length,
-			Nourashes: data.Nourashes,
-		})
-		if err != nil {
-			return model.Object{}, err
-		}
-
-		object.ObjectDetailedID = objectDetail.ID
-		break
-
-	case "mjd_objects":
-
-		objectDetail, err := service.mjdObjectRepo.Create(model.MJD_Object{
-			Model:          data.Model,
-			AmountStores:   data.AmountStores,
-			AmountEntraces: data.AmountEntraces,
-			HasBasement:    data.HasBasement,
-		})
-		if err != nil {
-			return model.Object{}, err
-		}
-
-		object.ObjectDetailedID = objectDetail.ID
-		break
-
-	case "sip_objects":
-
-		objectDetail, err := service.sipObjectRepo.Create(model.SIP_Object{
-			AmountFeeders: data.AmountFeeders,
-		})
-		if err != nil {
-			return model.Object{}, err
-		}
-
-		object.ObjectDetailedID = objectDetail.ID
-		break
-
-	case "stvt_objects":
-
-		objectDetail, err := service.stvtObjectRepo.Create(model.STVT_Object{
-			VoltageClass:  data.VoltageClass,
-			TTCoefficient: data.TTCoefficient,
-		})
-		if err != nil {
-			return model.Object{}, err
-		}
-
-		object.ObjectDetailedID = objectDetail.ID
-		break
-
-	case "tp_objects":
-
-		objectDetail, err := service.tpObjectRepo.Create(model.TP_Object{
-			Model:        data.Model,
-			VoltageClass: data.VoltageClass,
-			Nourashes:    data.Nourashes,
-		})
-		if err != nil {
-			return model.Object{}, err
-		}
-
-		object.ObjectDetailedID = objectDetail.ID
-		break
 
 	default:
 		return model.Object{}, fmt.Errorf("Неправильный тип объекта")
@@ -184,10 +132,10 @@ func (service *objectService) Create(data dto.ObjectCreate) (model.Object, error
 		})
 	}
 
-  _, err = service.supervisorObjectsRepo.CreateBatch(supervisorObjects)
-  if err != nil {
-    return model.Object{}, err
-  }
+	_, err = service.supervisorObjectsRepo.CreateBatch(supervisorObjects)
+	if err != nil {
+		return model.Object{}, err
+	}
 
 	return object, nil
 }

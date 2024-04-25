@@ -8,7 +8,7 @@ import (
 type InvoiceOutputPaginated struct {
 	ID                   uint      `json:"id"`
 	WarehouseManagerName string    `json:"warehouseManagerName"`
-	ReceivedName         string    `json:"releasedName"`
+	ReleasedName         string    `json:"releasedName"`
 	RecipientName        string    `json:"recipientName"`
 	TeamName             string    `json:"teamName"`
 	ObjectName           string    `json:"objectName"`
@@ -17,7 +17,6 @@ type InvoiceOutputPaginated struct {
 	Notes                string    `json:"notes"`
 	DateOfInvoice        time.Time `json:"dateOfInvoice"`
 	Confirmation         bool      `json:"confirmation"`
-	ObjectConfirmation   bool      `json:"objectConfirmation"`
 }
 
 type InvoiceOutputItem struct {
@@ -39,6 +38,7 @@ type InvoiceObject struct {
 }
 
 type InvoiceOutputReportFilterRequest struct {
+	ProjectID        uint      `json:"projectID"`
 	Code             string    `json:"code"`
 	WarehouseManager string    `json:"warehouseManager"`
 	Received         string    `json:"recieved"`

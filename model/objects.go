@@ -9,6 +9,7 @@ type Object struct {
 	Type             string `json:"type" gorm:"tinyText"`
 	Name             string `json:"name" gorm:"tinyText"`
 	Status           string `json:"status" gorm:"tinyText"`
+	ProjectID        uint   `json:"projectID"`
 
 	SupervisorObjectss []SupervisorObjects `json:"-" gorm:"foreignKey:ObjectID"`
 	TeamObjectss       []TeamObjects       `json:"-" gorm:"foreignKey:ObjectID"`
@@ -18,11 +19,11 @@ type Object struct {
 }
 
 type MJD_Object struct {
-	ID             uint   `json:"id" gorm:"primaryKey"`
-	Model          string `json:"model" gorm:"tinyText"`
-	AmountStores   uint   `json:"amountStores"`
-	AmountEntraces uint   `json:"amountEntraces"`
-	HasBasement    bool   `json:"hasBasement"`
+	ID              uint   `json:"id" gorm:"primaryKey"`
+	Model           string `json:"model" gorm:"tinyText"`
+	AmountStores    uint   `json:"amountStores"`
+	AmountEntrances uint   `json:"amountEntrances"`
+	HasBasement     bool   `json:"hasBasement"`
 }
 
 type TP_Object struct {

@@ -1,59 +1,91 @@
 package service
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/repository"
 	"backend-v2/model"
-	"backend-v2/pkg/utils"
 )
 
-type tpTPObjectService struct {
-	tpTPObjectRepo repository.ITPObjectRepository
+type tpObjectService struct {
+	tpObjectRepo repository.ITPObjectRepository
 }
 
-func InitTPObjectService(tpTPObjectRepo repository.ITPObjectRepository) ITPObjectService {
-	return &tpTPObjectService{
-		tpTPObjectRepo: tpTPObjectRepo,
+func InitTPObjectService(tpObjectRepo repository.ITPObjectRepository) ITPObjectService {
+	return &tpObjectService{
+		tpObjectRepo: tpObjectRepo,
 	}
 }
 
 type ITPObjectService interface {
-	GetAll() ([]model.TP_Object, error)
-	GetPaginated(page, limit int, data model.TP_Object) ([]model.TP_Object, error)
-	GetByID(id uint) (model.TP_Object, error)
-	Create(data model.TP_Object) (model.TP_Object, error)
-	Update(data model.TP_Object) (model.TP_Object, error)
-	Delete(id uint) error
-	Count() (int64, error)
+	GetPaginated(page, limit int, projectID uint) ([]dto.TPObjectPaginated, error)
+	Count(projectID uint) (int64, error)
+	Create(data dto.TPObjectCreate) (model.TP_Object, error)
+	Update(data dto.TPObjectCreate) (model.TP_Object, error)
+	Delete(id, projectID uint) error
 }
 
-func (service *tpTPObjectService) GetAll() ([]model.TP_Object, error) {
-	return service.tpTPObjectRepo.GetAll()
-}
+func (service *tpObjectService) GetPaginated(page, limit int, projectID uint) ([]dto.TPObjectPaginated, error) {
 
-func (service *tpTPObjectService) GetPaginated(page, limit int, data model.TP_Object) ([]model.TP_Object, error) {
-	if !(utils.IsEmptyFields(data)) {
-		return service.tpTPObjectRepo.GetPaginatedFiltered(page, limit, data)
+	data, err := service.tpObjectRepo.GetPaginated(page, limit, projectID)
+	if err != nil {
+		return []dto.TPObjectPaginated{}, err
 	}
 
-	return service.tpTPObjectRepo.GetPaginated(page, limit)
+	result := []dto.TPObjectPaginated{}
+	latestEntry := dto.TPObjectPaginated{}
+	for index, object := range data {
+		if index == 0 {
+			latestEntry = dto.TPObjectPaginated{
+				ObjectID:         object.ObjectID,
+				ObjectDetailedID: object.ObjectDetailedID,
+				Name:             object.Name,
+				Status:           object.Status,
+				Model:            object.Model,
+				VoltageClass:     object.VoltageClass,
+				Nourashes:        object.Nourashes,
+				Supervisors:      []string{},
+			}
+		}
+
+		if latestEntry.ObjectID == object.ObjectID {
+			latestEntry.Supervisors = append(latestEntry.Supervisors, object.SupervisorName)
+		} else {
+
+			result = append(result, latestEntry)
+			latestEntry = dto.TPObjectPaginated{
+				ObjectID:         object.ObjectID,
+				ObjectDetailedID: object.ObjectDetailedID,
+				Name:             object.Name,
+				Status:           object.Status,
+				Model:            object.Model,
+				VoltageClass:     object.VoltageClass,
+				Nourashes:        object.Nourashes,
+				Supervisors: []string{
+					object.SupervisorName,
+				},
+			}
+		}
+	}
+
+	if len(data) != 0 {
+		result = append(result, latestEntry)
+	}
+
+	return result, nil
 }
 
-func (service *tpTPObjectService) GetByID(id uint) (model.TP_Object, error) {
-	return service.tpTPObjectRepo.GetByID(id)
+func (service *tpObjectService) Count(projectID uint) (int64, error) {
+	return service.tpObjectRepo.Count(projectID)
 }
 
-func (service *tpTPObjectService) Create(data model.TP_Object) (model.TP_Object, error) {
-	return service.tpTPObjectRepo.Create(data)
+func (service *tpObjectService) Create(data dto.TPObjectCreate) (model.TP_Object, error) {
+	return service.tpObjectRepo.Create(data)
 }
 
-func (service *tpTPObjectService) Update(data model.TP_Object) (model.TP_Object, error) {
-	return service.tpTPObjectRepo.Update(data)
+func (service *tpObjectService) Update(data dto.TPObjectCreate) (model.TP_Object, error) {
+	return service.tpObjectRepo.Update(data)
 }
 
-func (service *tpTPObjectService) Delete(id uint) error {
-	return service.tpTPObjectRepo.Delete(id)
-}
-
-func (service *tpTPObjectService) Count() (int64, error) {
-	return service.tpTPObjectRepo.Count()
+func (service *tpObjectService) Delete(id, projectID uint) error {
+	return service.tpObjectRepo.Delete(id, projectID)
 }

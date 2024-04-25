@@ -20,7 +20,7 @@ func InitInvoiceInputRepository(db *gorm.DB) IInovoiceInputRepository {
 type IInovoiceInputRepository interface {
 	GetAll() ([]model.InvoiceInput, error)
 	GetPaginated(page, limit int) ([]model.InvoiceInput, error)
-	GetPaginatedFiltered(page, limit int, filter model.InvoiceInput) ([]model.InvoiceInput, error)
+	GetPaginatedFiltered(page, limit int, filter model.InvoiceInput) ([]dto.InvoiceInputPaginated, error)
 	GetByID(id uint) (model.InvoiceInput, error)
 	Create(data model.InvoiceInput) (model.InvoiceInput, error)
 	Update(data model.InvoiceInput) (model.InvoiceInput, error)
@@ -44,15 +44,27 @@ func (repo *invoiceInputRespository) GetPaginated(page, limit int) ([]model.Invo
 	return data, err
 }
 
-func (repo *invoiceInputRespository) GetPaginatedFiltered(page, limit int, filter model.InvoiceInput) ([]model.InvoiceInput, error) {
-	data := []model.InvoiceInput{}
+func (repo *invoiceInputRespository) GetPaginatedFiltered(page, limit int, filter model.InvoiceInput) ([]dto.InvoiceInputPaginated, error) {
+	data := []dto.InvoiceInputPaginated{}
 	err := repo.db.
-		Raw(`SELECT * FROM invoice_inputs WHERE
-			(nullif(?, 0) IS NULL OR project_id = ?) AND
-			(nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR released_worker_id = ?) AND
-			(nullif(?, '') IS NULL OR delivery_code = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.ProjectID, filter.ProjectID,
+		Raw(`
+      SELECT 
+        invoice_inputs.id as id,
+        invoice_inputs.confirmed as confirmation,
+        invoice_inputs.delivery_code as delivery_code,
+        warehouse_manager.name as warehouse_manager_name,
+        released.name as released_name,
+        invoice_inputs.date_of_invoice as date_of_invoice
+      FROM invoice_inputs
+        INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_inputs.warehouse_manager_worker_id
+        INNER JOIN workers AS released ON released.id = invoice_inputs.released_worker_id
+      WHERE 
+        project_id = ? AND
+        (nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
+        (nullif(?, 0) IS NULL OR released_worker_id = ?) AND
+        (nullif(?, '') IS NULL OR delivery_code = ?) ORDER BY invoice_inputs.id DESC LIMIT ? OFFSET ?;
+    `,
+			filter.ProjectID, 
 			filter.WarehouseManagerWorkerID, filter.WarehouseManagerWorkerID,
 			filter.ReleasedWorkerID, filter.ReleasedWorkerID,
 			filter.DeliveryCode, filter.DeliveryCode,

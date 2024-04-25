@@ -12,3 +12,11 @@ type InvoiceMaterial struct {
 	Notes         string          `json:"notes"`
 	Unit          string          `json:"unit"`
 }
+
+type InvoiceMaterialsView struct {
+	ID           uint            `json:"id"`
+	MaterialName string          `json:"materialName"`
+	CostM19      decimal.Decimal `json:"costM19"`
+	Amount       float64         `json:"amount"`
+	Notes        string          `json:"notes"`
+}

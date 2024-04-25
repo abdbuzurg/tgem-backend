@@ -15,47 +15,55 @@ func Permission(db *gorm.DB) gin.HandlerFunc {
 
 		roleID := c.GetUint("roleID")
 
-		var permissions []model.Permission
-		err := db.Find(&permissions, "role_id = ?", roleID).Error
+		path := c.Request.URL.Path
+		splittedpath := strings.Split(path, "/")
+		resourceUrl := "/" + splittedpath[1]
+
+		var permission model.Permission
+		err := db.Raw(`
+      SELECT 
+        permissions.role_id as role_id,
+        permissions.resource_id as resource_id,
+        permissions.r as r,
+        permissions.w as w,
+        permissions.u as u,
+        permissions.d as d
+      FROM permissions
+        INNER JOIN resources ON permissions.resource_id = resources.id
+        INNER JOIN roles ON permissions.role_id = roles.id
+      WHERE
+        resources.url = ?
+        AND roles.id = ?
+    `, resourceUrl, roleID).
+			Scan(&permission).
+			Error
 		if err != nil {
 			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
 			c.Abort()
 			return
 		}
 
-		path := c.Request.URL.Path
-		splittedpath := strings.Split(path, "/")
-		resourceUrl := "/" + splittedpath[1]
-
-		var indexOfThePermission int = -1
-		for index, permission := range permissions {
-			if permission.ResourceUrl == resourceUrl {
-				indexOfThePermission = index
-				break
-			}
-		}
-
 		requestMethod := c.Request.Method
 
-		if requestMethod == "GET" && !permissions[indexOfThePermission].R {
+		if requestMethod == "GET" && !permission.R {
 			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
 			c.Abort()
 			return
 		}
 
-		if requestMethod == "POST" && !permissions[indexOfThePermission].W {
+		if requestMethod == "POST" && !permission.W {
 			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
 			c.Abort()
 			return
 		}
 
-		if requestMethod == "PATCH" && !permissions[indexOfThePermission].U {
+		if requestMethod == "PATCH" && !permission.U {
 			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
 			c.Abort()
 			return
 		}
 
-		if requestMethod == "DELETE" && !permissions[indexOfThePermission].D {
+		if requestMethod == "DELETE" && !permission.D {
 			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
 			c.Abort()
 			return

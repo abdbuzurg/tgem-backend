@@ -49,11 +49,13 @@ type IInvoiceInputService interface {
 	// Update(data dto.InvoiceInput) (dto.InvoiceInput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
-	Confirmation(id uint) error
+	Confirmation(id, projectID uint) error
 	UniqueCode(projectID uint) ([]string, error)
 	UniqueWarehouseManager(projectID uint) ([]string, error)
 	UniqueReleased(projectID uint) ([]string, error)
 	Report(filter dto.InvoiceInputReportFilterRequest, projectID uint) (string, error)
+	NewMaterialCost(data model.MaterialCost) error
+	NewMaterialAndItsCost(data dto.NewMaterialDataFromInvoiceInput) error
 }
 
 func (service *invoiceInputService) GetAll() ([]model.InvoiceInput, error) {
@@ -61,42 +63,7 @@ func (service *invoiceInputService) GetAll() ([]model.InvoiceInput, error) {
 }
 
 func (service *invoiceInputService) GetPaginated(page, limit int, data model.InvoiceInput) ([]dto.InvoiceInputPaginated, error) {
-	result := []dto.InvoiceInputPaginated{}
-	invoiceInputs := []model.InvoiceInput{}
-	var err error
-	if !utils.IsEmptyFields(data) {
-		invoiceInputs, err = service.invoiceInputRepo.GetPaginatedFiltered(page, limit, data)
-	} else {
-		invoiceInputs, err = service.invoiceInputRepo.GetPaginated(page, limit)
-	}
-
-	if err != nil {
-		return []dto.InvoiceInputPaginated{}, err
-	}
-
-	for _, invoiceInput := range invoiceInputs {
-		warehouseManager, err := service.workerRepo.GetByID(invoiceInput.WarehouseManagerWorkerID)
-		if err != nil {
-			return []dto.InvoiceInputPaginated{}, err
-		}
-
-		released, err := service.workerRepo.GetByID(invoiceInput.ReleasedWorkerID)
-		if err != nil {
-			return []dto.InvoiceInputPaginated{}, err
-		}
-
-		result = append(result, dto.InvoiceInputPaginated{
-			ID:                   invoiceInput.ID,
-			WarehouseManagerName: warehouseManager.Name,
-			ReleasedName:         released.Name,
-			DeliveryCode:         invoiceInput.DeliveryCode,
-			Notes:                invoiceInput.Notes,
-			DateOfInvoice:        invoiceInput.DateOfInvoice,
-			Confirmation:         invoiceInput.Confirmed,
-		})
-	}
-
-	return result, nil
+	return service.invoiceInputRepo.GetPaginatedFiltered(page, limit, data)
 }
 
 func (service *invoiceInputService) GetByID(id uint) (model.InvoiceInput, error) {
@@ -110,17 +77,18 @@ func (service *invoiceInputService) Create(data dto.InvoiceInput) (dto.InvoiceIn
 		return dto.InvoiceInput{}, err
 	}
 
-	code := utils.UniqueCodeGeneration("П", count, data.Details.ProjectID)
+	code := utils.UniqueCodeGeneration("П", count+1, data.Details.ProjectID)
 	data.Details.DeliveryCode = code
 
 	invoiceInput, err := service.invoiceInputRepo.Create(data.Details)
 	if err != nil {
 		return dto.InvoiceInput{}, err
 	}
-  data.Details = invoiceInput
+	data.Details = invoiceInput
 
 	for _, item := range data.Items {
 		invoiceMaterial, err := service.invoiceMaterialRepo.Create(model.InvoiceMaterials{
+			ProjectID:      data.Details.ProjectID,
 			MaterialCostID: item.MaterialData.MaterialCostID,
 			InvoiceID:      invoiceInput.ID,
 			IsDefected:     item.MaterialData.IsDefected,
@@ -200,24 +168,29 @@ func (service *invoiceInputService) Count(projectID uint) (int64, error) {
 	return service.invoiceInputRepo.Count(projectID)
 }
 
-func (service *invoiceInputService) Confirmation(id uint) error {
+func (service *invoiceInputService) Confirmation(id, projectID uint) error {
 	invoiceInput, err := service.invoiceInputRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
 	invoiceInput.Confirmed = true
+
 	invoiceInput, err = service.invoiceInputRepo.Update(invoiceInput)
 	if err != nil {
 		return err
 	}
 
-	invoiceMaterials, err := service.invoiceMaterialRepo.GetByInvoice(invoiceInput.ID, "input")
+	invoiceMaterials, err := service.invoiceMaterialRepo.GetByInvoice(invoiceInput.ProjectID, invoiceInput.ID, "input")
 	if err != nil {
 		return err
 	}
 
+	fmt.Println(invoiceMaterials)
+
 	for _, invoiceMaterial := range invoiceMaterials {
-		materialLocation, err := service.materailLocationRepo.GetByMaterialCostIDOrCreate(invoiceMaterial.MaterialCostID, "warehouse", 0)
+
+		fmt.Println(invoiceMaterial)
+		materialLocation, err := service.materailLocationRepo.GetByMaterialCostIDOrCreate(invoiceInput.ProjectID, invoiceMaterial.MaterialCostID, "warehouse", 0)
 		if err != nil {
 			return err
 		}
@@ -333,7 +306,7 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 
 	rowCount := 2
 	for _, invoice := range invoices {
-		invoiceMaterials, err := service.invoiceMaterialRepo.GetByInvoice(invoice.ID, "input")
+		invoiceMaterials, err := service.invoiceMaterialRepo.GetByInvoice(filter.ProjectID, invoice.ID, "input")
 		if err != nil {
 			return "", err
 		}
@@ -382,6 +355,7 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 			f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), materialCost.CostM19)
 			f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.Notes)
 			rowCount++
+
 		}
 	}
 
@@ -392,4 +366,33 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 	}
 
 	return fileName, nil
+}
+
+func (service *invoiceInputService) NewMaterialCost(data model.MaterialCost) error {
+	_, err := service.materialCostRepo.Create(data)
+	return err
+}
+
+func (service *invoiceInputService) NewMaterialAndItsCost(data dto.NewMaterialDataFromInvoiceInput) error {
+
+	material, err := service.materialRepo.Create(model.Material{
+		Category:        data.Category,
+		Code:            data.Code,
+		Name:            data.Name,
+		Unit:            data.Unit,
+		ProjectID:       data.ProjectID,
+		Notes:           data.Notes,
+		HasSerialNumber: data.HasSerialNumber,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = service.materialCostRepo.Create(model.MaterialCost{
+		MaterialID:       material.ID,
+		CostPrime:        data.CostPrime,
+		CostM19:          data.CostM19,
+		CostWithCustomer: data.CostWithCustomer,
+	})
+
+	return err
 }

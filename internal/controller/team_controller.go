@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
@@ -126,7 +127,7 @@ func (controller *teamController) GetByID(c *gin.Context) {
 }
 
 func (controller *teamController) Create(c *gin.Context) {
-	var createData model.Team
+	var createData dto.TeamMutation
 	if err := c.ShouldBindJSON(&createData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return

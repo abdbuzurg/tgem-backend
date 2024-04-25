@@ -41,6 +41,8 @@ type IInvoiceInputController interface {
 	UniqueReleased(c *gin.Context)
 	UniqueWarehouseManager(c *gin.Context)
 	Report(c *gin.Context)
+  NewMaterial(c *gin.Context)
+  NewMaterialCost(c *gin.Context)
 }
 
 func (controller *invoiceInputController) GetAll(c *gin.Context) {
@@ -456,7 +458,7 @@ func (controller *invoiceInputController) Confirmation(c *gin.Context) {
 
 	}
 
-	err = controller.invoiceInputService.Confirmation(uint(id))
+	err = controller.invoiceInputService.Confirmation(uint(id), projectID)
 	if err != nil {
 
 		controller.userActionService.Create(model.UserAction{
@@ -640,6 +642,7 @@ func (controller *invoiceInputController) Report(c *gin.Context) {
 
 	}
 
+  filter.ProjectID = projectID
 	filename, err := controller.invoiceInputService.Report(filter, projectID)
 	if err != nil {
 
@@ -670,4 +673,39 @@ func (controller *invoiceInputController) Report(c *gin.Context) {
 	})
 	c.FileAttachment("./pkg/excels/report/"+filename, filename)
 	// response.ResponseSuccess(c, true)
+}
+
+func(controller *invoiceInputController) NewMaterial(c *gin.Context) {
+  var data dto.NewMaterialDataFromInvoiceInput
+  if err := c.ShouldBindJSON(&data); err != nil {
+    response.ResponseError(c, fmt.Sprintf("Неверное тело запроса %v", err))
+    return
+  }
+
+  projectID := c.GetUint("projectID")
+  data.ProjectID = projectID
+
+  err := controller.invoiceInputService.NewMaterialAndItsCost(data)
+  if err != nil {
+    response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+    return
+  }
+
+  response.ResponseSuccess(c, true)
+}
+
+func(controller *invoiceInputController) NewMaterialCost(c *gin.Context) {
+  var data model.MaterialCost
+  if err := c.ShouldBindJSON(&data); err != nil {
+    response.ResponseError(c, fmt.Sprintf("Неверное тело запроса %v", err))
+    return
+  }
+
+  err := controller.invoiceInputService.NewMaterialCost(data)
+  if err != nil {
+    response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+    return
+  }
+
+  response.ResponseSuccess(c, true)
 }

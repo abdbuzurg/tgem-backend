@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/model"
 
 	"gorm.io/gorm"
@@ -19,7 +20,7 @@ func InitTeamRepostory(db *gorm.DB) ITeamRepository {
 type ITeamRepository interface {
 	GetAll() ([]model.Team, error)
 	GetPaginated(page, limit int) ([]model.Team, error)
-	GetPaginatedFiltered(page, limit int, filter model.Team) ([]model.Team, error)
+	GetPaginatedFiltered(page, limit int, filter model.Team) ([]dto.TeamPaginatedQuery, error)
 	GetByID(id uint) (model.Team, error)
   GetByRangeOfIDs(ids []uint) ([]model.Team, error)
   GetByNumber(number string) (model.Team, error)
@@ -41,15 +42,29 @@ func (repo *teamRepository) GetPaginated(page, limit int) ([]model.Team, error) 
 	return data, err
 }
 
-func (repo *teamRepository) GetPaginatedFiltered(page, limit int, filter model.Team) ([]model.Team, error) {
-	data := []model.Team{}
+func (repo *teamRepository) GetPaginatedFiltered(page, limit int, filter model.Team) ([]dto.TeamPaginatedQuery, error) {
+	data := []dto.TeamPaginatedQuery{}
 	err := repo.db.
-		Raw(`SELECT * FROM teams WHERE
-			(nullif(?, '') IS NULL OR leader_worker_id = ?) AND
-			(nullif(?, '') IS NULL OR number = ?) AND
-			(nullif(?, '') IS NULL OR mobile_number = ?) AND
-			(nullif(?, '') IS NULL OR company = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.LeaderWorkerID, filter.LeaderWorkerID, filter.Number, filter.Number, filter.MobileNumber, filter.MobileNumber, filter.Company, filter.Company, limit, (page-1)*limit,
+		Raw(`SELECT 
+          teams.id as id,
+          teams.number AS team_number, 
+          workers.name AS leader_name,
+          teams.mobile_number AS team_mobile_number,
+          teams.company AS team_company,
+          objects.name AS object_name
+        FROM teams
+          INNER JOIN workers ON teams.leader_worker_id = workers.id
+          INNER JOIN team_objects ON team_objects.team_id = teams.id
+          INNER JOIN objects ON team_objects.object_id = objects.id
+        WHERE
+          (nullif(?, 0) IS NULL OR teams.leader_worker_id = ?) AND
+          (nullif(?, '') IS NULL OR teams.number = ?) AND
+          (nullif(?, '') IS NULL OR teams.mobile_number = ?) AND
+          (nullif(?, '') IS NULL OR teams.company = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
+			filter.LeaderWorkerID, filter.LeaderWorkerID, 
+      filter.Number, filter.Number, 
+      filter.MobileNumber, filter.MobileNumber, 
+      filter.Company, filter.Company, limit, (page-1)*limit,
 		).
 		Scan(&data).Error
 

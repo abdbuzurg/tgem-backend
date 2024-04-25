@@ -19,6 +19,8 @@ type invoiceReturnService struct {
 	invoiceMaterialsRepo repository.IInvoiceMaterialsRepository
 	materialRepo         repository.IMaterialRepository
 	materialCostRepo     repository.IMaterialCostRepository
+	materialDefectRepo   repository.IMaterialDefectRepository
+	serialNumberRepo     repository.ISerialNumberRepository
 }
 
 func InitInvoiceReturnService(
@@ -30,6 +32,8 @@ func InitInvoiceReturnService(
 	invoiceMaterialsRepo repository.IInvoiceMaterialsRepository,
 	materialRepo repository.IMaterialRepository,
 	materialCostRepo repository.IMaterialCostRepository,
+	materialDefectRepo repository.IMaterialDefectRepository,
+	serialNumberRepo repository.ISerialNumberRepository,
 ) IInvoiceReturnService {
 	return &invoiceReturnService{
 		invoiceReturnRepo:    invoiceReturnRepo,
@@ -40,6 +44,8 @@ func InitInvoiceReturnService(
 		invoiceMaterialsRepo: invoiceMaterialsRepo,
 		materialRepo:         materialRepo,
 		materialCostRepo:     materialCostRepo,
+		materialDefectRepo:   materialDefectRepo,
+		serialNumberRepo:     serialNumberRepo,
 	}
 }
 
@@ -55,6 +61,10 @@ type IInvoiceReturnService interface {
 	UniqueTeam(projectID uint) ([]string, error)
 	UniqueObject(projectID uint) ([]string, error)
 	Report(filter dto.InvoiceReturnReportFilterRequest, projectID uint) (string, error)
+	GetMaterialsInLocation(projectID, locationID uint, locationType string) ([]model.Material, error)
+	GetMaterialCostInLocation(projectID, locationID, materialID uint, locationType string) ([]model.MaterialCost, error)
+	GetMaterialAmountInLocation(projectID, locationID, materialCostID uint, locationType string) (float64, error)
+	GetSerialNumberCodesInLocation(projectID, materialID uint, status string) ([]string, error)
 }
 
 func (service *invoiceReturnService) GetAll() ([]model.InvoiceReturn, error) {
@@ -82,12 +92,12 @@ func (service *invoiceReturnService) GetPaginated(page, limit int, data model.In
 
 	for _, invoiceReturn := range invoiceReturns {
 		one := dto.InvoiceReturnPaginated{
-			DateOfInvoice:    invoiceReturn.DateOfInvoice,
-			ID:               invoiceReturn.ID,
-			Notes:            invoiceReturn.Notes,
-			DeliveryCode:     invoiceReturn.DeliveryCode,
-			ProjectName:      "",
-			Confirmation:     invoiceReturn.Confirmation,
+			DateOfInvoice: invoiceReturn.DateOfInvoice,
+			ID:            invoiceReturn.ID,
+			Notes:         invoiceReturn.Notes,
+			DeliveryCode:  invoiceReturn.DeliveryCode,
+			ProjectName:   "",
+			Confirmation:  invoiceReturn.Confirmation,
 		}
 
 		switch invoiceReturn.ReturnerType {
@@ -113,22 +123,23 @@ func (service *invoiceReturnService) GetPaginated(page, limit int, data model.In
 }
 
 func (service *invoiceReturnService) Create(data dto.InvoiceReturn) (dto.InvoiceReturn, error) {
-  
-  count, err := service.invoiceReturnRepo.Count(data.Details.ProjectID)
-  if err != nil {
-    return dto.InvoiceReturn{}, err
-  }
-  
-  data.Details.DeliveryCode = utils.UniqueCodeGeneration("В", count, data.Details.ProjectID)
+
+	count, err := service.invoiceReturnRepo.Count(data.Details.ProjectID)
+	if err != nil {
+		return dto.InvoiceReturn{}, err
+	}
+
+	data.Details.DeliveryCode = utils.UniqueCodeGeneration("В", count+1, data.Details.ProjectID)
 	invoiceReturn, err := service.invoiceReturnRepo.Create(data.Details)
 	if err != nil {
 		return dto.InvoiceReturn{}, err
 	}
 
-  data.Details = invoiceReturn
+	data.Details = invoiceReturn
 
 	for _, invoiceMaterial := range data.Items {
 		_, err = service.invoiceMaterialsRepo.Create(model.InvoiceMaterials{
+			ProjectID:      invoiceReturn.ProjectID,
 			MaterialCostID: invoiceMaterial.MaterialCostID,
 			InvoiceID:      invoiceReturn.ID,
 			InvoiceType:    "return",
@@ -147,7 +158,7 @@ func (service *invoiceReturnService) Create(data dto.InvoiceReturn) (dto.Invoice
 	}
 	sheetName := "Возврат"
 	startingRow := 5
-	currentInvoiceMaterails, err := service.invoiceMaterialsRepo.GetByInvoice(invoiceReturn.ID, "return")
+	currentInvoiceMaterails, err := service.invoiceMaterialsRepo.GetByInvoice(invoiceReturn.ProjectID, invoiceReturn.ID, "return")
 	f.InsertRows(sheetName, startingRow, len(currentInvoiceMaterails))
 
 	defaultStyle, _ := f.NewStyle(&excelize.Style{
@@ -236,18 +247,18 @@ func (service *invoiceReturnService) Confirmation(id uint) error {
 		return err
 	}
 
-	invoiceMaterials, err := service.invoiceMaterialsRepo.GetByInvoice(invoiceReturn.ID, "return")
+	invoiceMaterials, err := service.invoiceMaterialsRepo.GetByInvoice(invoiceReturn.ProjectID, invoiceReturn.ID, "return")
 	if err != nil {
 		return err
 	}
 
 	for _, invoiceMaterial := range invoiceMaterials {
-		oldLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceMaterial.MaterialCostID, invoiceReturn.ReturnerType, invoiceReturn.ReturnerID)
+		oldLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceReturn.ProjectID, invoiceMaterial.MaterialCostID, invoiceReturn.ReturnerType, invoiceReturn.ReturnerID)
 		if err != nil {
 			return err
 		}
 
-		newLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceMaterial.MaterialCostID, "warehouse", 0)
+		newLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceReturn.ProjectID, invoiceMaterial.MaterialCostID, "warehouse", 0)
 		if err != nil {
 			return err
 		}
@@ -255,6 +266,19 @@ func (service *invoiceReturnService) Confirmation(id uint) error {
 		oldLocation.Amount -= invoiceMaterial.Amount
 		newLocation.Amount += invoiceMaterial.Amount
 
+		if invoiceMaterial.IsDefected {
+			materialDefect, err := service.materialDefectRepo.FindOrCreate(newLocation.ID)
+			if err != nil {
+				return err
+			}
+
+			materialDefect.Amount += invoiceMaterial.Amount
+
+			_, err = service.materialDefectRepo.Update(materialDefect)
+			if err != nil {
+				return err
+			}
+		}
 		_, err = service.materialLocationRepo.Update(oldLocation)
 		if err != nil {
 			return err
@@ -364,7 +388,7 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 
 	rowCount := 2
 	for _, invoice := range invoices {
-		invoiceMaterialRepo, err := service.invoiceMaterialsRepo.GetByInvoice(invoice.ID, "output")
+		invoiceMaterialRepo, err := service.invoiceMaterialsRepo.GetByInvoice(projectID, invoice.ID, "output")
 		if err != nil {
 			return "", err
 		}
@@ -431,4 +455,20 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 	}
 
 	return fileName, nil
+}
+
+func (service *invoiceReturnService) GetMaterialsInLocation(projectID, locationID uint, locationType string) ([]model.Material, error) {
+	return service.materialLocationRepo.GetUniqueMaterialsFromLocation(projectID, locationID, locationType)
+}
+
+func (service *invoiceReturnService) GetMaterialCostInLocation(projectID, locationID, materialID uint, locationType string) ([]model.MaterialCost, error) {
+	return service.materialLocationRepo.GetUniqueMaterialCostsFromLocation(projectID, materialID, locationID, locationType)
+}
+
+func (service *invoiceReturnService) GetMaterialAmountInLocation(projectID, locationID, materialCostID uint, locationType string) (float64, error) {
+	return service.materialLocationRepo.GetUniqueMaterialTotalAmount(projectID, materialCostID, locationID, locationType)
+}
+
+func (service *invoiceReturnService) GetSerialNumberCodesInLocation(projectID, materialID uint, status string) ([]string, error) {
+	return service.serialNumberRepo.GetCodesByMaterialIDAndStatus(projectID, materialID, status)
 }

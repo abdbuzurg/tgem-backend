@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"backend-v2/internal/dto"
+	// "backend-v2/internal/dto"
 	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
@@ -25,7 +25,7 @@ func InitInvoiceWriteOffController(invoiceWriteOffService service.IInvoiceWriteO
 type IInvoiceWriteOffController interface {
 	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
-	Create(c *gin.Context)
+	// Create(c *gin.Context)
 	// Update(c *gin.Context)
 	Delete(c *gin.Context)
 	GetRawDocument(c *gin.Context)
@@ -92,21 +92,21 @@ func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
 	response.ResponsePaginatedData(c, data, dataCount)
 }
 
-func (controller *invoiceWriteOffController) Create(c *gin.Context) {
-	var createData dto.InvoiceWriteOff
-	if err := c.ShouldBindJSON(&createData); err != nil {
-		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
-		return
-	}
+// func (controller *invoiceWriteOffController) Create(c *gin.Context) {
+// 	var createData dto.InvoiceWriteOff
+// 	if err := c.ShouldBindJSON(&createData); err != nil {
+// 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+// 		return
+// 	}
 
-	data, err := controller.invoiceWriteOffService.Create(createData)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Invoice: %v", err))
-		return
-	}
+// 	data, err := controller.invoiceWriteOffService.Create(createData)
+// 	if err != nil {
+// 		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Invoice: %v", err))
+// 		return
+// 	}
 
-	response.ResponseSuccess(c, data)
-}
+// 	response.ResponseSuccess(c, data)
+// }
 
 // func (controller *invoiceWriteOffController) Update(c *gin.Context) {
 // 	var updateData dto.InvoiceWriteOff

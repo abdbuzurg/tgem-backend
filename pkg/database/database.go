@@ -47,6 +47,7 @@ func AutoMigrate(db *gorm.DB) {
 	db.AutoMigrate(
 		model.District{},
 		model.Role{},
+    model.Resource{},
 		model.Project{},
 		model.Worker{},
 		model.User{},

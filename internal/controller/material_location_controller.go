@@ -23,7 +23,6 @@ func InitMaterialLocationController(materialLocationService service.IMaterialLoc
 }
 
 type IMaterialLocationController interface {
-	GetTotalAmountByMaterialID(c *gin.Context)
 	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	GetByID(c *gin.Context)
@@ -154,25 +153,6 @@ func (controller *materialLocationController) Create(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, data)
-}
-
-func (controller *materialLocationController) GetTotalAmountByMaterialID(c *gin.Context) {
-
-	materilIDRaw := c.Param("materialID")
-	materialID, err := strconv.ParseUint(materilIDRaw, 10, 64)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
-		return
-	}
-
-	totalAmount, err := controller.materialLocationService.GetTotalAmountByMaterialID(uint(materialID))
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Internal Server Error"))
-		return
-	}
-
-	response.ResponseSuccess(c, totalAmount)
-
 }
 
 func (controller *materialLocationController) Update(c *gin.Context) {

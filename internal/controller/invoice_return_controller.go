@@ -34,6 +34,10 @@ type IInvoiceReturnController interface {
 	UniqueTeam(c *gin.Context)
 	UniqueObject(c *gin.Context)
 	Report(c *gin.Context)
+	GetUniqueMaterialCostsFromLocation(c *gin.Context)
+	GetMaterialsInLocation(c *gin.Context)
+	GetMaterialAmountInLocation(c *gin.Context)
+  GetSerialNumberCodesInLocation(c *gin.Context) 
 }
 
 func (controller *invoiceReturnController) GetAll(c *gin.Context) {
@@ -87,10 +91,10 @@ func (controller *invoiceReturnController) GetPaginated(c *gin.Context) {
 
 	projectID := c.GetUint("projectID")
 	filter := model.InvoiceReturn{
-		ProjectID:            projectID,
-		ReturnerType:         returnerType,
-		ReturnerID:           uint(returnerID),
-		DeliveryCode:         deliveryCode,
+		ProjectID:    projectID,
+		ReturnerType: returnerType,
+		ReturnerID:   uint(returnerID),
+		DeliveryCode: deliveryCode,
 	}
 
 	data, err := controller.invoiceReturnService.GetPaginated(page, limit, filter)
@@ -115,6 +119,8 @@ func (controller *invoiceReturnController) Create(c *gin.Context) {
 		return
 	}
 
+	projectID := c.GetUint("projectID")
+	createData.Details.ProjectID = projectID
 	data, err := controller.invoiceReturnService.Create(createData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Invoice: %v", err))
@@ -230,4 +236,106 @@ func (controller *invoiceReturnController) Report(c *gin.Context) {
 	}
 
 	c.FileAttachment("./pkg/excels/report/"+filename, filename)
+}
+
+func (controller *invoiceReturnController) GetUniqueMaterialCostsFromLocation(c *gin.Context) {
+
+	projectID := c.GetUint("projectID")
+
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+	locationType := c.Param("locationType")
+
+	materialIDRaw := c.Param("materialID")
+	materialID, err := strconv.Atoi(materialIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceReturnService.GetMaterialCostInLocation(projectID, uint(locationID), uint(materialID), locationType)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceReturnController) GetMaterialsInLocation(c *gin.Context) {
+
+	projectID := c.GetUint("projectID")
+
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+	locationType := c.Param("locationType")
+
+	data, err := controller.invoiceReturnService.GetMaterialsInLocation(projectID, uint(locationID), locationType)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceReturnController) GetMaterialAmountInLocation(c *gin.Context) {
+
+	projectID := c.GetUint("projectID")
+
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+	locationType := c.Param("locationType")
+
+	materialCostIDRaw := c.Param("materialCostID")
+	materialCostID, err := strconv.Atoi(materialCostIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceReturnService.GetMaterialAmountInLocation(projectID, uint(locationID), uint(materialCostID), locationType)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
+}
+
+func (controller *invoiceReturnController) GetSerialNumberCodesInLocation(c *gin.Context) {
+
+	materialIDRaw := c.Param("materialID")
+	materialID, err := strconv.Atoi(materialIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+  status := c.Param("status")
+  projectID := c.GetUint("projectID")
+
+  data, err := controller.invoiceReturnService.GetSerialNumberCodesInLocation(projectID, uint(materialID), status)
+  if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+  response.ResponseSuccess(c, data)
 }

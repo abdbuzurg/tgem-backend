@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/model"
 
 	"gorm.io/gorm"
@@ -17,62 +18,167 @@ func InitSIPObjectRepository(db *gorm.DB) ISIPObjectRepository {
 }
 
 type ISIPObjectRepository interface {
-	GetAll() ([]model.SIP_Object, error)
-	GetPaginated(page, limit int) ([]model.SIP_Object, error)
-	GetPaginatedFiltered(page, limit int, filter model.SIP_Object) ([]model.SIP_Object, error)
-	GetByID(id uint) (model.SIP_Object, error)
-	Create(data model.SIP_Object) (model.SIP_Object, error)
-	Update(data model.SIP_Object) (model.SIP_Object, error)
-	Delete(id uint) error
-	Count() (int64, error)
+	GetPaginated(page, limit int, projectID uint) ([]dto.SIPObjectPaginatedQuery, error)
+	Count(projectID uint) (int64, error)
+	Create(data dto.SIPObjectCreate) (model.SIP_Object, error)
+	Update(data dto.SIPObjectCreate) (model.SIP_Object, error)
+	Delete(id, projectID uint) error
 }
 
-func (repo *sipObjectRepository) GetAll() ([]model.SIP_Object, error) {
-	data := []model.SIP_Object{}
-	err := repo.db.Order("id desc").Find(&data).Error
+func (repo *sipObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.SIPObjectPaginatedQuery, error) {
+	data := []dto.SIPObjectPaginatedQuery{}
+	err := repo.db.Raw(`
+      SELECT 
+        objects.id as object_id,
+        objects.object_detailed_id as object_detailed_id,
+        objects.name as name,
+        objects.status as status,
+        s_ip_objects.amount_feeders,
+        workers.name as supervisor_name
+      FROM objects
+        INNER JOIN s_ip_objects ON objects.object_detailed_id = s_ip_objects.id
+        INNER JOIN supervisor_objects ON objects.id = supervisor_objects.object_id
+        INNER JOIN workers ON workers.id = supervisor_objects.supervisor_worker_id
+      WHERE
+        objects.type = 'sip_objects' AND
+        objects.project_id = ?
+      ORDER BY s_ip_objects.id DESC 
+      LIMIT ? 
+      OFFSET ?;
+    `, projectID, limit, (page-1)*limit).Scan(&data).Error
+
 	return data, err
 }
 
-func (repo *sipObjectRepository) GetPaginated(page, limit int) ([]model.SIP_Object, error) {
-	data := []model.SIP_Object{}
-	err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data).Error
-	return data, err
-}
-
-func (repo *sipObjectRepository) GetPaginatedFiltered(page, limit int, filter model.SIP_Object) ([]model.SIP_Object, error) {
-	data := []model.SIP_Object{}
-	err := repo.db.
-		Raw(`SELECT * FROM sip_objects WHERE
-			(nullif(?, '') IS NULL OR amount_feeders = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.AmountFeeders, filter.AmountFeeders, limit, (page-1)*limit,
-		).
-		Scan(&data).Error
-
-	return data, err
-}
-
-func (repo *sipObjectRepository) GetByID(id uint) (model.SIP_Object, error) {
-	data := model.SIP_Object{}
-	err := repo.db.Find(&data, "id = ?", id).Error
-	return data, err
-}
-
-func (repo *sipObjectRepository) Create(data model.SIP_Object) (model.SIP_Object, error) {
-	err := repo.db.Create(&data).Error
-	return data, err
-}
-
-func (repo *sipObjectRepository) Update(data model.SIP_Object) (model.SIP_Object, error) {
-	err := repo.db.Model(&model.SIP_Object{}).Select("*").Updates(&data).Error
-	return data, err
-}
-
-func (repo *sipObjectRepository) Delete(id uint) error {
-	return repo.db.Delete(&model.SIP_Object{}, "id = ?", id).Error
-}
-
-func (repo *sipObjectRepository) Count() (int64, error) {
+func (repo *sipObjectRepository) Count(projectID uint) (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.SIP_Object{}).Count(&count).Error
+	err := repo.db.Raw(`
+    SELECT COUNT(*)
+    FROM objects
+    WHERE
+      objects.type = 'sip_objects' AND
+      objects.project_id = ?
+    `, projectID).Scan(&count).Error
 	return count, err
+}
+
+func (repo *sipObjectRepository) Create(data dto.SIPObjectCreate) (model.SIP_Object, error) {
+	sip := model.SIP_Object{
+		AmountFeeders: data.DetailedInfo.AmountFeeders,
+	}
+
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+
+		if err := tx.Create(&sip).Error; err != nil {
+			return err
+		}
+
+		object := model.Object{
+			ID:               0,
+			ObjectDetailedID: sip.ID,
+			ProjectID:        data.BaseInfo.ProjectID,
+			Name:             data.BaseInfo.Name,
+			Status:           data.BaseInfo.Status,
+			Type:             "sip_objects",
+		}
+
+		if err := tx.Create(&object).Error; err != nil {
+			return err
+		}
+
+		supervisors_object := []model.SupervisorObjects{}
+		for _, supervisorID := range data.Supervisors {
+			supervisors_object = append(supervisors_object, model.SupervisorObjects{
+				ObjectID:           object.ID,
+				SupervisorWorkerID: supervisorID,
+			})
+		}
+
+		if err := tx.CreateInBatches(&supervisors_object, 5).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return sip, err
+
+}
+
+func (repo *sipObjectRepository) Update(data dto.SIPObjectCreate) (model.SIP_Object, error) {
+	sip := model.SIP_Object{
+		ID:            data.BaseInfo.ObjectDetailedID,
+		AmountFeeders: data.DetailedInfo.AmountFeeders,
+	}
+
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+
+		if err := tx.Model(&model.SIP_Object{}).Where("id = ?", sip.ID).Updates(&sip).Error; err != nil {
+			return err
+		}
+
+		object := model.Object{
+			ID:               data.BaseInfo.ID,
+			ProjectID:        data.BaseInfo.ProjectID,
+			ObjectDetailedID: data.BaseInfo.ObjectDetailedID,
+			Name:             data.BaseInfo.Name,
+			Type:             data.BaseInfo.Type,
+			Status:           data.BaseInfo.Status,
+		}
+
+		if err := tx.Model(&model.Object{}).Where("id = ?", object.ID).Updates(&object).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&model.SupervisorObjects{}, "object_id = ?", object.ID).Error; err != nil {
+			return err
+		}
+
+		supervisorsObject := []model.SupervisorObjects{}
+		for _, supervisorWorkerID := range data.Supervisors {
+			supervisorsObject = append(supervisorsObject, model.SupervisorObjects{
+				ObjectID:           object.ID,
+				SupervisorWorkerID: supervisorWorkerID,
+			})
+		}
+
+		if err := tx.CreateInBatches(&supervisorsObject, 5).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return sip, err
+}
+
+func (repo *sipObjectRepository) Delete(id, projectID uint) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		err := tx.Exec(`
+      DELETE FROM supervisor_objects
+      WHERE supervisor_objects.object_id = (
+        SELECT DISTINCT(objects.id)
+        FROM objects
+          INNER JOIN s_ip_objects ON s_ip_objects.id = objects.object_detailed_id
+        WHERE
+          objects.project_id = ? AND
+          s_ip_objects.id = ? AND
+          objects.type = 'sip_objects'
+      );
+    `, projectID, id).Error
+
+		if err != nil {
+			return err
+		}
+
+		if err := tx.Table("s_ip_objects").Delete(&model.SIP_Object{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Table("objects").Delete(&model.Object{}, "object_detailed_id = ? AND type = 'sip_objects'", id).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

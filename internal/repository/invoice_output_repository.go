@@ -20,7 +20,7 @@ func InitInvoiceOutputRepository(db *gorm.DB) IInvoiceOutputRepository {
 type IInvoiceOutputRepository interface {
 	GetAll() ([]model.InvoiceOutput, error)
 	GetPaginated(page, limit int) ([]model.InvoiceOutput, error)
-	GetPaginatedFiltered(page, limit int, filter model.InvoiceOutput) ([]model.InvoiceOutput, error)
+	GetPaginatedFiltered(page, limit int, filter model.InvoiceOutput) ([]dto.InvoiceOutputPaginated, error)
 	GetByID(id uint) (model.InvoiceOutput, error)
 	GetUnconfirmedByObjectInvoices() ([]model.InvoiceOutput, error)
 	Create(data model.InvoiceOutput) (model.InvoiceOutput, error)
@@ -48,19 +48,41 @@ func (repo *invoiceOutputRepository) GetPaginated(page, limit int) ([]model.Invo
 	return data, err
 }
 
-func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filter model.InvoiceOutput) ([]model.InvoiceOutput, error) {
-	data := []model.InvoiceOutput{}
+func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filter model.InvoiceOutput) ([]dto.InvoiceOutputPaginated, error) {
+	data := []dto.InvoiceOutputPaginated{}
 	err := repo.db.
-		Raw(`SELECT * FROM invoice_outputs WHERE
-			(nullif(?, 0) IS NULL OR project_id = ?) AND
-			(nullif(?, 0) IS NULL OR district_id = ?) AND
-			(nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR released_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR recipient_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR team_id = ?) AND
-			(nullif(?, 0) IS NULL OR object_id = ?) AND
-			(nullif(?, '') IS NULL OR delivery_code = ?)  ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.ProjectID, filter.ProjectID,
+		Raw(`
+      SELECT 
+        invoice_outputs.id as id,
+        invoice_outputs.delivery_code as delivery_code,
+        districts.name as district_name,
+        objects.name as object_name,
+        teams.number as team_name,
+        warehouse_manager.name as warehouse_manager_name,
+        released.name as released_name,
+        recipient.name as recipient_name,
+        invoice_outputs.date_of_invoice as date_of_invoice,
+        invoice_outputs.confirmation as confirmation,
+        invoice_outputs.notes as notes
+      FROM invoice_outputs
+        INNER JOIN districts ON districts.id = invoice_outputs.district_id
+        INNER JOIN teams ON teams.id = invoice_outputs.team_id
+        INNER JOIN objects ON objects.id = invoice_outputs.object_id
+        INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_outputs.warehouse_manager_worker_id
+        INNER JOIN workers AS released ON released.id = invoice_outputs.released_worker_id
+        INNER JOIN workers AS recipient ON recipient.id = invoice_outputs.recipient_worker_id
+      WHERE
+        project_id = ? AND
+        (nullif(?, 0) IS NULL OR district_id = ?) AND
+        (nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
+        (nullif(?, 0) IS NULL OR released_worker_id = ?) AND
+        (nullif(?, 0) IS NULL OR recipient_worker_id = ?) AND
+        (nullif(?, 0) IS NULL OR team_id = ?) AND
+        (nullif(?, 0) IS NULL OR object_id = ?) AND
+        (nullif(?, '') IS NULL OR delivery_code = ?) ORDER BY invoice_outputs.id DESC LIMIT ? OFFSET ?;
+
+      `,
+			filter.ProjectID, 
 			filter.DistrictID, filter.DistrictID,
 			filter.WarehouseManagerWorkerID, filter.WarehouseManagerWorkerID,
 			filter.ReleasedWorkerID, filter.ReleasedWorkerID,
@@ -174,4 +196,8 @@ func (repo *invoiceOutputRepository) ReportFilterData(filter dto.InvoiceOutputRe
 		Scan(&data).Error
 
 	return data, err
+}
+
+func(repo *invoiceOutputRepository) AmountOfMaterialInALocation(materialID uint) (float64, error) {
+  return 0, nil
 }

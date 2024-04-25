@@ -45,7 +45,6 @@ type IMaterialLocationService interface {
 	GetAll() ([]model.MaterialLocation, error)
 	GetPaginated(page, limit int, data model.MaterialLocation) ([]model.MaterialLocation, error)
 	GetByID(id uint) (model.MaterialLocation, error)
-	GetTotalAmountByMaterialID(materialID uint) (float64, error)
 	Create(data model.MaterialLocation) (model.MaterialLocation, error)
 	Update(data model.MaterialLocation) (model.MaterialLocation, error)
 	Delete(id uint) error
@@ -86,31 +85,6 @@ func (service *materialLocationService) Delete(id uint) error {
 
 func (service *materialLocationService) Count() (int64, error) {
 	return service.materialLocationRepo.Count()
-}
-
-func (service *materialLocationService) GetTotalAmountByMaterialID(materialID uint) (float64, error) {
-
-	materialCosts, err := service.materialCostRepo.GetByMaterialID(materialID)
-	if err != nil {
-		return 0, err
-	}
-
-	var total float64
-	for _, materialCost := range materialCosts {
-		materialLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(
-			materialCost.ID,
-			"warehouse",
-			0,
-		)
-		if err != nil {
-			return 0, err
-		}
-
-		total += materialLocation.Amount
-
-	}
-
-	return total, nil
 }
 
 func (service *materialLocationService) GetMaterialsInLocation(

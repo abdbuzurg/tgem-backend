@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/model"
 
 	"gorm.io/gorm"
@@ -25,8 +26,9 @@ type IInvoiceMaterialsRepository interface {
 	Update(data model.InvoiceMaterials) (model.InvoiceMaterials, error)
 	Delete(id uint) error
 	Count() (int64, error)
-	GetByInvoice(invoiceID uint, invoceType string) ([]model.InvoiceMaterials, error)
+	GetByInvoice(projectID, invoiceID uint, invoceType string) ([]model.InvoiceMaterials, error)
   GetByMaterialCostID(materialCostID uint, invoiceType string, invoiceID uint) (model.InvoiceMaterials, error)
+  GetByInvoiceData(projectID, invoiceID uint, invoiceType string) ([]dto.InvoiceMaterialsView, error)
 }
 
 func (repo *invoiceMaterialsRepository) GetAll() ([]model.InvoiceMaterials, error) {
@@ -84,9 +86,9 @@ func (repo *invoiceMaterialsRepository) Count() (int64, error) {
 	return count, err
 }
 
-func (repo *invoiceMaterialsRepository) GetByInvoice(invoiceID uint, invoiceType string) ([]model.InvoiceMaterials, error) {
+func (repo *invoiceMaterialsRepository) GetByInvoice(projectID, invoiceID uint, invoiceType string) ([]model.InvoiceMaterials, error) {
 	data := []model.InvoiceMaterials{}
-	err := repo.db.Find(&data, "invoice_id = ?", invoiceID).Error
+	err := repo.db.Find(&data, "invoice_id = ? AND invoice_type = ? AND project_id = ?", invoiceID, invoiceType, projectID).Error
 	return data, err
 }
 
@@ -99,5 +101,29 @@ func(repo *invoiceMaterialsRepository) GetByMaterialCostID(
   err := repo.db.Raw(`
     SELECT * FROM invoice_materials WHERE material_cost_id = ? AND invoice_type = ? AND invoice_id = ?
     `, materialCostID, invoiceType, invoiceID).Scan(&data).Error
+  return data, err
+}
+
+func(repo *invoiceMaterialsRepository) GetByInvoiceData(
+  projectID, invoiceID uint, 
+  invoiceType string,
+) ([]dto.InvoiceMaterialsView, error) {
+  data := []dto.InvoiceMaterialsView{}
+  err := repo.db.Raw(`
+    SELECT 
+      invoice_materials.id as id,
+      materials.name as material_name,
+      material_costs.cost_m19 as cost_m19,
+      invoice_materials.amount as amount,
+      invoice_materials.notes as notes
+    FROM invoice_materials
+      INNER JOIN material_costs ON material_costs.id = invoice_materials.material_cost_id
+      INNER JOIN materials ON materials.id = material_costs.material_id
+    WHERE
+      invoice_materials.project_id = ? AND
+      invoice_materials.invoice_type = ? AND
+      invoice_materials.invoice_id = ?;
+    `, projectID, invoiceType, invoiceID).Scan(&data).Error
+
   return data, err
 }

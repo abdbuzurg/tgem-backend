@@ -3,6 +3,8 @@ package dto
 import (
 	"backend-v2/model"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type InvoiceInput struct {
@@ -19,17 +21,14 @@ type InvoiceInputPaginated struct {
 	ID                   uint      `json:"id"`
 	WarehouseManagerName string    `json:"warehouseManagerName"`
 	ReleasedName         string    `json:"releasedName"`
-	OperatorAddName      string    `json:"operatorAddName"`
-	OperatorEditName     string    `json:"operatorEditName"`
-	DeliveryCode         string    `json:"deliveryCode"`
+  DeliveryCode         string    `json:"deliveryCode"`
 	Notes                string    `json:"notes"`
 	DateOfInvoice        time.Time `json:"dateOfInvoice"`
-	DateOfAdd            time.Time `json:"dateOfAdd"`
-	DateOfEdit           time.Time `json:"dateOfEdit"`
 	Confirmation         bool      `json:"confirmation"`
 }
 
 type InvoiceInputReportFilterRequest struct {
+	ProjectID        uint      `json:"projectID"`
 	Code             string    `json:"code"`
 	WarehouseManager string    `json:"warehouseManager"`
 	Released         string    `json:"released"`
@@ -43,4 +42,17 @@ type InvoiceInputReportFilter struct {
 	ReleasedID         uint
 	DateFrom           time.Time
 	DateTo             time.Time
+}
+
+type NewMaterialDataFromInvoiceInput struct {
+	Category         string          `json:"category" gorm:"tinyText"`
+	Code             string          `json:"code" gorm:"tinyText"`
+	Name             string          `json:"name" gorm:"tinyText"`
+	Unit             string          `json:"unit" gorm:"tinyText"`
+	Notes            string          `json:"notes"`
+	ProjectID        uint            `json:"projectID"`
+	HasSerialNumber  bool            `json:"hasSerialNumber"`
+	CostPrime        decimal.Decimal `json:"costPrime" gorm:"type:decimal(20,4)"`
+	CostM19          decimal.Decimal `json:"costM19" gorm:"type:decimal(20,4)"`
+	CostWithCustomer decimal.Decimal `json:"costWithCustomer" gorm:"type:decimal(20,4)"`
 }

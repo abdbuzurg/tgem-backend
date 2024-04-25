@@ -31,7 +31,6 @@ type IInvoiceOutputController interface {
 	GetDocument(c *gin.Context)
 	Confirmation(c *gin.Context)
 	GetUnconfirmedByObjectInvoices(c *gin.Context)
-	ConfirmByObject(c *gin.Context)
 	UniqueCode(c *gin.Context)
 	UniqueWarehouseManager(c *gin.Context)
 	UniqueRecieved(c *gin.Context)
@@ -39,6 +38,8 @@ type IInvoiceOutputController interface {
 	UniqueObject(c *gin.Context)
 	UniqueTeam(c *gin.Context)
 	Report(c *gin.Context)
+	GetTotalAmountInWarehouse(c *gin.Context)
+	GetCodesByMaterialID(c *gin.Context)
 }
 
 func (controller *invoiceOutputController) GetAll(c *gin.Context) {
@@ -250,23 +251,6 @@ func (controller *invoiceOutputController) GetUnconfirmedByObjectInvoices(c *gin
 	response.ResponseSuccess(c, data)
 }
 
-func (controller *invoiceOutputController) ConfirmByObject(c *gin.Context) {
-	idRaw := c.Param("id")
-	id, err := strconv.ParseUint(idRaw, 10, 64)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
-		return
-	}
-
-	err = controller.invoiceOutputService.ConfirmByObject(uint(id))
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("could not confirm the action by Object supervisor: %v", err))
-		return
-	}
-
-	response.ResponseSuccess(c, true)
-}
-
 func (controller *invoiceOutputController) UniqueCode(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	data, err := controller.invoiceOutputService.UniqueCode(projectID)
@@ -349,4 +333,49 @@ func (controller *invoiceOutputController) Report(c *gin.Context) {
 
 	c.FileAttachment("./pkg/excels/report/"+filename, filename)
 	// response.ResponseSuccess(c, true)
+}
+
+func (controller *invoiceOutputController) GetTotalAmountInWarehouse(c *gin.Context) {
+	materialIDRaw := c.Param("materialID")
+	materialID, err := strconv.ParseUint(materialIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	if materialID == 0 {
+		response.ResponseSuccess(c, 0)
+		return
+	}
+
+	projectID := c.GetUint("projectID")
+
+	totalAmount, err := controller.invoiceOutputService.GetTotalMaterialAmount(projectID, uint(materialID))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, totalAmount)
+}
+
+func (controller *invoiceOutputController) GetCodesByMaterialID(c *gin.Context) {
+
+	materialIDRaw := c.Param("materialID")
+	materialID, err := strconv.ParseUint(materialIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	projectID := c.GetUint("projectID")
+
+	data, err := controller.invoiceOutputService.GetSerialNumbersByMaterial(projectID, uint(materialID))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
 }
