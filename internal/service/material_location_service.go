@@ -5,22 +5,21 @@ import (
 	"backend-v2/internal/repository"
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/xuri/excelize/v2"
-	"gorm.io/gorm"
 )
 
 type materialLocationService struct {
-	materialLocationRepo repository.IMaterialLocationRepository
-	materialCostRepo     repository.IMaterialCostRepository
-	materialRepo         repository.IMaterialRepository
-	teamRepo             repository.ITeamRepository
-	objectRepo           repository.IObjectRepository
-	materialDefectRepo   repository.IMaterialDefectRepository
+	materialLocationRepo  repository.IMaterialLocationRepository
+	materialCostRepo      repository.IMaterialCostRepository
+	teamRepo              repository.ITeamRepository
+  materialRepo          repository.IMaterialRepository
+	objectRepo            repository.IObjectRepository
+	materialDefectRepo    repository.IMaterialDefectRepository
+	objectSupervisorsRepo repository.IObjectSupervisorsRepository
 }
 
 func InitMaterialLocationService(
@@ -30,6 +29,7 @@ func InitMaterialLocationService(
 	teamRepo repository.ITeamRepository,
 	objectRepo repository.IObjectRepository,
 	materialDefectRepo repository.IMaterialDefectRepository,
+	objectSupervisorsRepo repository.IObjectSupervisorsRepository,
 ) IMaterialLocationService {
 	return &materialLocationService{
 		materialLocationRepo: materialLocationRepo,
@@ -38,6 +38,7 @@ func InitMaterialLocationService(
 		teamRepo:             teamRepo,
 		objectRepo:           objectRepo,
 		materialDefectRepo:   materialDefectRepo,
+		objectSupervisorsRepo: objectSupervisorsRepo,
 	}
 }
 
@@ -52,7 +53,7 @@ type IMaterialLocationService interface {
 	GetMaterialsInLocation(locationType string, locationID uint) ([]model.Material, error)
 	UniqueObjects() ([]string, error)
 	UniqueTeams() ([]string, error)
-  BalanceReport(data dto.ReportBalanceFilterRequest) (string, error)
+	BalanceReport(projectID uint, data dto.ReportBalanceFilterRequest) (string, error)
 }
 
 func (service *materialLocationService) GetAll() ([]model.MaterialLocation, error) {
@@ -164,14 +165,25 @@ func (service *materialLocationService) UniqueObjects() ([]string, error) {
 	return result, err
 }
 
-func (service *materialLocationService) BalanceReport(data dto.ReportBalanceFilterRequest) (string, error) {
+func (service *materialLocationService) BalanceReport(projectID uint, data dto.ReportBalanceFilterRequest) (string, error) {
 
 	filter := dto.ReportBalanceFilter{
 		LocationType: data.Type,
 	}
 
+	f, err := excelize.OpenFile("./pkg/excels/templates/Отчет Остатка.xlsx")
+	defer f.Close()
+	if err != nil {
+		return "", err
+	}
+
+	sheetName := "Отчет"
+	rowCount := 2
+
 	switch data.Type {
 	case "teams":
+		f.SetCellValue(sheetName, "I1", "№ Бригады")
+		f.SetCellValue(sheetName, "J1", "Бригадир")
 		if data.Team != "" {
 			team, err := service.teamRepo.GetByNumber(data.Team)
 			if err != nil {
@@ -185,6 +197,8 @@ func (service *materialLocationService) BalanceReport(data dto.ReportBalanceFilt
 		filter.LocationID = 0
 		break
 	case "objects":
+		f.SetCellValue(sheetName, "I1", "Объект")
+		f.SetCellValue(sheetName, "J1", "Супервайзер")
 		if data.Object != "" {
 			object, err := service.objectRepo.GetByName(data.Object)
 			if err != nil {
@@ -203,75 +217,112 @@ func (service *materialLocationService) BalanceReport(data dto.ReportBalanceFilt
 		return "", fmt.Errorf("incorrect type")
 	}
 
-	materialLocations, err := service.materialLocationRepo.GetByLocationTypeAndID(filter.LocationType, filter.LocationID)
+	materialsData, err := service.materialLocationRepo.GetDataForBalanceReport(projectID, filter.LocationType, filter.LocationID)
 	if err != nil {
 		return "", err
 	}
 
-	f, err := excelize.OpenFile("./pkg/excels/report/Balance Report.xlsx")
-  defer f.Close()
-	if err != nil {
-		return "", err
+	locationInformation := struct {
+		LocationID        uint
+		LocationName      string
+		LocationOwnerName string
+	}{
+		LocationID:        0,
+		LocationName:      "",
+		LocationOwnerName: "",
 	}
 
-	sheetName := "Sheet1"
-	rowCount := 2
+	for _, entry := range materialsData {
 
-	for _, materialLocation := range materialLocations {
-    if materialLocation.Amount == 0 {
-      continue
-    }
+		if entry.LocationID != locationInformation.LocationID {
 
-		materialCost, err := service.materialCostRepo.GetByID(materialLocation.MaterialCostID)
-		if err != nil {
-			return "", err
+			locationInformation.LocationID = entry.LocationID
+			locationInformation.LocationOwnerName = ""
+
+			if filter.LocationType == "teams" {
+
+				//teamData has TeamNumber and TeamLeaderName
+				//the TeamNumber is repeated but TeamLeaderName is not
+				teamData, err := service.teamRepo.GetTeamNumberAndTeamLeadersByID(projectID, entry.LocationID)
+				if err != nil {
+					return "", fmt.Errorf("Ошибка базы: %v", err)
+				}
+				locationInformation.LocationName = teamData[0].TeamNumber
+
+				for index, entry := range teamData {
+					if index == len(teamData)-1 {
+						locationInformation.LocationOwnerName += entry.TeamLeaderName
+						break
+					}
+
+					locationInformation.LocationOwnerName += entry.TeamLeaderName + ", "
+				}
+
+			}
+
+			if filter.LocationType == "objects" {
+				// objectData has objectName and supervisorName
+				// the objectName is repeated but supervisorName is not repeated
+				objectData, err := service.objectSupervisorsRepo.GetSupervisorAndObjectNamesByObjectID(projectID, entry.LocationID)
+				if err != nil {
+					return "", fmt.Errorf("Ошибка базы: %v", err)
+				}
+				locationInformation.LocationName = objectData[0].ObjectName
+
+				for index, entry := range objectData {
+					if index == len(objectData)-1 {
+						locationInformation.LocationOwnerName += entry.SupervisorName
+						break
+					}
+
+					locationInformation.LocationOwnerName += entry.SupervisorName + ", "
+
+				}
+
+			}
 		}
 
-		material, err := service.materialRepo.GetByID(materialCost.MaterialID)
-		if err != nil {
-			return "", err
-		}
+		f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), entry.MaterialCode)
+		f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), entry.MaterialName)
+		f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), entry.MaterialUnit)
+		f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), entry.TotalAmount)
+		f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), entry.DefectAmount)
 
-		materialDefect, err := service.materialDefectRepo.GetByMaterialLocationID(materialLocation.ID)
-    if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-      return "", err
-    }
+		costM19, _ := entry.MaterialCostM19.Float64()
+		totalCost, _ := entry.TotalCost.Float64()
+		totalDefectCost, _ := entry.TotalDefectCost.Float64()
+		f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), costM19)
+		f.SetCellValue(sheetName, "G"+fmt.Sprint(rowCount), totalCost)
+		f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), totalDefectCost)
 
-    f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), material.Code)
-    f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), material.Name)
-    f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), material.Unit)
-    f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), materialLocation.Amount)
-    f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), materialDefect.Amount)
-    costM19, _ := materialCost.CostM19.Float64()
-    f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), costM19)
-    f.SetCellValue(sheetName, "G"+fmt.Sprint(rowCount), materialLocation.Amount * costM19)
-    f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), materialDefect.Amount * costM19)
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), locationInformation.LocationName)
+		f.SetCellValue(sheetName, "J"+fmt.Sprint(rowCount), locationInformation.LocationOwnerName)
 
-    rowCount++
+		rowCount++
 	}
 
-  currentTime := time.Now()
-  var fileName string
-  if filter.LocationID == 0 {
+	currentTime := time.Now()
+	var fileName string
+	if filter.LocationID == 0 {
 
-    fileName = fmt.Sprintf(
-      "Report Balance %s %s.xlsx", 
-      strings.ToUpper(filter.LocationType),
-      currentTime.Format("02-01-2006"),
-    )
+		fileName = fmt.Sprintf(
+			"Report Balance %s %s.xlsx",
+			strings.ToUpper(filter.LocationType),
+			currentTime.Format("02-01-2006"),
+		)
 
-  } else {
+	} else {
 
-    fileName = fmt.Sprintf(
-      "Report Balance %s-%d %s.xlsx", 
-      strings.ToUpper(filter.LocationType),
-      filter.LocationID,
-      currentTime.Format("02-01-2006"),
-    )
+		fileName = fmt.Sprintf(
+			"Report Balance %s-%d %s.xlsx",
+			strings.ToUpper(filter.LocationType),
+			filter.LocationID,
+			currentTime.Format("02-01-2006"),
+		)
 
-  }
+	}
 
-  f.SaveAs("./pkg/excels/report/" + fileName)
+	f.SaveAs("./pkg/excels/temp/" + fileName)
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}

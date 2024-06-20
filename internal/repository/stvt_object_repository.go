@@ -23,6 +23,7 @@ type ISTVTObjectRepository interface {
 	Create(data dto.STVTObjectCreate) (model.STVT_Object, error)
 	Update(data dto.STVTObjectCreate) (model.STVT_Object, error)
 	Delete(id, projectID uint) error
+	CreateInBatches(objects []model.Object, stvts []model.STVT_Object, supervisors []uint) ([]model.STVT_Object, error)
 }
 
 func (repo *stvtObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.STVTObjectPaginatedQuery, error) {
@@ -34,13 +35,10 @@ func (repo *stvtObjectRepository) GetPaginated(page, limit int, projectID uint) 
         objects.name as name,
         objects.status as status,
         stvt_objects.voltage_class as voltage_class,
-        stvt_objects.tt_coefficient as tt_coefficient,
-        workers.name as supervisor_name
+        stvt_objects.tt_coefficient as tt_coefficient
       FROM objects
         INNER JOIN stvt_objects ON objects.object_detailed_id = stvt_objects.id
-        INNER JOIN supervisor_objects ON objects.id = supervisor_objects.object_id
-        INNER JOIN workers ON workers.id = supervisor_objects.supervisor_worker_id
-      WHERE
+     WHERE
         objects.type = 'stvt_objects' AND
         objects.project_id = ?
       ORDER BY stvt_objects.id DESC 
@@ -88,16 +86,32 @@ func (repo *stvtObjectRepository) Create(data dto.STVTObjectCreate) (model.STVT_
 			return err
 		}
 
-		supervisors_object := []model.SupervisorObjects{}
-		for _, supervisorID := range data.Supervisors {
-			supervisors_object = append(supervisors_object, model.SupervisorObjects{
-				ObjectID:           object.ID,
-				SupervisorWorkerID: supervisorID,
-			})
+		if len(data.Supervisors) != 0 {
+			object_supervisors := []model.ObjectSupervisors{}
+			for _, supervisorID := range data.Supervisors {
+				object_supervisors = append(object_supervisors, model.ObjectSupervisors{
+					ObjectID:           object.ID,
+					SupervisorWorkerID: supervisorID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&object_supervisors, 5).Error; err != nil {
+				return err
+			}
 		}
 
-		if err := tx.CreateInBatches(&supervisors_object, 5).Error; err != nil {
-			return err
+		if len(data.Teams) != 0 {
+			object_teams := []model.ObjectTeams{}
+			for _, teamID := range data.Teams {
+				object_teams = append(object_teams, model.ObjectTeams{
+					ObjectID: object.ID,
+					TeamID:   teamID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&object_teams, 5).Error; err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -133,20 +147,40 @@ func (repo *stvtObjectRepository) Update(data dto.STVTObjectCreate) (model.STVT_
 			return err
 		}
 
-		if err := tx.Delete(&model.SupervisorObjects{}, "object_id = ?", object.ID).Error; err != nil {
+		if err := tx.Delete(&model.ObjectSupervisors{}, "object_id = ?", object.ID).Error; err != nil {
 			return err
 		}
 
-		supervisorsObject := []model.SupervisorObjects{}
-		for _, supervisorWorkerID := range data.Supervisors {
-			supervisorsObject = append(supervisorsObject, model.SupervisorObjects{
-				ObjectID:           object.ID,
-				SupervisorWorkerID: supervisorWorkerID,
-			})
+		if len(data.Supervisors) != 0 {
+			object_supervisors := []model.ObjectSupervisors{}
+			for _, supervisorWorkerID := range data.Supervisors {
+				object_supervisors = append(object_supervisors, model.ObjectSupervisors{
+					ObjectID:           object.ID,
+					SupervisorWorkerID: supervisorWorkerID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&object_supervisors, 5).Error; err != nil {
+				return err
+			}
 		}
 
-		if err := tx.CreateInBatches(&supervisorsObject, 5).Error; err != nil {
+		if err := tx.Delete(&model.ObjectTeams{}, "object_id = ?", object.ID).Error; err != nil {
 			return err
+		}
+
+		if len(data.Teams) != 0 {
+			object_teams := []model.ObjectTeams{}
+			for _, teamID := range data.Teams {
+				object_teams = append(object_teams, model.ObjectTeams{
+					ObjectID: object.ID,
+					TeamID:   teamID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&object_teams, 5).Error; err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -158,8 +192,25 @@ func (repo *stvtObjectRepository) Update(data dto.STVTObjectCreate) (model.STVT_
 func (repo *stvtObjectRepository) Delete(id, projectID uint) error {
 	return repo.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Exec(`
-      DELETE FROM supervisor_objects
-      WHERE supervisor_objects.object_id = (
+      DELETE FROM object_supervisors
+      WHERE object_supervisors.object_id = (
+        SELECT DISTINCT(objects.id)
+        FROM objects
+          INNER JOIN stvt_objects ON stvt_objects.id = objects.object_detailed_id
+        WHERE
+          objects.project_id = ? AND
+          stvt_objects.id = ? AND
+          objects.type = 'stvt_objects'
+      );
+    `, projectID, id).Error
+
+		if err != nil {
+			return err
+		}
+
+		err = tx.Exec(`
+      DELETE FROM object_teams
+      WHERE object_teams.object_id = (
         SELECT DISTINCT(objects.id)
         FROM objects
           INNER JOIN stvt_objects ON stvt_objects.id = objects.object_detailed_id
@@ -184,4 +235,24 @@ func (repo *stvtObjectRepository) Delete(id, projectID uint) error {
 
 		return nil
 	})
+}
+
+func (repo *stvtObjectRepository) CreateInBatches(objects []model.Object, stvts []model.STVT_Object, supervisors []uint) ([]model.STVT_Object, error) {
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.CreateInBatches(&stvts, 10).Error; err != nil {
+			return err
+		}
+
+		for index := range objects {
+			objects[index].ObjectDetailedID = stvts[index].ID
+		}
+
+		if err := tx.CreateInBatches(&objects, 10).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return stvts, err
 }

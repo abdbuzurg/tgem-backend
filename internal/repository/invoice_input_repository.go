@@ -5,6 +5,7 @@ import (
 	"backend-v2/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type invoiceInputRespository struct {
@@ -22,7 +23,7 @@ type IInovoiceInputRepository interface {
 	GetPaginated(page, limit int) ([]model.InvoiceInput, error)
 	GetPaginatedFiltered(page, limit int, filter model.InvoiceInput) ([]dto.InvoiceInputPaginated, error)
 	GetByID(id uint) (model.InvoiceInput, error)
-	Create(data model.InvoiceInput) (model.InvoiceInput, error)
+	Create(data dto.InvoiceInputCreateQueryData) (model.InvoiceInput, error)
 	Update(data model.InvoiceInput) (model.InvoiceInput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
@@ -30,6 +31,7 @@ type IInovoiceInputRepository interface {
 	UniqueWarehouseManager(projectID uint) ([]string, error)
 	UniqueReleased(projectID uint) ([]string, error)
 	ReportFilterData(filter dto.InvoiceInputReportFilter, projectID uint) ([]model.InvoiceInput, error)
+	Confirmation(data dto.InvoiceInputConfirmationQueryData) error
 }
 
 func (repo *invoiceInputRespository) GetAll() ([]model.InvoiceInput, error) {
@@ -64,7 +66,7 @@ func (repo *invoiceInputRespository) GetPaginatedFiltered(page, limit int, filte
         (nullif(?, 0) IS NULL OR released_worker_id = ?) AND
         (nullif(?, '') IS NULL OR delivery_code = ?) ORDER BY invoice_inputs.id DESC LIMIT ? OFFSET ?;
     `,
-			filter.ProjectID, 
+			filter.ProjectID,
 			filter.WarehouseManagerWorkerID, filter.WarehouseManagerWorkerID,
 			filter.ReleasedWorkerID, filter.ReleasedWorkerID,
 			filter.DeliveryCode, filter.DeliveryCode,
@@ -81,9 +83,39 @@ func (repo *invoiceInputRespository) GetByID(id uint) (model.InvoiceInput, error
 	return data, err
 }
 
-func (repo *invoiceInputRespository) Create(data model.InvoiceInput) (model.InvoiceInput, error) {
-	err := repo.db.Create(&data).Error
-	return data, err
+func (repo *invoiceInputRespository) Create(data dto.InvoiceInputCreateQueryData) (model.InvoiceInput, error) {
+	result := data.InvoiceData
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&result).Error; err != nil {
+			return err
+		}
+
+		for index := range data.InvoiceMaterials {
+			data.InvoiceMaterials[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
+			return err
+		}
+
+		serialNumbers := data.SerialNumbers
+		if err := tx.CreateInBatches(&serialNumbers, 15).Error; err != nil {
+			return err
+		}
+
+		for index := range data.SerialNumberMovement {
+			data.SerialNumberMovement[index].SerialNumberID = serialNumbers[index].ID
+			data.SerialNumberMovement[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.SerialNumberMovement, 15).Error; err != nil {
+			return err
+		}
+
+		return nil
+
+	})
+	return result, err
 }
 
 func (repo *invoiceInputRespository) Update(data model.InvoiceInput) (model.InvoiceInput, error) {
@@ -143,4 +175,44 @@ func (repo *invoiceInputRespository) ReportFilterData(filter dto.InvoiceInputRep
 		Scan(&data).Error
 
 	return data, err
+}
+
+func (repo *invoiceInputRespository) Confirmation(data dto.InvoiceInputConfirmationQueryData) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.InvoiceInput{}).Select("*").Where("id = ?", data.InvoiceData.ID).Updates(&data.InvoiceData).Error; err != nil {
+			return err
+		}
+
+		if len(data.ToBeUpdatedMaterials) != 0 {
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"amount"}),
+			}).Create(&data.ToBeUpdatedMaterials).Error; err != nil {
+				return err
+			}
+		}
+
+		if len(data.ToBeCreatedMaterials) != 0 {
+			if err := tx.Create(&data.ToBeCreatedMaterials).Error; err != nil {
+				return err
+			}
+		}
+
+		if err := tx.Exec(`
+      UPDATE 
+        serial_number_movements 
+      SET confirmation = true 
+      WHERE 
+        invoice_id = ? AND 
+        invoice_type = 'input'
+    `, data.InvoiceData.ID).Error; err != nil {
+			return err
+		}
+
+		if err := tx.CreateInBatches(&data.SerialNumbers, 15).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

@@ -1,10 +1,10 @@
 App:
-  Port: 8080
+  Port: 5000
 
 # "host=localhost user=postgres password=password dbname=tgem port=5432 sslmode=disable",
 
 Database:
-  Host: "localhost"
+  Host: "127.0.0.1"
   Port: 5432
   Username: "postgres"
   Password: "password"

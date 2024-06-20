@@ -18,17 +18,65 @@ func InitInvoiceObjectRepository(db *gorm.DB) IInvoiceObjectRepository {
 }
 
 type IInvoiceObjectRepository interface {
-	Create(data model.InvoiceObject) (model.InvoiceObject, error)
+	Create(data dto.InvoiceObjectCreateQueryData) (model.InvoiceObject, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
+	GetInvoiceObjectDescriptiveDataByID(id uint) (dto.InvoiceObjectPaginated, error)
 	GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceObjectPaginated, error)
 	GetByID(id uint) (dto.InvoiceObjectPaginated, error)
 	GetForCorrection(projectID uint) ([]dto.InvoiceObjectPaginated, error)
 }
 
-func (repo *invoiceObjectRepository) Create(data model.InvoiceObject) (model.InvoiceObject, error) {
-	err := repo.db.Create(&data).Error
+func (repo *invoiceObjectRepository) GetInvoiceObjectDescriptiveDataByID(id uint) (dto.InvoiceObjectPaginated, error) {
+	data := dto.InvoiceObjectPaginated{}
+	err := repo.db.Raw(`
+    SELECT 
+      invoice_objects.id as id,
+      workers.name as supervisor_name,
+      objects.name as object_name,
+      teams.number as team_number,
+      invoice_objects.date_of_invoice as date_of_invoice,
+      invoice_objects.delivery_code as delivery_code,
+      invoice_objects.confirmed_by_operator as confirmed_by_operator  
+    FROM invoice_objects
+      INNER JOIN workers ON workers.id = invoice_objects.supervisor_worker_id
+      INNER JOIN objects ON objects.id = invoice_objects.object_id
+      INNER JOIN teams ON teams.id = invoice_objects.team_id
+    WHERE
+      invoice_objects.id = ?
+    `, id).Scan(&data).Error
+
 	return data, err
+}
+
+func (repo *invoiceObjectRepository) Create(data dto.InvoiceObjectCreateQueryData) (model.InvoiceObject, error) {
+	invoice := data.Invoice
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+
+		if err := tx.Create(&invoice).Error; err != nil {
+			return err
+		}
+
+		for index := range data.InvoiceMaterials {
+			data.InvoiceMaterials[index].InvoiceID = invoice.ID
+		}
+
+		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
+			return err
+		}
+
+		for index := range data.SerialNumberMovements {
+			data.SerialNumberMovements[index].InvoiceID = invoice.ID
+		}
+
+		if err := tx.CreateInBatches(&data.SerialNumberMovements, 15).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return invoice, err
 }
 
 func (repo *invoiceObjectRepository) Delete(id uint) error {

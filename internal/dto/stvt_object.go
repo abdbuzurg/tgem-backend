@@ -10,7 +10,6 @@ type STVTObjectPaginatedQuery struct {
 	Status           string `json:"status" gorm:"tinyText"`
 	VoltageClass     string `json:"voltageClass" gorm:"tinyText"`
 	TTCoefficient    string `json:"ttCoefficient" gorm:"tinyText"`
-	SupervisorName   string `json:"supervisorName"`
 }
 
 type STVTObjectPaginated struct {
@@ -22,10 +21,12 @@ type STVTObjectPaginated struct {
 	VoltageClass     string   `json:"voltageClass" gorm:"tinyText"`
 	TTCoefficient    string   `json:"ttCoefficient" gorm:"tinyText"`
 	Supervisors      []string `json:"supervisors"`
+	Teams            []string `json:"teams"`
 }
 
 type STVTObjectCreate struct {
 	BaseInfo     model.Object      `json:"baseInfo"`
 	DetailedInfo model.STVT_Object `json:"detailedInfo"`
 	Supervisors  []uint            `json:"supervisors"`
+	Teams        []uint            `json:"teams"`
 }

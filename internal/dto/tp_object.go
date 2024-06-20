@@ -10,7 +10,6 @@ type TPObjectPaginatedQuery struct {
 	Model            string `json:"model"`
 	VoltageClass     string `json:"voltageClass"`
 	Nourashes        string `json:"nourashes"`
-	SupervisorName   string `json:"supervisorName"`
 }
 
 type TPObjectPaginated struct {
@@ -22,10 +21,12 @@ type TPObjectPaginated struct {
 	VoltageClass     string   `json:"voltageClass"`
 	Nourashes        string   `json:"nourashes"`
 	Supervisors      []string `json:"supervisors"`
+	Teams            []string `json:"teams"`
 }
 
 type TPObjectCreate struct {
 	BaseInfo     model.Object    `json:"baseInfo"`
 	DetailedInfo model.TP_Object `json:"detailedInfo"`
 	Supervisors  []uint          `json:"supervisors"`
+	Teams        []uint          `json:"teams"`
 }

@@ -18,7 +18,7 @@ func InitObjectRepository(db *gorm.DB) IObjectRepository {
 }
 
 type IObjectRepository interface {
-	GetAll() ([]model.Object, error)
+	GetAll(projectID uint) ([]model.Object, error)
 	GetPaginated(page, limit int) ([]model.Object, error)
 	GetPaginatedFiltered(page, limit int, filter model.Object) ([]dto.ObjectPaginatedQuery, error)
 	GetByID(id uint) (model.Object, error)
@@ -30,9 +30,9 @@ type IObjectRepository interface {
 	GetByName(name string) (model.Object, error)
 }
 
-func (repo *objectRepository) GetAll() ([]model.Object, error) {
+func (repo *objectRepository) GetAll(projectID uint) ([]model.Object, error) {
 	data := []model.Object{}
-	err := repo.db.Order("id desc").Find(&data).Error
+	err := repo.db.Order("id desc").Find(&data, "project_id = ?", projectID).Error
 	return data, err
 }
 
@@ -98,7 +98,8 @@ func (repo *objectRepository) Count() (int64, error) {
 func (repo *objectRepository) GetByName(name string) (model.Object, error) {
 	var data model.Object
 	err := repo.db.
-		Raw("SELECT * FROM objects WHERE name = ?").
+		Raw("SELECT * FROM objects WHERE name = ? LIMIT 1", name).
+    Scan(&data).
 		Error
 	return data, err
 }

@@ -54,8 +54,9 @@ type IInvoiceOutputService interface {
 	GetAll() ([]model.InvoiceOutput, error)
 	GetPaginated(page, limit int, data model.InvoiceOutput) ([]dto.InvoiceOutputPaginated, error)
 	GetByID(id uint) (model.InvoiceOutput, error)
-	GetUnconfirmedByObjectInvoices() ([]dto.InvoiceObject, error)
-	Create(data dto.InvoiceOutput) (dto.InvoiceOutput, error)
+	GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error)
+	GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error)
+	Create(data dto.InvoiceOutput) (model.InvoiceOutput, error)
 	// Update(data dto.InvoiceOutput) (dto.InvoiceOutput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
@@ -69,6 +70,7 @@ type IInvoiceOutputService interface {
 	Report(filter dto.InvoiceOutputReportFilterRequest, projectID uint) (string, error)
 	GetTotalMaterialAmount(projectID, materialID uint) (float64, error)
 	GetSerialNumbersByMaterial(projectID, materialID uint) ([]string, error)
+	GetAvailableMaterialsInWarehouse(projectID uint) ([]dto.AvailableMaterialsInWarehouse, error)
 }
 
 func (service *invoiceOutputService) GetAll() ([]model.InvoiceOutput, error) {
@@ -83,103 +85,179 @@ func (service *invoiceOutputService) GetPaginated(page, limit int, data model.In
 	return service.invoiceOutputRepo.GetPaginatedFiltered(page, limit, data)
 }
 
-func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.InvoiceOutput, error) {
+func (service *invoiceOutputService) GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error) {
+	return service.invoiceMaterialRepo.GetInvoiceMaterialsWithoutSerialNumbers(id, "output")
+}
+
+func (service *invoiceOutputService) GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error) {
+	queryData, err := service.invoiceMaterialRepo.GetInvoiceMaterialsWithSerialNumbers(id, "output")
+	if err != nil {
+		return []dto.InvoiceMaterialsWithSerialNumberView{}, err
+	}
+
+	result := []dto.InvoiceMaterialsWithSerialNumberView{}
+	current := dto.InvoiceMaterialsWithSerialNumberView{}
+	for index, materialInfo := range queryData {
+		if index == 0 {
+			current = dto.InvoiceMaterialsWithSerialNumberView{
+				ID:            materialInfo.ID,
+				MaterialName:  materialInfo.MaterialName,
+				MaterialUnit:  materialInfo.MaterialUnit,
+				SerialNumbers: []string{},
+				Amount:        materialInfo.Amount,
+				CostM19:       materialInfo.CostM19,
+				Notes:         materialInfo.Notes,
+			}
+		}
+
+		if current.MaterialName == materialInfo.MaterialName && current.CostM19.Equal(materialInfo.CostM19) {
+			if len(current.SerialNumbers) == 0 {
+				current.SerialNumbers = append(current.SerialNumbers, materialInfo.SerialNumber)
+				continue
+			}
+
+			if current.SerialNumbers[len(current.SerialNumbers)-1] != materialInfo.SerialNumber {
+				current.SerialNumbers = append(current.SerialNumbers, materialInfo.SerialNumber)
+			}
+
+		} else {
+			result = append(result, current)
+			current = dto.InvoiceMaterialsWithSerialNumberView{
+				ID:            materialInfo.ID,
+				MaterialName:  materialInfo.MaterialName,
+				MaterialUnit:  materialInfo.MaterialUnit,
+				SerialNumbers: []string{materialInfo.SerialNumber},
+				Amount:        materialInfo.Amount,
+				CostM19:       materialInfo.CostM19,
+				Notes:         materialInfo.Notes,
+			}
+		}
+	}
+
+	if len(queryData) != 0 {
+		result = append(result, current)
+	}
+
+	return result, nil
+}
+
+func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.InvoiceOutput, error) {
 	count, err := service.invoiceOutputRepo.Count(data.Details.ProjectID)
 	if err != nil {
-		return dto.InvoiceOutput{}, err
+		return model.InvoiceOutput{}, err
 	}
 
 	data.Details.DeliveryCode = utils.UniqueCodeGeneration("О", count+1, data.Details.ProjectID)
-	invoiceOutput, err := service.invoiceOutputRepo.Create(data.Details)
-	if err != nil {
-		return dto.InvoiceOutput{}, err
+
+	invoiceMaterialForCreate := []model.InvoiceMaterials{}
+	serialNumberMovements := []model.SerialNumberMovement{}
+	for _, invoiceMaterial := range data.Items {
+		if len(invoiceMaterial.SerialNumbers) == 0 {
+			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
+			if err != nil {
+				return model.InvoiceOutput{}, err
+			}
+
+			index := 0
+			for invoiceMaterial.Amount > 0 {
+				invoiceMaterialCreate := model.InvoiceMaterials{
+					ProjectID:      data.Details.ProjectID,
+					ID:             0,
+					MaterialCostID: materialInfoSorted[index].MaterialCostID,
+					InvoiceID:      0,
+					InvoiceType:    "output",
+					IsDefected:     false,
+					Amount:         0,
+					Notes:          invoiceMaterial.Notes,
+				}
+
+				if materialInfoSorted[index].MaterialAmount <= invoiceMaterial.Amount {
+					invoiceMaterialCreate.Amount = materialInfoSorted[index].MaterialAmount
+					invoiceMaterial.Amount -= materialInfoSorted[index].MaterialAmount
+				} else {
+					invoiceMaterialCreate.Amount = invoiceMaterial.Amount
+					invoiceMaterial.Amount = 0
+				}
+
+				invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
+				index++
+			}
+
+		}
+
+		if len(invoiceMaterial.SerialNumbers) != 0 {
+			MC_IDs_AND_SN_IDs, err := service.serialNumberRepo.GetMaterialCostIDsByCodesInLocation(invoiceMaterial.MaterialID, invoiceMaterial.SerialNumbers, "warehouse", 0)
+			if err != nil {
+				return model.InvoiceOutput{}, err
+			}
+
+			var invoiceMaterialCreate model.InvoiceMaterials
+			for index, oneEntry := range MC_IDs_AND_SN_IDs {
+
+				serialNumberMovements = append(serialNumberMovements, model.SerialNumberMovement{
+					ID:             0,
+					SerialNumberID: oneEntry.SerialNumberID,
+					ProjectID:      data.Details.ProjectID,
+					InvoiceID:      0,
+					InvoiceType:    "output",
+					IsDefected:     false,
+					Confirmation:   false,
+				})
+
+				if index == 0 {
+					invoiceMaterialCreate = model.InvoiceMaterials{
+						ProjectID:      data.Details.ProjectID,
+						ID:             0,
+						MaterialCostID: oneEntry.MaterialCostID,
+						InvoiceID:      data.Details.ID,
+						InvoiceType:    "output",
+						IsDefected:     false,
+						Amount:         0,
+						Notes:          invoiceMaterial.Notes,
+					}
+				}
+
+				if oneEntry.MaterialCostID == invoiceMaterialCreate.MaterialCostID {
+					invoiceMaterialCreate.Amount++
+				} else {
+					invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
+					invoiceMaterialCreate = model.InvoiceMaterials{
+						ProjectID:      data.Details.ProjectID,
+						ID:             0,
+						MaterialCostID: oneEntry.MaterialCostID,
+						InvoiceID:      data.Details.ID,
+						InvoiceType:    "output",
+						IsDefected:     false,
+						Amount:         0,
+						Notes:          invoiceMaterial.Notes,
+					}
+
+				}
+
+			}
+
+			invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
+		}
+
 	}
 
-	data.Details = invoiceOutput
-
-	for _, invoiceMaterial := range data.Items {
-		materialCosts, err := service.materialCostRepo.GetByMaterialIDSorted(invoiceMaterial.MaterialID)
-		if err != nil {
-			return dto.InvoiceOutput{}, err
-		}
-
-		materialLocations := []model.MaterialLocation{}
-
-		for _, materialCost := range materialCosts {
-			materialLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceOutput.ProjectID, materialCost.ID, "warehouse", 0)
-			if err != nil {
-				return dto.InvoiceOutput{}, err
-			}
-
-			materialLocations = append(materialLocations, materialLocation)
-		}
-
-		index := 0
-		for invoiceMaterial.Amount > 0 {
-			invoiceMaterialCreate := model.InvoiceMaterials{
-				ProjectID:      invoiceOutput.ProjectID,
-				ID:             0,
-				MaterialCostID: materialCosts[index].ID,
-				InvoiceID:      invoiceOutput.ID,
-				InvoiceType:    "output",
-				IsDefected:     false,
-				Amount:         0,
-				Notes:          "",
-			}
-			if materialLocations[index].Amount <= invoiceMaterial.Amount {
-				invoiceMaterialCreate.Amount = materialLocations[index].Amount
-				invoiceMaterial.Amount -= materialLocations[index].Amount
-				materialLocations[index].Amount = 0
-			} else {
-				materialLocations[index].Amount -= invoiceMaterial.Amount
-				invoiceMaterialCreate.Amount = invoiceMaterial.Amount
-				invoiceMaterial.Amount = 0
-			}
-
-			invoiceMaterialCreate, err = service.invoiceMaterialRepo.Create(invoiceMaterialCreate)
-			if err != nil {
-				return dto.InvoiceOutput{}, err
-			}
-
-			index++
-		}
-
-		if len(invoiceMaterial.SerialNumbers) == 0 {
-			continue
-		}
-
-		for _, code := range invoiceMaterial.SerialNumbers {
-			serialNumber, err := service.serialNumberRepo.GetByCode(code)
-			if err != nil {
-				return dto.InvoiceOutput{}, err
-			}
-
-			invoiceMaterialSaved, err := service.invoiceMaterialRepo.GetByMaterialCostID(
-				serialNumber.MaterialCostID,
-				"output",
-				invoiceOutput.ID,
-			)
-			if err != nil {
-				return dto.InvoiceOutput{}, err
-			}
-
-			serialNumber.Status = "pending"
-			serialNumber.StatusID = invoiceMaterialSaved.ID
-			_, err = service.serialNumberRepo.Update(serialNumber)
-			if err != nil {
-				return dto.InvoiceOutput{}, err
-			}
-		}
+	invoiceOutput, err := service.invoiceOutputRepo.Create(dto.InvoiceOutputCreateQueryData{
+		Invoice:               data.Details,
+		InvoiceMaterials:      invoiceMaterialForCreate,
+		SerialNumberMovements: serialNumberMovements,
+	})
+	if err != nil {
+		return model.InvoiceOutput{}, err
 	}
 
 	f, err := excelize.OpenFile("./pkg/excels/templates/output.xlsx")
 	if err != nil {
-		return dto.InvoiceOutput{}, err
+		return model.InvoiceOutput{}, err
 	}
+
 	sheetName := "Отпуск"
 	startingRow := 5
-	currentInvoiceMaterails, err := service.invoiceMaterialRepo.GetByInvoice(invoiceOutput.ProjectID, invoiceOutput.ID, "output")
-	f.InsertRows(sheetName, startingRow, len(currentInvoiceMaterails))
+	f.InsertRows(sheetName, startingRow, len(data.Items))
 
 	defaultStyle, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{
@@ -193,7 +271,7 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 			{Type: "bottom", Color: "#000000", Style: 1},
 		},
 		Alignment: &excelize.Alignment{
-			Horizontal: "center",
+			Horizontal: "left",
 			WrapText:   true,
 			Vertical:   "center",
 		},
@@ -216,19 +294,30 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 		},
 	})
 
-	for index, oneEntry := range currentInvoiceMaterails {
-		materialCost, err := service.materialCostRepo.GetByID(oneEntry.MaterialCostID)
-		if err != nil {
-			return dto.InvoiceOutput{}, err
-		}
+	invoiceOutputDescriptive, err := service.invoiceOutputRepo.GetDataForExcel(invoiceOutput.ID)
+	if err != nil {
+		return model.InvoiceOutput{}, err
+	}
 
-		material, err := service.materialRepo.GetByID(materialCost.MaterialID)
+	f.SetCellValue(sheetName, "E1", fmt.Sprintf(`НАКЛАДНАЯ № %s
+от %s года       
+на отпуск материала 
+`, invoiceOutput.DeliveryCode, utils.DateConverter(invoiceOutputDescriptive.DateOfInvoice)))
+
+	f.SetCellValue(sheetName, "I1", fmt.Sprintf(`%s
+Регион: %s `, invoiceOutputDescriptive.ProjectName, invoiceOutputDescriptive.DistrictName))
+	f.SetCellValue(sheetName, "D2", fmt.Sprintf("%s", utils.ObjectTypeConverter(invoiceOutputDescriptive.ObjectType)))
+	f.SetCellValue(sheetName, "D3", invoiceOutputDescriptive.ObjectName)
+
+	for index, oneEntry := range data.Items {
+		material, err := service.materialRepo.GetByID(oneEntry.MaterialID)
 		if err != nil {
-			return dto.InvoiceOutput{}, err
+			return model.InvoiceOutput{}, err
 		}
 
 		f.MergeCell(sheetName, "D"+fmt.Sprint(startingRow+index), "F"+fmt.Sprint(startingRow+index))
 		f.MergeCell(sheetName, "I"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index))
+
 		f.SetCellStyle(sheetName, "A"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index), defaultStyle)
 		f.SetCellStyle(sheetName, "B"+fmt.Sprint(startingRow+index), "B"+fmt.Sprint(startingRow+index), namingStyle)
 
@@ -240,12 +329,16 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (dto.Invoice
 		f.SetCellValue(sheetName, "I"+fmt.Sprint(startingRow+index), oneEntry.Notes)
 	}
 
-	f.SaveAs("./pkg/excels/output/" + invoiceOutput.DeliveryCode + ".xlsx")
+	f.SetCellValue(sheetName, "D"+fmt.Sprint(9+len(data.Items)), invoiceOutputDescriptive.ReleasedName)
+	f.SetCellValue(sheetName, "I"+fmt.Sprint(6+len(data.Items)), invoiceOutputDescriptive.TeamLeaderName)
+	f.SetCellValue(sheetName, "I"+fmt.Sprint(9+len(data.Items)), invoiceOutputDescriptive.RecipientName)
+
+	f.SaveAs("./pkg/excels/output/" + data.Details.DeliveryCode + ".xlsx")
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}
 
-	return data, nil
+	return invoiceOutput, nil
 }
 
 func (service *invoiceOutputService) Delete(id uint) error {
@@ -261,93 +354,62 @@ func (service *invoiceOutputService) Confirmation(id uint) error {
 	if err != nil {
 		return err
 	}
-
 	invoiceOutput.Confirmation = true
-	invoiceOutput, err = service.invoiceOutputRepo.Update(invoiceOutput)
+
+	invoiceMaterials, err := service.invoiceMaterialRepo.GetByInvoice(invoiceOutput.ProjectID, invoiceOutput.ID, "output")
 	if err != nil {
 		return err
 	}
 
-	invoiceMaterails, err := service.invoiceMaterialRepo.GetByInvoice(invoiceOutput.ProjectID, invoiceOutput.ID, "output")
+	materialsInWarehouse, err := service.materialLocationRepo.GetMaterialsInLocationBasedOnInvoiceID(0, "warehouse", id, "output")
 	if err != nil {
 		return err
 	}
 
-	for _, invoiceMaterial := range invoiceMaterails {
-		oldLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceOutput.ProjectID, invoiceMaterial.MaterialCostID, "warehouse", 0)
-		if err != nil {
-			return err
-		}
+	materialsInTeam, err := service.materialLocationRepo.GetMaterialsInLocationBasedOnInvoiceID(invoiceOutput.TeamID, "team", id, "output")
+	if err != nil {
+		return err
+	}
 
-		newLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceOutput.ProjectID, invoiceMaterial.MaterialCostID, "teams", invoiceOutput.TeamID)
-		if err != nil {
-			return err
-		}
-
-		oldLocation.Amount -= invoiceMaterial.Amount
-		newLocation.Amount += invoiceMaterial.Amount
-
-		_, err = service.materialLocationRepo.Update(oldLocation)
-		if err != nil {
-			return err
-		}
-
-		_, err = service.materialLocationRepo.Update(newLocation)
-		if err != nil {
-			return err
-		}
-
-		serialNumbers, err := service.serialNumberRepo.GetByStatus("pending", invoiceMaterial.ID)
-		if err != nil {
-			return err
-		}
-
-		for _, serialNumber := range serialNumbers {
-			serialNumber.Status = "teams"
-			serialNumber.StatusID = newLocation.ID
-
-			_, err = service.serialNumberRepo.Update(serialNumber)
-			if err != nil {
-				return err
+	for _, invoiceMaterial := range invoiceMaterials {
+		materialInWarehouseIndex := -1
+		for index, materialInWarehouse := range materialsInWarehouse {
+			if materialInWarehouse.MaterialCostID == invoiceMaterial.MaterialCostID {
+				materialInWarehouseIndex = index
+				break
 			}
 		}
-	}
 
-	return nil
-}
+		materialsInWarehouse[materialInWarehouseIndex].Amount -= invoiceMaterial.Amount
 
-func (service *invoiceOutputService) GetUnconfirmedByObjectInvoices() ([]dto.InvoiceObject, error) {
-	invoiceOutputs, err := service.invoiceOutputRepo.GetUnconfirmedByObjectInvoices()
-	if err != nil {
-		return []dto.InvoiceObject{}, err
-	}
-
-	result := []dto.InvoiceObject{}
-	for _, invoiceOutput := range invoiceOutputs {
-		team, err := service.teamRepo.GetByID(invoiceOutput.TeamID)
-		if err != nil {
-			return []dto.InvoiceObject{}, err
+		materialInTeamIndex := -1
+		for index, materialInTeam := range materialsInTeam {
+			if materialInTeam.MaterialCostID == invoiceMaterial.MaterialCostID {
+				materialInTeamIndex = index
+				break
+			}
 		}
 
-		teamLeader, err := service.workerRepo.GetByID(team.LeaderWorkerID)
-		if err != nil {
-			return []dto.InvoiceObject{}, err
+		if materialInTeamIndex != -1 {
+			materialsInTeam[materialInTeamIndex].Amount += invoiceMaterial.Amount
+		} else {
+			materialsInTeam = append(materialsInTeam, model.MaterialLocation{
+				ProjectID:      invoiceOutput.ProjectID,
+				MaterialCostID: invoiceMaterial.MaterialCostID,
+				LocationType:   "team",
+				LocationID:     invoiceOutput.TeamID,
+				Amount:         invoiceMaterial.Amount,
+			})
 		}
-
-		object, err := service.objectRepo.GetByID(invoiceOutput.ObjectID)
-		if err != nil {
-			return []dto.InvoiceObject{}, err
-		}
-
-		result = append(result, dto.InvoiceObject{
-			ID:             invoiceOutput.ID,
-			TeamLeaderName: teamLeader.Name,
-			TeamNumber:     team.Number,
-			ObjectName:     object.Name,
-		})
 	}
 
-	return result, nil
+	err = service.invoiceOutputRepo.Confirmation(dto.InvoiceOutputConfirmationQueryData{
+		InvoiceData:        invoiceOutput,
+		WarehouseMaterials: materialsInWarehouse,
+		TeamMaterials:      materialsInTeam,
+	})
+
+	return err
 }
 
 func (service *invoiceOutputService) UniqueCode(projectID uint) ([]string, error) {
@@ -600,4 +662,31 @@ func (service *invoiceOutputService) GetTotalMaterialAmount(projectID, materialI
 
 func (service *invoiceOutputService) GetSerialNumbersByMaterial(projectID, materialID uint) ([]string, error) {
 	return service.serialNumberRepo.GetCodesByMaterialID(projectID, materialID, "warehouse")
+}
+
+func (service *invoiceOutputService) GetAvailableMaterialsInWarehouse(projectID uint) ([]dto.AvailableMaterialsInWarehouse, error) {
+	data, err := service.invoiceOutputRepo.GetAvailableMaterialsInWarehouse(projectID)
+	if err != nil {
+		return []dto.AvailableMaterialsInWarehouse{}, err
+	}
+
+	result := []dto.AvailableMaterialsInWarehouse{}
+	currentMaterial := dto.AvailableMaterialsInWarehouse{}
+	for index, oneEntry := range data {
+		if currentMaterial.ID == oneEntry.ID {
+			currentMaterial.Amount += oneEntry.Amount
+		} else {
+			if index != 0 {
+				result = append(result, currentMaterial)
+			}
+			currentMaterial = oneEntry
+		}
+	}
+
+	if len(data) != 0 {
+		result = append(result, currentMaterial)
+	}
+
+	return result, err
+
 }

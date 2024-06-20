@@ -6,6 +6,7 @@ import (
 	"backend-v2/pkg/response"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +26,8 @@ type IKL04KVObjectController interface {
 	Create(c *gin.Context)
 	Delete(c *gin.Context)
 	Update(c *gin.Context)
+	GetTemplateFile(c *gin.Context)
+  Import(c *gin.Context)
 }
 
 func (controller *kl04kvObjectController) GetPaginated(c *gin.Context) {
@@ -104,14 +107,50 @@ func (controller *kl04kvObjectController) Update(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
-  data.BaseInfo.ProjectID = projectID
+	projectID := c.GetUint("projectID")
+	data.BaseInfo.ProjectID = projectID
 
-  _, err := controller.kl04kvObjectService.Update(data)
+	_, err := controller.kl04kvObjectService.Update(data)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
+
+	response.ResponseSuccess(c, true)
+}
+
+func (controller *kl04kvObjectController) GetTemplateFile(c *gin.Context) {
+	filepath := "./pkg/excels/templates/Шаблон для импорта КЛ 04 КВ.xlsx"
+
+	if err := controller.kl04kvObjectService.TemplateFile(filepath); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	c.FileAttachment(filepath, "Шаблон для импорта КЛ 04 КВ.xlsx")
+}
+
+func (controller *kl04kvObjectController) Import(c *gin.Context) {
+  file, err := c.FormFile("file")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сформирован, проверьте файл: %v", err))
+		return
+	}
+
+  date := time.Now()
+	filePath := "./pkg/excels/temp/" + date.Format("2006-01-02 15-04-05") + file.Filename 
+	err = c.SaveUploadedFile(file, filePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
+		return
+	}
+
+  projectID := c.GetUint("projectID")
+  err = controller.kl04kvObjectService.Import(projectID, filePath)
+  if err != nil {
+    response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+    return
+  }
 
   response.ResponseSuccess(c, true)
 }

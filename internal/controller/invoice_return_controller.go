@@ -3,10 +3,8 @@ package controller
 import (
 	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
-	"backend-v2/model"
 	"backend-v2/pkg/response"
 	"fmt"
-	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +35,9 @@ type IInvoiceReturnController interface {
 	GetUniqueMaterialCostsFromLocation(c *gin.Context)
 	GetMaterialsInLocation(c *gin.Context)
 	GetMaterialAmountInLocation(c *gin.Context)
-  GetSerialNumberCodesInLocation(c *gin.Context) 
+	GetSerialNumberCodesInLocation(c *gin.Context)
+	GetInvoiceMaterialsWithSerialNumbers(c *gin.Context)
+	GetInvoiceMaterialsWithoutSerialNumbers(c *gin.Context)
 }
 
 func (controller *invoiceReturnController) GetAll(c *gin.Context) {
@@ -65,45 +65,28 @@ func (controller *invoiceReturnController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	returnerIDStr := c.DefaultQuery("returnerID", "")
-	returnerID := 0
-	if returnerIDStr != "" {
-		returnerID, err = strconv.Atoi(returnerIDStr)
+	projectID := c.GetUint("projectID")
+
+	invoiceReturnType := c.Param("type")
+
+	var data interface{}
+	if invoiceReturnType == "team" {
+		data, err = controller.invoiceReturnService.GetPaginatedTeam(page, limit, projectID)
 		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode returnerID parameter: %v", err))
+			response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of Invoice: %v", err))
 			return
 		}
 	}
 
-	deliveryCode := c.DefaultQuery("deliveryCode", "")
-	deliveryCode, err = url.QueryUnescape(deliveryCode)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for deliveryCode: %v", err))
-		return
+	if invoiceReturnType == "object" {
+		data, err = controller.invoiceReturnService.GetPaginatedObject(page, limit, projectID)
+		if err != nil {
+			response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of Invoice: %v", err))
+			return
+		}
 	}
 
-	returnerType := c.DefaultQuery("returnerType", "")
-	returnerType, err = url.QueryUnescape(returnerType)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for returnerType: %v", err))
-		return
-	}
-
-	projectID := c.GetUint("projectID")
-	filter := model.InvoiceReturn{
-		ProjectID:    projectID,
-		ReturnerType: returnerType,
-		ReturnerID:   uint(returnerID),
-		DeliveryCode: deliveryCode,
-	}
-
-	data, err := controller.invoiceReturnService.GetPaginated(page, limit, filter)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of Invoice: %v", err))
-		return
-	}
-
-	dataCount, err := controller.invoiceReturnService.Count(projectID)
+	dataCount, err := controller.invoiceReturnService.CountBasedOnType(projectID, invoiceReturnType)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the total amount of Invoice: %v", err))
 		return
@@ -328,14 +311,56 @@ func (controller *invoiceReturnController) GetSerialNumberCodesInLocation(c *gin
 		return
 	}
 
-  status := c.Param("status")
-  projectID := c.GetUint("projectID")
+	locationType := c.Param("locationType")
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+	projectID := c.GetUint("projectID")
 
-  data, err := controller.invoiceReturnService.GetSerialNumberCodesInLocation(projectID, uint(materialID), status)
-  if err != nil {
+	data, err := controller.invoiceReturnService.GetSerialNumberCodesInLocation(projectID, uint(materialID), locationType, uint(locationID))
+	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
 		return
 	}
 
-  response.ResponseSuccess(c, data)
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceReturnController) GetInvoiceMaterialsWithoutSerialNumbers(c *gin.Context) {
+
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceReturnService.GetInvoiceMaterialsWithoutSerialNumbers(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceReturnController) GetInvoiceMaterialsWithSerialNumbers(c *gin.Context) {
+
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceReturnService.GetInvoiceMaterialsWithSerialNumbers(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

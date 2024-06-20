@@ -6,6 +6,7 @@ import (
 	"backend-v2/pkg/response"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +26,8 @@ type IMJDObjectController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	GetTemplateFile(c *gin.Context)
+	Import(c *gin.Context)
 }
 
 func (controller *mjdObjectController) GetPaginated(c *gin.Context) {
@@ -67,8 +70,8 @@ func (controller *mjdObjectController) Create(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
-  createData.BaseInfo.ProjectID = projectID
+	projectID := c.GetUint("projectID")
+	createData.BaseInfo.ProjectID = projectID
 
 	data, err := controller.mjdObjectService.Create(createData)
 	if err != nil {
@@ -86,8 +89,8 @@ func (controller *mjdObjectController) Update(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
-  updateData.BaseInfo.ProjectID = projectID
+	projectID := c.GetUint("projectID")
+	updateData.BaseInfo.ProjectID = projectID
 
 	data, err := controller.mjdObjectService.Update(updateData)
 	if err != nil {
@@ -109,6 +112,42 @@ func (controller *mjdObjectController) Delete(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 
 	err = controller.mjdObjectService.Delete(uint(id), projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, true)
+}
+
+func (controller *mjdObjectController) GetTemplateFile(c *gin.Context) {
+	filepath := "./pkg/excels/templates/Шаблон для импорта МЖД.xlsx"
+
+	if err := controller.mjdObjectService.TemplateFile(filepath); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	c.FileAttachment(filepath, "Шаблон для импорта МЖД.xlsx")
+}
+
+func (controller *mjdObjectController) Import(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сформирован, проверьте файл: %v", err))
+		return
+	}
+
+	date := time.Now()
+	filePath := "./pkg/excels/temp/" + date.Format("2006-01-02 15-04-05") + file.Filename
+	err = c.SaveUploadedFile(file, filePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
+		return
+	}
+
+	projectID := c.GetUint("projectID")
+	err = controller.mjdObjectService.Import(projectID, filePath)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return

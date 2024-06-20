@@ -24,12 +24,30 @@ func InitInvoiceObjectController(
 }
 
 type IInvoiceObjectController interface {
+	GetInvoiceObjectDescriptiveDataByID(c *gin.Context)
 	GetTeamsMaterials(c *gin.Context)
 	GetSerialNumbersOfMaterial(c *gin.Context)
 	Create(c *gin.Context)
 	GetMaterialAmountInTeam(c *gin.Context)
 	GetPaginated(c *gin.Context)
-	GetFullDataByID(c *gin.Context)
+}
+
+func (controller *invoiceObjectController) GetInvoiceObjectDescriptiveDataByID(c *gin.Context) {
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceObjectService.GetInvoiceObjectDescriptiveDataByID(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
 }
 
 func (controller *invoiceObjectController) GetPaginated(c *gin.Context) {
@@ -105,9 +123,16 @@ func (controller *invoiceObjectController) GetSerialNumbersOfMaterial(c *gin.Con
 		return
 	}
 
+	teamIDRaw := c.Param("teamID")
+	teamID, err := strconv.ParseUint(teamIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
 	projectID := c.GetUint("projectID")
 
-	data, err := controller.invoiceObjectService.GetSerialNumberOfMaterial(projectID, uint(materialID))
+	data, err := controller.invoiceObjectService.GetSerialNumberOfMaterial(projectID, uint(materialID), uint(teamID))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return
@@ -172,25 +197,4 @@ func (controller *invoiceObjectController) GetMaterialAmountInTeam(c *gin.Contex
 	}
 
 	response.ResponseSuccess(c, data)
-}
-
-func (controller *invoiceObjectController) GetFullDataByID(c *gin.Context) {
-
-	projectID := c.GetUint("projectID")
-
-	idRaw := c.Param("id")
-	id, err := strconv.ParseUint(idRaw, 10, 64)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
-		return
-	}
-
-	data, err := controller.invoiceObjectService.GetInvoiceObjectFullData(projectID, uint(id))
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
-		return
-	}
-
-	response.ResponseSuccess(c, data)
-
 }

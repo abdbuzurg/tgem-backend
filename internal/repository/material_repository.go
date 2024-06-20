@@ -22,6 +22,7 @@ type IMaterialRepository interface {
 	GetPaginatedFiltered(page, limit int, filter model.Material) ([]model.Material, error)
 	GetByID(id uint) (model.Material, error)
 	Create(data model.Material) (model.Material, error)
+  CreateInBatches(data []model.Material) ([]model.Material, error)
 	Update(data model.Material) (model.Material, error)
 	Delete(id uint) error
 	Count() (int64, error)
@@ -63,6 +64,11 @@ func (repo *materialRepository) GetByID(id uint) (model.Material, error) {
 func (repo *materialRepository) Create(data model.Material) (model.Material, error) {
 	err := repo.db.Create(&data).Error
 	return data, err
+}
+
+func(repo *materialRepository) CreateInBatches(data []model.Material) ([]model.Material, error) {
+  err := repo.db.CreateInBatches(&data, 20).Error
+  return data, err
 }
 
 func (repo *materialRepository) Update(data model.Material) (model.Material, error) {

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"backend-v2/model"
+	"errors"
 
 	"gorm.io/gorm"
 )
@@ -30,6 +31,10 @@ func (repo *materialDefectRepository) GetByMaterialLocationID(materialLocationID
 		Raw("SELECT * FROM material_defects WHERE material_location_id = ?", materialLocationID).
 		Scan(&data).
 		Error
+
+  if errors.Is(err, gorm.ErrRecordNotFound) {
+    return model.MaterialDefect{}, nil
+  }
 
 	return data, err
 }

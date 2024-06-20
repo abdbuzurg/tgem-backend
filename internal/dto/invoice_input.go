@@ -21,10 +21,24 @@ type InvoiceInputPaginated struct {
 	ID                   uint      `json:"id"`
 	WarehouseManagerName string    `json:"warehouseManagerName"`
 	ReleasedName         string    `json:"releasedName"`
-  DeliveryCode         string    `json:"deliveryCode"`
+	DeliveryCode         string    `json:"deliveryCode"`
 	Notes                string    `json:"notes"`
 	DateOfInvoice        time.Time `json:"dateOfInvoice"`
 	Confirmation         bool      `json:"confirmation"`
+}
+
+type InvoiceInputCreateQueryData struct {
+	InvoiceData          model.InvoiceInput
+	InvoiceMaterials     []model.InvoiceMaterials
+	SerialNumbers        []model.SerialNumber
+	SerialNumberMovement []model.SerialNumberMovement
+}
+
+type InvoiceInputConfirmationQueryData struct {
+  InvoiceData model.InvoiceInput
+  ToBeUpdatedMaterials []model.MaterialLocation
+  ToBeCreatedMaterials []model.MaterialLocation
+  SerialNumbers []model.SerialNumberLocation
 }
 
 type InvoiceInputReportFilterRequest struct {

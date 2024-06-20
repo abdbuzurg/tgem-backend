@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,9 +26,11 @@ type IMaterialController interface {
 	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	GetByID(c *gin.Context)
+	GetTemplateFile(c *gin.Context)
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+  Import(c *gin.Context)
 }
 
 func (controller *materialController) GetAll(c *gin.Context) {
@@ -169,4 +172,33 @@ func (controller *materialController) Delete(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, "deleted")
+}
+
+func (controller *materialController) GetTemplateFile(c *gin.Context) {
+	c.FileAttachment("./pkg/excels/templates/Шаблон для импорта материалов.xlsx", "Шаблон для импорта материалов.xlsx")
+}
+
+func (controller *materialController) Import(c *gin.Context) {
+  file, err := c.FormFile("file")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сформирован, проверьте файл: %v", err))
+		return
+	}
+
+  date := time.Now()
+	filePath := "./pkg/excels/temp/" + date.Format("2006-01-02 15-04-05") + file.Filename 
+	err = c.SaveUploadedFile(file, filePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
+		return
+	}
+
+  projectID := c.GetUint("projectID")
+  err = controller.materialService.Import(projectID, filePath)
+  if err != nil {
+    response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+    return
+  }
+
+  response.ResponseSuccess(c, true)
 }

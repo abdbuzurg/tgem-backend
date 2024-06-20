@@ -52,10 +52,11 @@ func InitInvoiceReturnService(
 type IInvoiceReturnService interface {
 	GetAll() ([]model.InvoiceReturn, error)
 	GetByID(id uint) (model.InvoiceReturn, error)
-	GetPaginated(page, limit int, data model.InvoiceReturn) ([]dto.InvoiceReturnPaginated, error)
-	Create(data dto.InvoiceReturn) (dto.InvoiceReturn, error)
+	GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginated, error)
+	GetPaginatedObject(page, limit int, projectID uint) ([]dto.InvoiceReturnObjectPaginated, error)
+	Create(data dto.InvoiceReturn) (model.InvoiceReturn, error)
 	Delete(id uint) error
-	Count(projectID uint) (int64, error)
+	CountBasedOnType(projectID uint, invoiceType string) (int64, error)
 	Confirmation(id uint) error
 	UniqueCode(projectID uint) ([]string, error)
 	UniqueTeam(projectID uint) ([]string, error)
@@ -64,7 +65,9 @@ type IInvoiceReturnService interface {
 	GetMaterialsInLocation(projectID, locationID uint, locationType string) ([]model.Material, error)
 	GetMaterialCostInLocation(projectID, locationID, materialID uint, locationType string) ([]model.MaterialCost, error)
 	GetMaterialAmountInLocation(projectID, locationID, materialCostID uint, locationType string) (float64, error)
-	GetSerialNumberCodesInLocation(projectID, materialID uint, status string) ([]string, error)
+	GetSerialNumberCodesInLocation(projectID, materialID uint, locationType string, locationID uint) ([]string, error)
+	GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error)
+	GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error)
 }
 
 func (service *invoiceReturnService) GetAll() ([]model.InvoiceReturn, error) {
@@ -75,91 +78,153 @@ func (service *invoiceReturnService) GetByID(id uint) (model.InvoiceReturn, erro
 	return service.invoiceReturnRepo.GetByID(id)
 }
 
-func (service *invoiceReturnService) GetPaginated(page, limit int, data model.InvoiceReturn) ([]dto.InvoiceReturnPaginated, error) {
-	result := []dto.InvoiceReturnPaginated{}
-	invoiceReturns := []model.InvoiceReturn{}
-	var err error
-	if !utils.IsEmptyFields(data) {
-		invoiceReturns, err = service.invoiceReturnRepo.GetPaginatedFiltered(page, limit, data)
-	} else {
-		invoiceReturns, err = service.invoiceReturnRepo.GetPaginated(page, limit)
-		fmt.Println(invoiceReturns)
-	}
-
+func (service *invoiceReturnService) GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginated, error) {
+	invoiceReturnQueryData, err := service.invoiceReturnRepo.GetPaginatedTeam(page, limit, projectID)
 	if err != nil {
-		return []dto.InvoiceReturnPaginated{}, err
+		return []dto.InvoiceReturnTeamPaginated{}, err
 	}
 
-	for _, invoiceReturn := range invoiceReturns {
-		one := dto.InvoiceReturnPaginated{
-			DateOfInvoice: invoiceReturn.DateOfInvoice,
-			ID:            invoiceReturn.ID,
-			Notes:         invoiceReturn.Notes,
-			DeliveryCode:  invoiceReturn.DeliveryCode,
-			ProjectName:   "",
-			Confirmation:  invoiceReturn.Confirmation,
+	result := []dto.InvoiceReturnTeamPaginated{}
+	currentInvoice := dto.InvoiceReturnTeamPaginated{}
+	for index, entry := range invoiceReturnQueryData {
+		if index == 0 {
+			currentInvoice = dto.InvoiceReturnTeamPaginated{
+				ID:              entry.ID,
+				DeliveryCode:    entry.DeliveryCode,
+				DateOfInvoice:   entry.DateOfInvoice,
+				TeamNumber:      entry.TeamNumber,
+				TeamLeaderNames: []string{},
+				Confirmation:    entry.Confirmation,
+			}
 		}
 
-		switch invoiceReturn.ReturnerType {
-		case "teams":
-			team, err := service.teamRepo.GetByID(invoiceReturn.ReturnerID)
-			if err != nil {
-				return []dto.InvoiceReturnPaginated{}, err
+		if currentInvoice.ID == entry.ID {
+			currentInvoice.TeamLeaderNames = append(currentInvoice.TeamLeaderNames, entry.TeamLeaderName)
+		} else {
+			result = append(result, currentInvoice)
+			currentInvoice = dto.InvoiceReturnTeamPaginated{
+				ID:              entry.ID,
+				DeliveryCode:    entry.DeliveryCode,
+				DateOfInvoice:   entry.DateOfInvoice,
+				TeamNumber:      entry.TeamNumber,
+				TeamLeaderNames: []string{entry.TeamLeaderName},
+				Confirmation:    entry.Confirmation,
 			}
-			one.ReturnerName = team.Number
-			one.ReturnerType = "Бригада"
-		case "objects":
-			object, err := service.objectRepo.GetByID(invoiceReturn.ReturnerID)
-			if err != nil {
-				return []dto.InvoiceReturnPaginated{}, err
-			}
-			one.ReturnerName = object.Name
-			one.ReturnerType = "Объект"
 		}
-
-		result = append(result, one)
 	}
+
+	if len(invoiceReturnQueryData) != 0 {
+		result = append(result, currentInvoice)
+	}
+
 	return result, nil
 }
 
-func (service *invoiceReturnService) Create(data dto.InvoiceReturn) (dto.InvoiceReturn, error) {
+func (service *invoiceReturnService) GetPaginatedObject(page, limit int, projectID uint) ([]dto.InvoiceReturnObjectPaginated, error) {
+	invoiceReturnQueryData, err := service.invoiceReturnRepo.GetPaginatedObject(page, limit, projectID)
+	if err != nil {
+		return []dto.InvoiceReturnObjectPaginated{}, err
+	}
+
+	result := []dto.InvoiceReturnObjectPaginated{}
+	currentInvoice := dto.InvoiceReturnObjectPaginated{}
+	for index, entry := range invoiceReturnQueryData {
+		if index == 0 {
+			currentInvoice = dto.InvoiceReturnObjectPaginated{
+				ID:                    entry.ID,
+				DeliveryCode:          entry.DeliveryCode,
+				DateOfInvoice:         entry.DateOfInvoice,
+				ObjectName:            entry.ObjectName,
+				ObjectSupervisorNames: []string{},
+				Confirmation:          entry.Confirmation,
+			}
+		}
+
+		if currentInvoice.ID == entry.ID {
+			currentInvoice.ObjectSupervisorNames = append(currentInvoice.ObjectSupervisorNames, entry.ObjectSupervisorName)
+		} else {
+			result = append(result, currentInvoice)
+			currentInvoice = dto.InvoiceReturnObjectPaginated{
+				ID:                    entry.ID,
+				DeliveryCode:          entry.DeliveryCode,
+				DateOfInvoice:         entry.DateOfInvoice,
+				ObjectName:            entry.ObjectName,
+				ObjectSupervisorNames: []string{entry.ObjectSupervisorName},
+				Confirmation:          entry.Confirmation,
+			}
+		}
+	}
+
+	if len(invoiceReturnQueryData) != 0 {
+		result = append(result, currentInvoice)
+	}
+
+	return result, nil
+}
+
+func (service *invoiceReturnService) Create(data dto.InvoiceReturn) (model.InvoiceReturn, error) {
 
 	count, err := service.invoiceReturnRepo.Count(data.Details.ProjectID)
 	if err != nil {
-		return dto.InvoiceReturn{}, err
+		return model.InvoiceReturn{}, err
 	}
 
 	data.Details.DeliveryCode = utils.UniqueCodeGeneration("В", count+1, data.Details.ProjectID)
-	invoiceReturn, err := service.invoiceReturnRepo.Create(data.Details)
-	if err != nil {
-		return dto.InvoiceReturn{}, err
-	}
 
-	data.Details = invoiceReturn
-
+	invoiceMaterialsForCreate := []model.InvoiceMaterials{}
+	serialNumberMovements := []model.SerialNumberMovement{}
 	for _, invoiceMaterial := range data.Items {
-		_, err = service.invoiceMaterialsRepo.Create(model.InvoiceMaterials{
-			ProjectID:      invoiceReturn.ProjectID,
+		invoiceMaterialsForCreate = append(invoiceMaterialsForCreate, model.InvoiceMaterials{
+			ProjectID:      data.Details.ProjectID,
 			MaterialCostID: invoiceMaterial.MaterialCostID,
-			InvoiceID:      invoiceReturn.ID,
+			InvoiceID:      0,
 			InvoiceType:    "return",
 			Amount:         invoiceMaterial.Amount,
 			IsDefected:     invoiceMaterial.IsDefected,
-			Notes:          invoiceReturn.Notes,
+			Notes:          invoiceMaterial.Notes,
 		})
-		if err != nil {
-			return dto.InvoiceReturn{}, err
+
+		if len(invoiceMaterial.SerialNumbers) != 0 {
+			serialNumbers, err := service.serialNumberRepo.GetSerialNumberIDsBySerialNumberCodes(invoiceMaterial.SerialNumbers)
+			if err != nil {
+				return model.InvoiceReturn{}, err
+			}
+
+			for _, serialNumber := range serialNumbers {
+				serialNumberMovements = append(serialNumberMovements, model.SerialNumberMovement{
+					ID:             0,
+					SerialNumberID: serialNumber.ID,
+					ProjectID:      data.Details.ProjectID,
+					InvoiceID:      0,
+					InvoiceType:    "return",
+					IsDefected:     invoiceMaterial.IsDefected,
+				})
+			}
 		}
+	}
+
+	invoiceReturn, err := service.invoiceReturnRepo.Create(dto.InvoiceReturnCreateQueryData{
+		Invoice:               data.Details,
+		InvoiceMaterials:      invoiceMaterialsForCreate,
+		SerialNumberMovements: serialNumberMovements,
+	})
+	if err != nil {
+		return model.InvoiceReturn{}, err
 	}
 
 	f, err := excelize.OpenFile("./pkg/excels/templates/return.xlsx")
 	if err != nil {
-		return dto.InvoiceReturn{}, err
+		return model.InvoiceReturn{}, err
 	}
 	sheetName := "Возврат"
 	startingRow := 5
-	currentInvoiceMaterails, err := service.invoiceMaterialsRepo.GetByInvoice(invoiceReturn.ProjectID, invoiceReturn.ID, "return")
-	f.InsertRows(sheetName, startingRow, len(currentInvoiceMaterails))
+
+	materialsForExcel, err := service.invoiceReturnRepo.GetInvoiceReturnMaterialsForExcel(invoiceReturn.ID)
+	if err != nil {
+		return model.InvoiceReturn{}, err
+	}
+
+	f.InsertRows(sheetName, startingRow, len(materialsForExcel))
 
 	defaultStyle, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{
@@ -196,44 +261,91 @@ func (service *invoiceReturnService) Create(data dto.InvoiceReturn) (dto.Invoice
 		},
 	})
 
-	for index, oneEntry := range currentInvoiceMaterails {
-		materialCost, err := service.materialCostRepo.GetByID(oneEntry.MaterialCostID)
+	if invoiceReturn.AcceptorType == "warehouse" {
+		invoiceReturnTeamDataExcel, err := service.invoiceReturnRepo.GetInvoiceReturnTeamDataForExcel(invoiceReturn.ID)
 		if err != nil {
-			return dto.InvoiceReturn{}, err
+			return model.InvoiceReturn{}, err
 		}
 
-		material, err := service.materialRepo.GetByID(materialCost.MaterialID)
+		f.SetCellValue(sheetName, "E1", fmt.Sprintf(`
+НАКЛАДНАЯ № %s
+от %s года       
+на возврат материала 
+      `, invoiceReturnTeamDataExcel.DeliveryCode, utils.DateConverter(invoiceReturnTeamDataExcel.DateOfInvoice)))
+		f.SetCellValue(sheetName, "I1", fmt.Sprintf(`
+%s
+в г. Душанбе
+Регион: %s 
+      `, invoiceReturnTeamDataExcel.ProjectName, invoiceReturnTeamDataExcel.DistrictName))
+
+		f.SetCellValue(sheetName, "A2", "")
+		f.SetCellValue(sheetName, "A3", "")
+		f.SetCellValue(sheetName, "E2", "")
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(6+len(materialsForExcel)), fmt.Sprint(invoiceReturnTeamDataExcel.TeamLeaderName))
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(9+len(materialsForExcel)), fmt.Sprint(invoiceReturnTeamDataExcel.TeamLeaderName))
+		f.SetCellValue(sheetName, "D"+fmt.Sprint(9+len(materialsForExcel)), fmt.Sprint(invoiceReturnTeamDataExcel.AcceptorName))
+	}
+
+	if invoiceReturn.AcceptorType == "team" {
+		invoiceReturnObjectDataExcel, err := service.invoiceReturnRepo.GetInvoiceReturnObjectDataForExcel(invoiceReturn.ID)
 		if err != nil {
-			return dto.InvoiceReturn{}, err
+			return model.InvoiceReturn{}, err
 		}
 
+		f.SetCellValue(sheetName, "E1", fmt.Sprintf(`
+НАКЛАДНАЯ № %s
+от %s года       
+на возврат материала 
+      `, invoiceReturnObjectDataExcel.DeliveryCode, utils.DateConverter(invoiceReturnObjectDataExcel.DateOfInvoice)))
+		f.SetCellValue(sheetName, "I1", fmt.Sprintf(`
+%s
+в г. Душанбе
+Регион: %s 
+      `, invoiceReturnObjectDataExcel.ProjectName, invoiceReturnObjectDataExcel.DistrictName))
+
+		f.SetCellValue(sheetName, "D2", invoiceReturnObjectDataExcel.ObjectType)
+		f.SetCellValue(sheetName, "D3", invoiceReturnObjectDataExcel.ObjectName)
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(6+len(materialsForExcel)), fmt.Sprint(invoiceReturnObjectDataExcel.TeamLeaderName))
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(9+len(materialsForExcel)), fmt.Sprint(invoiceReturnObjectDataExcel.SupervisorName))
+		f.SetCellValue(sheetName, "D"+fmt.Sprint(9+len(materialsForExcel)), fmt.Sprint(invoiceReturnObjectDataExcel.TeamLeaderName))
+	}
+
+	for index, oneEntry := range materialsForExcel {
 		f.MergeCell(sheetName, "D"+fmt.Sprint(startingRow+index), "F"+fmt.Sprint(startingRow+index))
 		f.MergeCell(sheetName, "I"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index))
+
 		f.SetCellStyle(sheetName, "A"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index), defaultStyle)
 		f.SetCellStyle(sheetName, "B"+fmt.Sprint(startingRow+index), "B"+fmt.Sprint(startingRow+index), namingStyle)
 
 		f.SetCellValue(sheetName, "A"+fmt.Sprint(startingRow+index), index+1)
-		f.SetCellValue(sheetName, "B"+fmt.Sprint(startingRow+index), material.Code)
-		f.SetCellValue(sheetName, "D"+fmt.Sprint(startingRow+index), material.Name)
-		f.SetCellValue(sheetName, "G"+fmt.Sprint(startingRow+index), material.Unit)
-		f.SetCellValue(sheetName, "H"+fmt.Sprint(startingRow+index), oneEntry.Amount)
-		f.SetCellValue(sheetName, "I"+fmt.Sprint(startingRow+index), oneEntry.Notes)
+		f.SetCellValue(sheetName, "B"+fmt.Sprint(startingRow+index), oneEntry.MaterialCode)
+		f.SetCellValue(sheetName, "D"+fmt.Sprint(startingRow+index), oneEntry.MaterialName)
+		f.SetCellValue(sheetName, "G"+fmt.Sprint(startingRow+index), oneEntry.MaterialUnit)
+		f.SetCellValue(sheetName, "H"+fmt.Sprint(startingRow+index), oneEntry.MaterialAmount)
+		materialDefect := ""
+		if oneEntry.MaterialDefected {
+			materialDefect = "Да"
+		} else {
+			materialDefect = "Нет"
+		}
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(startingRow+index), materialDefect)
+		f.SetCellValue(sheetName, "J"+fmt.Sprint(startingRow+index), oneEntry.MaterialNotes)
 	}
 
-	f.SaveAs("./pkg/excels/return/" + invoiceReturn.DeliveryCode + ".xlsx")
+	f.SaveAs("./pkg/excels/return/" + data.Details.DeliveryCode + ".xlsx")
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}
 
-	return data, nil
+	return invoiceReturn, nil
 }
 
 func (service *invoiceReturnService) Delete(id uint) error {
 	return service.invoiceReturnRepo.Delete(id)
 }
 
-func (service *invoiceReturnService) Count(projectID uint) (int64, error) {
-	return service.invoiceReturnRepo.Count(projectID)
+func (service *invoiceReturnService) CountBasedOnType(projectID uint, invoiceType string) (int64, error) {
+	return service.invoiceReturnRepo.CountBasedOnType(projectID, invoiceType)
 }
 
 func (service *invoiceReturnService) Confirmation(id uint) error {
@@ -242,55 +354,103 @@ func (service *invoiceReturnService) Confirmation(id uint) error {
 		return err
 	}
 	invoiceReturn.Confirmation = true
-	invoiceReturn, err = service.invoiceReturnRepo.Update(invoiceReturn)
-	if err != nil {
-		return err
-	}
 
 	invoiceMaterials, err := service.invoiceMaterialsRepo.GetByInvoice(invoiceReturn.ProjectID, invoiceReturn.ID, "return")
 	if err != nil {
 		return err
 	}
 
+	materialsInReturnerLocation, err := service.materialLocationRepo.GetMaterialsInLocationBasedOnInvoiceID(invoiceReturn.ReturnerID, invoiceReturn.ReturnerType, id, "return")
+	if err != nil {
+		return err
+	}
+
+	materialsInAcceptorLocation, err := service.materialLocationRepo.GetMaterialsInLocationBasedOnInvoiceID(invoiceReturn.AcceptorID, invoiceReturn.AcceptorType, id, "return")
+	if err != nil {
+		return err
+	}
+
+	materialsDefected := []model.MaterialDefect{}
+	newMaterialsDefected := []model.MaterialDefect{}
+	newMaterialsInAcceptorLocationWithDefect := []model.MaterialLocation{}
 	for _, invoiceMaterial := range invoiceMaterials {
-		oldLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceReturn.ProjectID, invoiceMaterial.MaterialCostID, invoiceReturn.ReturnerType, invoiceReturn.ReturnerID)
-		if err != nil {
-			return err
+		materialInReturnerLocationIndex := -1
+		for index, materialInReturnerLocation := range materialsInReturnerLocation {
+			if materialInReturnerLocation.MaterialCostID == invoiceMaterial.MaterialCostID {
+				materialInReturnerLocationIndex = index
+				break
+			}
 		}
 
-		newLocation, err := service.materialLocationRepo.GetByMaterialCostIDOrCreate(invoiceReturn.ProjectID, invoiceMaterial.MaterialCostID, "warehouse", 0)
-		if err != nil {
-			return err
+		materialsInReturnerLocation[materialInReturnerLocationIndex].Amount -= invoiceMaterial.Amount
+
+		materialInAcceptorLocationIndex := -1
+		for index, materialInAcceptorLocation := range materialsInAcceptorLocation {
+			if materialInAcceptorLocation.MaterialCostID == invoiceMaterial.MaterialCostID {
+				materialInAcceptorLocationIndex = index
+				break
+			}
 		}
 
-		oldLocation.Amount -= invoiceMaterial.Amount
-		newLocation.Amount += invoiceMaterial.Amount
+		if materialInAcceptorLocationIndex != -1 {
+			materialsInAcceptorLocation[materialInAcceptorLocationIndex].Amount += invoiceMaterial.Amount
+		} else {
+			materialsInAcceptorLocation = append(materialsInAcceptorLocation, model.MaterialLocation{
+				ProjectID:      invoiceReturn.ProjectID,
+				MaterialCostID: invoiceMaterial.MaterialCostID,
+				LocationType:   invoiceReturn.AcceptorType,
+				LocationID:     invoiceReturn.AcceptorID,
+				Amount:         invoiceMaterial.Amount,
+			})
+			materialInAcceptorLocationIndex = len(materialsInAcceptorLocation) - 1
+		}
 
 		if invoiceMaterial.IsDefected {
-			materialDefect, err := service.materialDefectRepo.FindOrCreate(newLocation.ID)
+			materialDefectInDatabase, err := service.materialDefectRepo.GetByMaterialLocationID(materialsInReturnerLocation[materialInReturnerLocationIndex].ID)
 			if err != nil {
 				return err
 			}
 
-			materialDefect.Amount += invoiceMaterial.Amount
+			if materialsInAcceptorLocation[materialInAcceptorLocationIndex].ID == 0 {
+				newMaterialInAcceptorLocation := model.MaterialLocation{}
 
-			_, err = service.materialDefectRepo.Update(materialDefect)
-			if err != nil {
-				return err
+				if materialInAcceptorLocationIndex != -1 {
+					newMaterialInAcceptorLocation = model.MaterialLocation{
+						ProjectID:      invoiceReturn.ProjectID,
+						MaterialCostID: invoiceMaterial.MaterialCostID,
+						LocationType:   invoiceReturn.AcceptorType,
+						LocationID:     invoiceReturn.AcceptorID,
+						Amount:         invoiceMaterial.Amount,
+					}
+				} else {
+					newMaterialInAcceptorLocation = materialsInAcceptorLocation[materialInAcceptorLocationIndex]
+
+					materialsInAcceptorLocation = materialsInAcceptorLocation[:len(materialsInAcceptorLocation)-1]
+				}
+				materialDefectInDatabase.Amount = invoiceMaterial.Amount
+
+				newMaterialsDefected = append(newMaterialsDefected, materialDefectInDatabase)
+				newMaterialsInAcceptorLocationWithDefect = append(newMaterialsInAcceptorLocationWithDefect, newMaterialInAcceptorLocation)
 			}
-		}
-		_, err = service.materialLocationRepo.Update(oldLocation)
-		if err != nil {
-			return err
-		}
 
-		_, err = service.materialLocationRepo.Update(newLocation)
-		if err != nil {
-			return err
+			if materialsInAcceptorLocation[materialInAcceptorLocationIndex].ID != 0 {
+				materialDefectInDatabase.MaterialLocationID = materialsInAcceptorLocation[materialInAcceptorLocationIndex].ID
+				materialDefectInDatabase.Amount += invoiceMaterial.Amount
+				materialsDefected = append(materialsDefected, materialDefectInDatabase)
+			}
 		}
 	}
 
-	return nil
+	err = service.invoiceReturnRepo.Confirmation(dto.InvoiceReturnConfirmDataQuery{
+		Invoice:                     invoiceReturn,
+		MaterialsInReturnerLocation: materialsInReturnerLocation,
+		MaterialsInAcceptorLocation: materialsInAcceptorLocation,
+		MaterialsDefected:           materialsDefected,
+		NewMaterialsInAcceptorLocationWithNewDefect: newMaterialsInAcceptorLocationWithDefect,
+		NewMaterialsDefected:                        newMaterialsDefected,
+	})
+
+	return err
 }
 
 func (service *invoiceReturnService) UniqueCode(projectID uint) ([]string, error) {
@@ -394,7 +554,7 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 		}
 
 		fmt.Println(invoiceMaterialRepo)
-		for index, invoiceMaterial := range invoiceMaterialRepo {
+		for _, invoiceMaterial := range invoiceMaterialRepo {
 			materialCost, err := service.materialCostRepo.GetByID(invoiceMaterial.MaterialCostID)
 			if err != nil {
 				return "", nil
@@ -405,39 +565,31 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 				return "", nil
 			}
 
-			fmt.Println(materialCost, material)
-			if index == 0 {
-				f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
+			f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
 
-				if invoice.ReturnerType == "teams" {
-					f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
+			if invoice.ReturnerType == "teams" {
+				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
 
-					team, err := service.teamRepo.GetByID(invoice.ReturnerID)
-					if err != nil {
-						return "", err
-					}
-
-					f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), team.Number)
-				} else {
-					f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
-
-					object, err := service.objectRepo.GetByID(invoice.ReturnerID)
-					if err != nil {
-						return "", err
-					}
-
-					f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), object.Name)
+				team, err := service.teamRepo.GetByID(invoice.ReturnerID)
+				if err != nil {
+					return "", err
 				}
 
-				dateOfInvoice := invoice.DateOfInvoice.String()
-				dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
-				f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
+				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), team.Number)
 			} else {
-				f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), "-")
+				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
+
+				object, err := service.objectRepo.GetByID(invoice.ReturnerID)
+				if err != nil {
+					return "", err
+				}
+
+				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), object.Name)
 			}
+
+			dateOfInvoice := invoice.DateOfInvoice.String()
+			dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
+			f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
 
 			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), material.Name)
 			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), material.Unit)
@@ -469,6 +621,64 @@ func (service *invoiceReturnService) GetMaterialAmountInLocation(projectID, loca
 	return service.materialLocationRepo.GetUniqueMaterialTotalAmount(projectID, materialCostID, locationID, locationType)
 }
 
-func (service *invoiceReturnService) GetSerialNumberCodesInLocation(projectID, materialID uint, status string) ([]string, error) {
-	return service.serialNumberRepo.GetCodesByMaterialIDAndStatus(projectID, materialID, status)
+func (service *invoiceReturnService) GetSerialNumberCodesInLocation(projectID, materialID uint, locationType string, locationID uint) ([]string, error) {
+	return service.serialNumberRepo.GetCodesByMaterialIDAndLocation(projectID, materialID, locationType, locationID)
+}
+
+func (service *invoiceReturnService) GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error) {
+	return service.invoiceMaterialsRepo.GetInvoiceMaterialsWithoutSerialNumbers(id, "return")
+}
+
+func (service *invoiceReturnService) GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error) {
+	queryData, err := service.invoiceMaterialsRepo.GetInvoiceMaterialsWithSerialNumbers(id, "return")
+	if err != nil {
+		return []dto.InvoiceMaterialsWithSerialNumberView{}, err
+	}
+
+	result := []dto.InvoiceMaterialsWithSerialNumberView{}
+	current := dto.InvoiceMaterialsWithSerialNumberView{}
+	for index, materialInfo := range queryData {
+		if index == 0 {
+			current = dto.InvoiceMaterialsWithSerialNumberView{
+				ID:            materialInfo.ID,
+				MaterialName:  materialInfo.MaterialName,
+				MaterialUnit:  materialInfo.MaterialUnit,
+				IsDefected:    materialInfo.IsDefected,
+				SerialNumbers: []string{},
+				Amount:        materialInfo.Amount,
+				CostM19:       materialInfo.CostM19,
+				Notes:         materialInfo.Notes,
+			}
+		}
+
+		if current.MaterialName == materialInfo.MaterialName && current.CostM19.Equal(materialInfo.CostM19) && current.IsDefected == materialInfo.IsDefected {
+			if len(current.SerialNumbers) == 0 {
+				current.SerialNumbers = append(current.SerialNumbers, materialInfo.SerialNumber)
+				continue
+			}
+
+			if current.SerialNumbers[len(current.SerialNumbers)-1] != materialInfo.SerialNumber {
+				current.SerialNumbers = append(current.SerialNumbers, materialInfo.SerialNumber)
+			}
+
+		} else {
+			result = append(result, current)
+			current = dto.InvoiceMaterialsWithSerialNumberView{
+				ID:            materialInfo.ID,
+				MaterialName:  materialInfo.MaterialName,
+				MaterialUnit:  materialInfo.MaterialUnit,
+				IsDefected:    materialInfo.IsDefected,
+				SerialNumbers: []string{materialInfo.SerialNumber},
+				Amount:        materialInfo.Amount,
+				CostM19:       materialInfo.CostM19,
+				Notes:         materialInfo.Notes,
+			}
+		}
+	}
+
+	if len(queryData) != 0 {
+		result = append(result, current)
+	}
+
+	return result, nil
 }

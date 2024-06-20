@@ -19,11 +19,18 @@ type InvoiceObjectItem struct {
 	MaterialID    uint     `json:"materialID"`
 	Amount        float64  `json:"amount"`
 	SerialNumbers []string `json:"serialNumbers"`
+	Notes         string   `json:"notes"`
 }
 
 type InvoiceObjectCreate struct {
 	Details model.InvoiceObject `json:"details"`
 	Items   []InvoiceObjectItem `json:"items"`
+}
+
+type InvoiceObjectCreateQueryData struct {
+	Invoice               model.InvoiceObject
+	InvoiceMaterials      []model.InvoiceMaterials
+	SerialNumberMovements []model.SerialNumberMovement
 }
 
 type InvoiceObjectFullDataItem struct {
@@ -36,4 +43,10 @@ type InvoiceObjectFullDataItem struct {
 type InvoiceObjectFullData struct {
 	Details InvoiceObjectPaginated      `json:"details"`
 	Items   []InvoiceObjectFullDataItem `json:"items"`
+}
+
+type InvoiceObjectWithMaterialsDescriptive struct {
+	InvoiceData                  InvoiceObjectPaginated                    `json:"invoiceData"`
+	MaterialsWithSerialNumber    []InvoiceMaterialsWithSerialNumberView    `json:"materialsWithSN"`
+	MaterialsWithoutSerialNumber []InvoiceMaterialsWithoutSerialNumberView `json:"materialsWithoutSN"`
 }

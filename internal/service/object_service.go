@@ -4,12 +4,11 @@ import (
 	"backend-v2/internal/dto"
 	"backend-v2/internal/repository"
 	"backend-v2/model"
-	"fmt"
 )
 
 type objectService struct {
 	objectRepo            repository.IObjectRepository
-	supervisorObjectsRepo repository.ISupervisorObjectsRepository
+	objectSupervisorsRepo repository.IObjectSupervisorsRepository
 	kl04kvObjectRepo      repository.IKL04KVObjectRepository
 	mjdObjectRepo         repository.IMJDObjectRepository
 	sipObjectRepo         repository.ISIPObjectRepository
@@ -19,7 +18,7 @@ type objectService struct {
 
 func InitObjectService(
 	objectRepo repository.IObjectRepository,
-	supervisorObjectsRepo repository.ISupervisorObjectsRepository,
+	objectSupervisorsRepo repository.IObjectSupervisorsRepository,
 	kl04kvObjectRepo repository.IKL04KVObjectRepository,
 	mjdObjectRepo repository.IMJDObjectRepository,
 	sipObjectRepo repository.ISIPObjectRepository,
@@ -28,7 +27,7 @@ func InitObjectService(
 ) IObjectService {
 	return &objectService{
 		objectRepo:            objectRepo,
-		supervisorObjectsRepo: supervisorObjectsRepo,
+		objectSupervisorsRepo: objectSupervisorsRepo,
 		kl04kvObjectRepo:      kl04kvObjectRepo,
 		mjdObjectRepo:         mjdObjectRepo,
 		sipObjectRepo:         sipObjectRepo,
@@ -38,7 +37,7 @@ func InitObjectService(
 }
 
 type IObjectService interface {
-	GetAll() ([]model.Object, error)
+	GetAll(projectID uint) ([]model.Object, error)
 	GetPaginated(page, limit int, data model.Object) ([]dto.ObjectPaginated, error)
 	GetByID(id uint) (model.Object, error)
 	Create(data dto.ObjectCreate) (model.Object, error)
@@ -47,8 +46,8 @@ type IObjectService interface {
 	Count() (int64, error)
 }
 
-func (service *objectService) GetAll() ([]model.Object, error) {
-	return service.objectRepo.GetAll()
+func (service *objectService) GetAll(projectID uint) ([]model.Object, error) {
+	return service.objectRepo.GetAll(projectID)
 }
 
 func (service *objectService) GetPaginated(page, limit int, filter model.Object) ([]dto.ObjectPaginated, error) {
@@ -106,36 +105,17 @@ func (service *objectService) Create(data dto.ObjectCreate) (model.Object, error
 	object := model.Object{
 		ID:               0,
 		ObjectDetailedID: 0,
-		Type:             data.Type,
+		Type:             "",
 		Name:             data.Name,
 		Status:           data.Status,
 		ProjectID:        data.ProjectID,
 	}
 
-	switch data.Type {
-
-	default:
-		return model.Object{}, fmt.Errorf("Неправильный тип объекта")
-
-	}
-
-	object, err := service.objectRepo.Create(object)
+  object, err := service.objectRepo.Create(object)
 	if err != nil {
 		return model.Object{}, err
 	}
-
-	var supervisorObjects []model.SupervisorObjects
-	for _, supervisorID := range data.Supervisors {
-		supervisorObjects = append(supervisorObjects, model.SupervisorObjects{
-			ObjectID:           object.ID,
-			SupervisorWorkerID: supervisorID,
-		})
-	}
-
-	_, err = service.supervisorObjectsRepo.CreateBatch(supervisorObjects)
-	if err != nil {
-		return model.Object{}, err
-	}
+	
 
 	return object, nil
 }

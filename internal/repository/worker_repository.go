@@ -24,6 +24,7 @@ type IWorkerRepository interface {
   GetByName(name string) (model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
 	Create(data model.Worker) (model.Worker, error)
+  CreateInBatches(data []model.Worker) ([]model.Worker, error)
 	Update(data model.Worker) (model.Worker, error)
 	Delete(id uint) error
 	Count() (int64, error)
@@ -75,6 +76,11 @@ func (repo *workerRepository) GetByID(id uint) (model.Worker, error) {
 func (repo *workerRepository) Create(data model.Worker) (model.Worker, error) {
 	err := repo.db.Create(&data).Error
 	return data, err
+}
+
+func (repo *workerRepository) CreateInBatches(data []model.Worker) ([]model.Worker, error) {
+  err := repo.db.CreateInBatches(&data, 15).Error
+  return data, err
 }
 
 func (repo *workerRepository) Update(data model.Worker) (model.Worker, error) {

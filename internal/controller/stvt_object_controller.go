@@ -6,6 +6,7 @@ import (
 	"backend-v2/pkg/response"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +26,8 @@ type ISTVTObjectController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	GetTemplateFile(c *gin.Context)
+	Import(c *gin.Context)
 }
 
 func (controller *stvtObjectController) GetPaginated(c *gin.Context) {
@@ -118,4 +121,40 @@ func (controller *stvtObjectController) Delete(c *gin.Context) {
 
 	response.ResponseSuccess(c, true)
 
+}
+
+func (controller *stvtObjectController) GetTemplateFile(c *gin.Context) {
+	filepath := "./pkg/excels/templates/Шаблон для импорта СТВТ.xlsx"
+
+	if err := controller.stvtObjectService.TemplateFile(filepath); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	c.FileAttachment(filepath, "Шаблон для импорта СТВТ.xlsx")
+}
+
+func (controller *stvtObjectController) Import(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сформирован, проверьте файл: %v", err))
+		return
+	}
+
+	date := time.Now()
+	filePath := "./pkg/excels/temp/" + date.Format("2006-01-02 15-04-05") + file.Filename
+	err = c.SaveUploadedFile(file, filePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
+		return
+	}
+
+	projectID := c.GetUint("projectID")
+	err = controller.stvtObjectService.Import(projectID, filePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, true)
 }

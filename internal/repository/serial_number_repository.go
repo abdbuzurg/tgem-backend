@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/model"
 
 	"gorm.io/gorm"
@@ -19,15 +20,16 @@ func InitSerialNumberRepository(db *gorm.DB) ISerialNumberRepository {
 type ISerialNumberRepository interface {
 	GetAll() ([]model.SerialNumber, error)
 	GetByID(id uint) (model.SerialNumber, error)
-	GetByStatus(status string, statusID uint) ([]model.SerialNumber, error)
 	GetByCode(code string) (model.SerialNumber, error)
 	GetByMaterialCostID(materialCostID uint) ([]model.SerialNumber, error)
+	GetMaterialCostIDsByCodesInLocation(materialID uint, codes []string, locationType string, locationID uint) ([]dto.MaterialCostIDAndSNLocationIDQueryResult, error)
+	GetSerialNumberIDsBySerialNumberCodes(codes []string) ([]model.SerialNumber, error)
 	Create(data model.SerialNumber) (model.SerialNumber, error)
 	CreateInBatches(data []model.SerialNumber) ([]model.SerialNumber, error)
 	Update(data model.SerialNumber) (model.SerialNumber, error)
 	Delete(id uint) error
 	GetCodesByMaterialID(projectID, materialID uint, status string) ([]string, error)
-	GetCodesByMaterialIDAndStatus(projectID, materialID uint, status string) ([]string, error)
+	GetCodesByMaterialIDAndLocation(projectID, materialID uint, locationType string, locationID uint) ([]string, error)
 }
 
 func (repo *serialNumberRepository) GetAll() ([]model.SerialNumber, error) {
@@ -42,12 +44,6 @@ func (repo *serialNumberRepository) GetByID(id uint) (model.SerialNumber, error)
 	return data, err
 }
 
-func (repo *serialNumberRepository) GetByStatus(status string, statusID uint) ([]model.SerialNumber, error) {
-	var data []model.SerialNumber
-	err := repo.db.Find(&data, "status = ? AND status_id = ?", status, statusID).Error
-	return data, err
-}
-
 func (repo *serialNumberRepository) GetByCode(code string) (model.SerialNumber, error) {
 	data := model.SerialNumber{}
 	err := repo.db.Find(&data, "code = ?", code).Error
@@ -57,6 +53,34 @@ func (repo *serialNumberRepository) GetByCode(code string) (model.SerialNumber, 
 func (repo *serialNumberRepository) GetByMaterialCostID(materialCostID uint) ([]model.SerialNumber, error) {
 	data := []model.SerialNumber{}
 	err := repo.db.Find(&data, "material_cost_id = ?", materialCostID).Error
+	return data, err
+}
+
+func (repo *serialNumberRepository) GetMaterialCostIDsByCodesInLocation(materialID uint, codes []string, locationType string, locationID uint) ([]dto.MaterialCostIDAndSNLocationIDQueryResult, error) {
+	data := []dto.MaterialCostIDAndSNLocationIDQueryResult{}
+	err := repo.db.Raw(`
+      SELECT
+        material_costs.id as material_cost_id,
+        serial_numbers.id as serial_number_id,
+        serial_number_locations.id as serial_number_location_id
+      FROM serial_numbers
+      INNER JOIN material_costs ON material_costs.id = serial_numbers.material_cost_id
+      INNER JOIN materials ON materials.id = material_costs.material_id
+      INNER JOIN serial_number_locations ON serial_number_locations.serial_number_id = serial_numbers.id
+      WHERE 	
+        materials.id = ? AND
+        serial_number_locations.location_type = ? AND
+        serial_number_locations.location_id = ? AND
+        serial_numbers.code IN ?
+      ORDER BY material_costs.id
+    `, materialID, locationType, locationID, codes).Scan(&data).Error
+
+	return data, err
+}
+
+func (repo *serialNumberRepository) GetSerialNumberIDsBySerialNumberCodes(codes []string) ([]model.SerialNumber, error) {
+	data := []model.SerialNumber{}
+	err := repo.db.Find(&data, "code IN ?", codes).Error
 	return data, err
 }
 
@@ -84,31 +108,38 @@ func (repo *serialNumberRepository) GetCodesByMaterialID(projectID, materialID u
 	var data []string
 	err := repo.db.Raw(`
     SELECT serial_numbers.code
-    FROM serial_numbers
-      INNER JOIN material_costs ON material_costs.id = serial_numbers.material_cost_id
-      INNER JOIN materials ON materials.id = material_costs.material_id
+    FROM materials
+    INNER JOIN material_costs ON material_costs.material_id = materials.id
+    INNER JOIN serial_numbers ON material_costs.id = serial_numbers.material_cost_id
+    INNER JOIN serial_number_locations ON serial_number_locations.serial_number_id = serial_numbers.id
     WHERE
+      materials.project_id = serial_numbers.project_id AND
+      materials.project_id = serial_number_locations.project_id AND
       materials.project_id = ? AND
       materials.id = ? AND
-      serial_numbers.status = ?
+      serial_number_locations.location_type = ? AND
+      serial_number_locations.location_id = 0;
     `, projectID, materialID, status).Scan(&data).Error
 	return data, err
 }
 
-func (repo *serialNumberRepository) GetCodesByMaterialIDAndStatus(projectID, materialID uint, status string) ([]string, error) {
+func (repo *serialNumberRepository) GetCodesByMaterialIDAndLocation(projectID, materialID uint, locationType string, locationID uint) ([]string, error) {
 	var data []string
 	err := repo.db.Raw(`
     SELECT serial_numbers.code
-    FROM serial_numbers
-      INNER JOIN material_locations ON serial_numbers.status_id = material_locations.id
-      INNER JOIN material_costs ON material_costs.id = material_locations.material_cost_id
-      INNER JOIN materials ON materials.id = material_costs.material_id
+    FROM material_locations
+    INNER JOIN serial_numbers ON serial_numbers.material_cost_id = material_locations.material_cost_id
+    INNER JOIN serial_number_locations ON serial_number_locations.serial_number_id = serial_numbers.id
+    INNER JOIN material_costs ON material_locations.material_cost_id = material_costs.id
+    INNER JOIN materials ON materials.id = material_costs.material_id
     WHERE
       materials.project_id = ? AND
       materials.id = ? AND
+      material_locations.location_type = serial_number_locations.location_type AND
       material_locations.location_type = ? AND
-      serial_numbers.status = ?;
-    `, projectID, materialID, status, status).Scan(&data).Error
+      material_locations.location_id = serial_number_locations.location_id AND
+      material_locations.location_id = ?;
+    `, projectID, materialID, locationType, locationID).Scan(&data).Error
 
 	return data, err
 }

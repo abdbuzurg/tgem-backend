@@ -23,6 +23,7 @@ type IMJDObjectRepository interface {
 	Create(data dto.MJDObjectCreate) (model.MJD_Object, error)
 	Update(data dto.MJDObjectCreate) (model.MJD_Object, error)
 	Delete(id, projectID uint) error
+	CreateInBatches(objects []model.Object, mjds []model.MJD_Object, supervisors []uint) ([]model.MJD_Object, error)
 }
 
 func (repo *mjdObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.MJDObjectPaginatedQuery, error) {
@@ -36,12 +37,9 @@ func (repo *mjdObjectRepository) GetPaginated(page, limit int, projectID uint) (
         mjd_objects.model as model,
         mjd_objects.amount_stores as amount_stores,
         mjd_objects.amount_entrances as amount_entrances,
-        mjd_objects.has_basement as has_basement,
-        workers.name as supervisor_name
+        mjd_objects.has_basement as has_basement
       FROM objects
         INNER JOIN mjd_objects ON objects.object_detailed_id = mjd_objects.id
-        INNER JOIN supervisor_objects ON objects.id = supervisor_objects.object_id
-        INNER JOIN workers ON workers.id = supervisor_objects.supervisor_worker_id
       WHERE
         objects.type = 'mjd_objects' AND
         objects.project_id = ?
@@ -93,16 +91,34 @@ func (repo *mjdObjectRepository) Create(data dto.MJDObjectCreate) (model.MJD_Obj
 			return err
 		}
 
-		supervisors_object := []model.SupervisorObjects{}
-		for _, supervisorID := range data.Supervisors {
-			supervisors_object = append(supervisors_object, model.SupervisorObjects{
-				ObjectID:           object.ID,
-				SupervisorWorkerID: supervisorID,
-			})
+		if len(data.Supervisors) != 0 {
+
+			objectSupervisors := []model.ObjectSupervisors{}
+			for _, supervisorID := range data.Supervisors {
+				objectSupervisors = append(objectSupervisors, model.ObjectSupervisors{
+					ObjectID:           object.ID,
+					SupervisorWorkerID: supervisorID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&objectSupervisors, 5).Error; err != nil {
+				return err
+			}
 		}
 
-		if err := tx.CreateInBatches(&supervisors_object, 5).Error; err != nil {
-			return err
+		if len(data.Teams) != 0 {
+
+			objectTeams := []model.ObjectTeams{}
+			for _, teamID := range data.Teams {
+				objectTeams = append(objectTeams, model.ObjectTeams{
+					ObjectID: object.ID,
+					TeamID:   teamID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&objectTeams, 5).Error; err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -139,22 +155,37 @@ func (repo *mjdObjectRepository) Update(data dto.MJDObjectCreate) (model.MJD_Obj
 			return err
 		}
 
-		if err := tx.Delete(&model.SupervisorObjects{}, "object_id = ?", object.ID).Error; err != nil {
+		if err := tx.Delete(&model.ObjectSupervisors{}, "object_id = ?", object.ID).Error; err != nil {
 			return err
 		}
 
-		supervisorsObject := []model.SupervisorObjects{}
-		for _, supervisorWorkerID := range data.Supervisors {
-			supervisorsObject = append(supervisorsObject, model.SupervisorObjects{
-				ObjectID:           object.ID,
-				SupervisorWorkerID: supervisorWorkerID,
-			})
+		if len(data.Supervisors) != 0 {
+			objectSupervisors := []model.ObjectSupervisors{}
+			for _, supervisorWorkerID := range data.Supervisors {
+				objectSupervisors = append(objectSupervisors, model.ObjectSupervisors{
+					ObjectID:           object.ID,
+					SupervisorWorkerID: supervisorWorkerID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&objectSupervisors, 5).Error; err != nil {
+				return err
+			}
 		}
 
-		if err := tx.CreateInBatches(&supervisorsObject, 5).Error; err != nil {
-			return err
-		}
+		if len(data.Teams) != 0 {
+			objectTeams := []model.ObjectTeams{}
+			for _, teamID := range data.Teams {
+				objectTeams = append(objectTeams, model.ObjectTeams{
+					ObjectID: object.ID,
+					TeamID:   teamID,
+				})
+			}
 
+			if err := tx.CreateInBatches(&objectTeams, 5).Error; err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 
@@ -164,8 +195,8 @@ func (repo *mjdObjectRepository) Update(data dto.MJDObjectCreate) (model.MJD_Obj
 func (repo *mjdObjectRepository) Delete(id, projectID uint) error {
 	return repo.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Exec(`
-      DELETE FROM supervisor_objects
-      WHERE supervisor_objects.object_id = (
+      DELETE FROM object_supervisors
+      WHERE object_supervisors.object_id = (
         SELECT DISTINCT(objects.id)
         FROM objects
           INNER JOIN mjd_objects ON mjd_objects.id = objects.object_detailed_id
@@ -180,6 +211,23 @@ func (repo *mjdObjectRepository) Delete(id, projectID uint) error {
 			return err
 		}
 
+    err = tx.Exec(`
+      DELETE FROM object_teams
+      WHERE object_teams.object_id = (
+        SELECT DISTINCT(objects.id)
+        FROM objects
+          INNER JOIN mjd_objects ON mjd_objects.id = objects.object_detailed_id
+        WHERE
+          objects.project_id = ? AND
+          mjd_objects.id = ? AND
+          objects.type = 'mjd_objects'
+      );
+    `).Error
+
+    if err != nil {
+      return err
+    }
+
 		if err := tx.Table("mjd_objects").Delete(&model.MJD_Object{}, "id = ?", id).Error; err != nil {
 			return err
 		}
@@ -190,4 +238,24 @@ func (repo *mjdObjectRepository) Delete(id, projectID uint) error {
 
 		return nil
 	})
+}
+
+func (repo *mjdObjectRepository) CreateInBatches(objects []model.Object, mjds []model.MJD_Object, supervisors []uint) ([]model.MJD_Object, error) {
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.CreateInBatches(&mjds, 10).Error; err != nil {
+			return err
+		}
+
+		for index := range objects {
+			objects[index].ObjectDetailedID = mjds[index].ID
+		}
+
+		if err := tx.CreateInBatches(&objects, 10).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return mjds, err
 }

@@ -3,6 +3,8 @@ package dto
 import (
 	"backend-v2/model"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type InvoiceOutputPaginated struct {
@@ -23,6 +25,7 @@ type InvoiceOutputItem struct {
 	MaterialID    uint     `json:"materialID"`
 	Amount        float64  `json:"amount"`
 	SerialNumbers []string `json:"serialNumbers"`
+	Notes         string   `json:"notes"`
 }
 
 type InvoiceOutput struct {
@@ -35,6 +38,18 @@ type InvoiceObject struct {
 	TeamLeaderName string `json:"teamLeaderName"`
 	TeamNumber     string `json:"teamNumber"`
 	ObjectName     string `json:"objectName"`
+}
+
+type InvoiceOutputCreateQueryData struct {
+	Invoice                       model.InvoiceOutput
+	InvoiceMaterials              []model.InvoiceMaterials
+	SerialNumberMovements         []model.SerialNumberMovement
+}
+
+type InvoiceOutputConfirmationQueryData struct {
+  InvoiceData model.InvoiceOutput
+  WarehouseMaterials []model.MaterialLocation
+  TeamMaterials []model.MaterialLocation
 }
 
 type InvoiceOutputReportFilterRequest struct {
@@ -58,4 +73,39 @@ type InvoiceOutputReportFilter struct {
 	DistrictID         uint
 	DateFrom           time.Time
 	DateTo             time.Time
+}
+
+type AvailableMaterialsInWarehouse struct {
+	ID              uint    `json:"id"`
+	Name            string  `json:"name"`
+	Unit            string  `json:"unit"`
+	HasSerialNumber bool    `json:"hasSerialNumber"`
+	Amount          float64 `json:"amount"`
+}
+
+type MaterialAmountSortedByCostM19QueryResult struct {
+	MaterialID      uint
+	MaterialCostID  uint
+	MaterialCostM19 decimal.Decimal
+	MaterialAmount  float64
+}
+
+type MaterialCostIDAndSNLocationIDQueryResult struct {
+	MaterialCostID         uint
+	SerialNumberID         uint
+	SerialNumberLocationID uint
+}
+
+type InvoiceOutputDataForExcelQueryResult struct {
+  ID uint
+  ProjectName string
+  DeliveryCode string
+  DistrictName string
+  ObjectType string
+  ObjectName string
+  TeamLeaderName string
+  WarehouseManagerName string
+  ReleasedName string
+  RecipientName string
+  DateOfInvoice time.Time
 }

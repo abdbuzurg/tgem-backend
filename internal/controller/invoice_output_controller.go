@@ -29,8 +29,9 @@ type IInvoiceOutputController interface {
 	// Update(c *gin.Context)
 	Delete(c *gin.Context)
 	GetDocument(c *gin.Context)
+	GetInvoiceMaterialsWithoutSerialNumbers(c *gin.Context)
+	GetInvoiceMaterialsWithSerialNumbers(c *gin.Context)
 	Confirmation(c *gin.Context)
-	GetUnconfirmedByObjectInvoices(c *gin.Context)
 	UniqueCode(c *gin.Context)
 	UniqueWarehouseManager(c *gin.Context)
 	UniqueRecieved(c *gin.Context)
@@ -40,6 +41,7 @@ type IInvoiceOutputController interface {
 	Report(c *gin.Context)
 	GetTotalAmountInWarehouse(c *gin.Context)
 	GetCodesByMaterialID(c *gin.Context)
+	GetAvailableMaterialsInWarehouse(c *gin.Context)
 }
 
 func (controller *invoiceOutputController) GetAll(c *gin.Context) {
@@ -161,6 +163,42 @@ func (controller *invoiceOutputController) GetPaginated(c *gin.Context) {
 	response.ResponsePaginatedData(c, data, dataCount)
 }
 
+func (controller *invoiceOutputController) GetInvoiceMaterialsWithoutSerialNumbers(c *gin.Context) {
+
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceOutputService.GetInvoiceMaterialsWithoutSerialNumbers(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceOutputController) GetInvoiceMaterialsWithSerialNumbers(c *gin.Context) {
+
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceOutputService.GetInvoiceMaterialsWithSerialNumbers(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
 func (controller *invoiceOutputController) Create(c *gin.Context) {
 	var createData dto.InvoiceOutput
 	if err := c.ShouldBindJSON(&createData); err != nil {
@@ -220,7 +258,7 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 	}
 	file.Filename = invoiceOutput.DeliveryCode
 
-	filePath := "./pkg/excels/output/" + file.Filename + ".xlsx"
+	filePath := "./pkg/excels/output/" + file.Filename
 	err = c.SaveUploadedFile(file, filePath)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("cannot save file: %v", err))
@@ -239,16 +277,6 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 func (controller *invoiceOutputController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
 	c.FileAttachment("./pkg/excels/output/"+deliveryCode+".xlsx", deliveryCode+".xlsx")
-}
-
-func (controller *invoiceOutputController) GetUnconfirmedByObjectInvoices(c *gin.Context) {
-	data, err := controller.invoiceOutputService.GetUnconfirmedByObjectInvoices()
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("cannot get data: %v", err))
-		return
-	}
-
-	response.ResponseSuccess(c, data)
 }
 
 func (controller *invoiceOutputController) UniqueCode(c *gin.Context) {
@@ -371,6 +399,19 @@ func (controller *invoiceOutputController) GetCodesByMaterialID(c *gin.Context) 
 	projectID := c.GetUint("projectID")
 
 	data, err := controller.invoiceOutputService.GetSerialNumbersByMaterial(projectID, uint(materialID))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
+}
+
+func (controller *invoiceOutputController) GetAvailableMaterialsInWarehouse(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+
+	data, err := controller.invoiceOutputService.GetAvailableMaterialsInWarehouse(projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
 		return

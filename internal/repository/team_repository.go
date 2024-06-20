@@ -18,53 +18,42 @@ func InitTeamRepostory(db *gorm.DB) ITeamRepository {
 }
 
 type ITeamRepository interface {
-	GetAll() ([]model.Team, error)
-	GetPaginated(page, limit int) ([]model.Team, error)
-	GetPaginatedFiltered(page, limit int, filter model.Team) ([]dto.TeamPaginatedQuery, error)
+	GetAll(projectID uint) ([]model.Team, error)
+	GetPaginated(page, limit int, projectID uint) ([]dto.TeamPaginatedQuery, error)
 	GetByID(id uint) (model.Team, error)
-  GetByRangeOfIDs(ids []uint) ([]model.Team, error)
-  GetByNumber(number string) (model.Team, error)
-	Create(data model.Team) (model.Team, error)
-	Update(data model.Team) (model.Team, error)
+	GetByRangeOfIDs(ids []uint) ([]model.Team, error)
+	GetByNumber(number string) (model.Team, error)
+	Create(data dto.TeamMutation) (model.Team, error)
+	CreateInBatches(data []dto.TeamMutation) ([]model.Team, error)
+	Update(data dto.TeamMutation) (model.Team, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(projectID uint) (int64, error)
+	GetTeamNumberAndTeamLeadersByID(projectID, id uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error)
 }
 
-func (repo *teamRepository) GetAll() ([]model.Team, error) {
+func (repo *teamRepository) GetAll(projectID uint) ([]model.Team, error) {
 	data := []model.Team{}
-	err := repo.db.Order("id desc").Find(&data).Error
+	err := repo.db.Order("id desc").Find(&data, "project_id = ?", projectID).Error
 	return data, err
 }
 
-func (repo *teamRepository) GetPaginated(page, limit int) ([]model.Team, error) {
-	data := []model.Team{}
-	err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data).Error
-	return data, err
-}
-
-func (repo *teamRepository) GetPaginatedFiltered(page, limit int, filter model.Team) ([]dto.TeamPaginatedQuery, error) {
+func (repo *teamRepository) GetPaginated(page, limit int, projectID uint) ([]dto.TeamPaginatedQuery, error) {
 	data := []dto.TeamPaginatedQuery{}
 	err := repo.db.
 		Raw(`SELECT 
           teams.id as id,
           teams.number AS team_number, 
+          workers.id AS leader_id,
           workers.name AS leader_name,
           teams.mobile_number AS team_mobile_number,
-          teams.company AS team_company,
-          objects.name AS object_name
+          teams.company AS team_company
         FROM teams
-          INNER JOIN workers ON teams.leader_worker_id = workers.id
-          INNER JOIN team_objects ON team_objects.team_id = teams.id
-          INNER JOIN objects ON team_objects.object_id = objects.id
+        INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+        INNER JOIN workers ON team_leaders.leader_worker_id = workers.id
         WHERE
-          (nullif(?, 0) IS NULL OR teams.leader_worker_id = ?) AND
-          (nullif(?, '') IS NULL OR teams.number = ?) AND
-          (nullif(?, '') IS NULL OR teams.mobile_number = ?) AND
-          (nullif(?, '') IS NULL OR teams.company = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.LeaderWorkerID, filter.LeaderWorkerID, 
-      filter.Number, filter.Number, 
-      filter.MobileNumber, filter.MobileNumber, 
-      filter.Company, filter.Company, limit, (page-1)*limit,
+          teams.project_id = ?
+        ORDER BY teams.id DESC LIMIT ? OFFSET ?`,
+			projectID, limit, (page-1)*limit,
 		).
 		Scan(&data).Error
 
@@ -77,37 +66,162 @@ func (repo *teamRepository) GetByID(id uint) (model.Team, error) {
 	return data, err
 }
 
-func (repo *teamRepository) Create(data model.Team) (model.Team, error) {
-	err := repo.db.Create(&data).Error
-	return data, err
+func (repo *teamRepository) Create(data dto.TeamMutation) (model.Team, error) {
+	team := model.Team{
+		ProjectID:    data.ProjectID,
+		Number:       data.Number,
+		Company:      data.Company,
+		MobileNumber: data.MobileNumber,
+	}
+
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+
+		if err := tx.Create(&team).Error; err != nil {
+			return err
+		}
+
+		teamLeaders := []model.TeamLeaders{}
+		for _, teamLeaderID := range data.LeaderWorkerIDs {
+			teamLeaders = append(teamLeaders, model.TeamLeaders{
+				TeamID:         team.ID,
+				LeaderWorkerID: teamLeaderID,
+			})
+		}
+
+		if err := tx.CreateInBatches(&teamLeaders, 5).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return team, err
 }
 
-func (repo *teamRepository) Update(data model.Team) (model.Team, error) {
-	err := repo.db.Model(&model.Team{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
-	return data, err
+func (repo *teamRepository) Update(data dto.TeamMutation) (model.Team, error) {
+	team := model.Team{
+		ID:           data.ID,
+		Number:       data.Number,
+		MobileNumber: data.MobileNumber,
+		Company:      data.Company,
+	}
+
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+
+		if err := tx.Model(&model.Team{}).Where("id = ?", team.ID).Updates(&team).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&model.TeamLeaders{}, "team_id = ?", team.ID).Error; err != nil {
+			return err
+		}
+
+		teamLeaders := []model.TeamLeaders{}
+		for _, teamLeaderID := range data.LeaderWorkerIDs {
+			teamLeaders = append(teamLeaders, model.TeamLeaders{
+				TeamID:         team.ID,
+				LeaderWorkerID: teamLeaderID,
+			})
+		}
+
+		if err := tx.CreateInBatches(&teamLeaders, 5).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return team, err
 }
 
 func (repo *teamRepository) Delete(id uint) error {
-	return repo.db.Delete(&model.Team{}, "id = ?", id).Error
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+
+		if err := tx.Delete(&model.TeamLeaders{}, "team_id = ?", id).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&model.Team{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		return nil
+
+	})
 }
 
-func (repo *teamRepository) Count() (int64, error) {
+func (repo *teamRepository) Count(projectID uint) (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.Team{}).Count(&count).Error
+	err := repo.db.Model(&model.Team{}).Where("project_id = ?", projectID).Count(&count).Error
 	return count, err
 }
 
-func (repo *teamRepository)   GetByNumber(number string) (model.Team, error) {
-  data := model.Team{}
-  err := repo.db.
-    Raw(`SELECT * FROM teams WHERE number = ?`, number).
-    Error
-  return data, err
+func (repo *teamRepository) GetByNumber(number string) (model.Team, error) {
+	data := model.Team{}
+	err := repo.db.
+		Raw(`SELECT * FROM teams WHERE number = ?`, number).
+		Error
+	return data, err
 }
 
 func (repo *teamRepository) GetByRangeOfIDs(ids []uint) ([]model.Team, error) {
-  var data []model.Team
-  err := repo.db.Model(model.Team{}).Select("*").Where("id IN ?", ids).Scan(&data).Error
-  return data, err
+	var data []model.Team
+	err := repo.db.Model(model.Team{}).Select("*").Where("id IN ?", ids).Scan(&data).Error
+	return data, err
 }
 
+func (repo *teamRepository) CreateInBatches(data []dto.TeamMutation) ([]model.Team, error) {
+	teams := []model.Team{}
+
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+
+		for _, oneEntry := range data {
+			teams = append(teams, model.Team{
+				Number:       oneEntry.Number,
+				MobileNumber: oneEntry.MobileNumber,
+				Company:      oneEntry.Company,
+				ProjectID:    oneEntry.ProjectID,
+			})
+		}
+
+		if err := tx.CreateInBatches(&teams, 5).Error; err != nil {
+			return err
+		}
+
+		teamLeaders := []model.TeamLeaders{}
+		for index, oneEntry := range data {
+
+			for _, learderWorkerID := range oneEntry.LeaderWorkerIDs {
+				teamLeaders = append(teamLeaders, model.TeamLeaders{
+					TeamID:         teams[index].ID,
+					LeaderWorkerID: learderWorkerID,
+				})
+			}
+		}
+
+		if err := tx.CreateInBatches(&teamLeaders, 10).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return teams, err
+}
+
+func (repo *teamRepository) GetTeamNumberAndTeamLeadersByID(projectID, id uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error) {
+	data := []dto.TeamNumberAndTeamLeaderNameQueryResult{}
+	err := repo.db.Raw(`
+    SELECT 
+      teams.number as team_number,
+      workers.name as team_leader_name
+    FROM teams
+    INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+    INNER JOIN workers ON workers.id = team_leaders.leader_worker_id
+    WHERE
+      teams.project_id = ? AND
+      teams.id = ?
+	  `, projectID, id).Scan(&data).Error
+
+	return data, err
+}

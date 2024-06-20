@@ -10,6 +10,7 @@ type KL04KVObjectPaginated struct {
 	Length           float64  `json:"length"`
 	Nourashes        string   `json:"nourashes"`
 	Supervisors      []string `json:"supervisors"`
+	Teams            []string `json:"teams"`
 }
 
 type KL04KVObjectPaginatedQuery struct {
@@ -19,11 +20,11 @@ type KL04KVObjectPaginatedQuery struct {
 	Status           string  `json:"status"`
 	Length           float64 `json:"length"`
 	Nourashes        string  `json:"nourashes"`
-	SupervisorName   string  `json:"supervisorName"`
 }
 
 type KL04KVObjectCreate struct {
 	BaseInfo     model.Object        `json:"baseInfo"`
 	DetailedInfo model.KL04KV_Object `json:"detailedInfo"`
 	Supervisors  []uint              `json:"supervisors"`
+	Teams        []uint              `json:"teams"`
 }

@@ -22,13 +22,14 @@ type IInvoiceMaterialsRepository interface {
 	GetPaginated(page, limit int) ([]model.InvoiceMaterials, error)
 	GetPaginatedFiltered(page, limit int, filter model.InvoiceMaterials) ([]model.InvoiceMaterials, error)
 	GetByID(id uint) (model.InvoiceMaterials, error)
+	GetInvoiceMaterialsWithoutSerialNumbers(id uint, invoiceType string) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error)
+	GetInvoiceMaterialsWithSerialNumbers(id uint, invoiceType string) ([]dto.InvoiceMaterialsWithSerialNumberQuery, error)
 	Create(data model.InvoiceMaterials) (model.InvoiceMaterials, error)
 	Update(data model.InvoiceMaterials) (model.InvoiceMaterials, error)
 	Delete(id uint) error
 	Count() (int64, error)
 	GetByInvoice(projectID, invoiceID uint, invoceType string) ([]model.InvoiceMaterials, error)
-  GetByMaterialCostID(materialCostID uint, invoiceType string, invoiceID uint) (model.InvoiceMaterials, error)
-  GetByInvoiceData(projectID, invoiceID uint, invoiceType string) ([]dto.InvoiceMaterialsView, error)
+	GetByMaterialCostID(materialCostID uint, invoiceType string, invoiceID uint) (model.InvoiceMaterials, error)
 }
 
 func (repo *invoiceMaterialsRepository) GetAll() ([]model.InvoiceMaterials, error) {
@@ -92,38 +93,71 @@ func (repo *invoiceMaterialsRepository) GetByInvoice(projectID, invoiceID uint, 
 	return data, err
 }
 
-func(repo *invoiceMaterialsRepository) GetByMaterialCostID(
-  materialCostID uint, 
-  invoiceType string, 
-  invoiceID uint,
+func (repo *invoiceMaterialsRepository) GetByMaterialCostID(
+	materialCostID uint,
+	invoiceType string,
+	invoiceID uint,
 ) (model.InvoiceMaterials, error) {
-  var data model.InvoiceMaterials
-  err := repo.db.Raw(`
+	var data model.InvoiceMaterials
+	err := repo.db.Raw(`
     SELECT * FROM invoice_materials WHERE material_cost_id = ? AND invoice_type = ? AND invoice_id = ?
     `, materialCostID, invoiceType, invoiceID).Scan(&data).Error
-  return data, err
+	return data, err
 }
 
-func(repo *invoiceMaterialsRepository) GetByInvoiceData(
-  projectID, invoiceID uint, 
-  invoiceType string,
-) ([]dto.InvoiceMaterialsView, error) {
-  data := []dto.InvoiceMaterialsView{}
-  err := repo.db.Raw(`
+func (repo *invoiceMaterialsRepository) GetInvoiceMaterialsWithoutSerialNumbers(id uint, invoiceType string) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error) {
+	data := []dto.InvoiceMaterialsWithoutSerialNumberView{}
+	err := repo.db.Raw(`
     SELECT 
       invoice_materials.id as id,
       materials.name as material_name,
+      materials.unit as material_unit,
+      invoice_materials.is_defected as is_defected,
       material_costs.cost_m19 as cost_m19,
       invoice_materials.amount as amount,
       invoice_materials.notes as notes
     FROM invoice_materials
-      INNER JOIN material_costs ON material_costs.id = invoice_materials.material_cost_id
-      INNER JOIN materials ON materials.id = material_costs.material_id
+    INNER JOIN material_costs ON material_costs.id = invoice_materials.material_cost_id
+    INNER JOIN materials ON materials.id = material_costs.material_id
     WHERE
-      invoice_materials.project_id = ? AND
+      invoice_materials.project_id = materials.project_id AND
       invoice_materials.invoice_type = ? AND
-      invoice_materials.invoice_id = ?;
-    `, projectID, invoiceType, invoiceID).Scan(&data).Error
+      invoice_materials.invoice_id = ? AND
+      materials.has_serial_number = false 
+    ORDER BY materials.name DESC
+    `, invoiceType, id).Scan(&data).Error
 
-  return data, err
+	return data, err
+}
+
+func (repo *invoiceMaterialsRepository) GetInvoiceMaterialsWithSerialNumbers(id uint, invoiceType string) ([]dto.InvoiceMaterialsWithSerialNumberQuery, error) {
+	data := []dto.InvoiceMaterialsWithSerialNumberQuery{}
+	err := repo.db.Raw(`
+       SELECT
+        invoice_materials.id as id,
+        materials.name as material_name,
+        materials.unit as material_unit,
+        invoice_materials.is_defected as is_defected,
+        material_costs.cost_m19 as cost_m19,
+        serial_numbers.code as serial_number,
+        invoice_materials.amount as amount,
+        invoice_materials.notes as notes
+      FROM invoice_materials
+      INNER JOIN serial_number_movements ON serial_number_movements.invoice_id = invoice_materials.invoice_id
+      INNER JOIN serial_numbers ON serial_numbers.id = serial_number_movements.serial_number_id
+      INNER JOIN material_costs ON material_costs.id = serial_numbers.material_cost_id
+      INNER JOIN materials ON materials.id = material_costs.material_id
+      WHERE
+        invoice_materials.project_id = serial_numbers.project_id AND
+        invoice_materials.project_id = serial_number_movements.project_id AND
+        invoice_materials.invoice_type = serial_number_movements.invoice_type AND
+        invoice_materials.material_cost_id = serial_numbers.material_cost_id AND
+        invoice_materials.is_defected = serial_number_movements.is_defected AND
+        invoice_materials.invoice_type = ? AND
+        invoice_materials.invoice_id = ? AND
+        materials.has_serial_number = true
+      ORDER BY materials.name DESC
+    `, invoiceType, id).Scan(&data).Error
+
+	return data, err
 }

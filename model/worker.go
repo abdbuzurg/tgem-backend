@@ -6,11 +6,13 @@ type Worker struct {
 	JobTitle     string `json:"jobTitle" gorm:"tinyText"`
 	MobileNumber string `json:"mobileNumber" gorm:"tinyText"`
 
-	User    User     `json:"-" gorm:"foreignKey:WorkerID"`
-	Teams   []Team   `json:"-" gorm:"foreignKey:LeaderWorkerID"`
+	User User `json:"-" gorm:"foreignKey:WorkerID"`
 
-  //Object Workers
-  SupervisorObjectss []SupervisorObjects `json:"-" gorm:"foreignKey:SupervisorWorkerID"`
+	//Object Workers
+	ObjectSupervisors  []ObjectSupervisors `json:"-" gorm:"foreignKey:SupervisorWorkerID"`
+
+	//Team Leaders
+	TeamLeaderss []TeamLeaders `json:"-" gorm:"foreignKey:LeaderWorkerID"`
 
 	//Invoice Input Workers
 	InvoiceInputsWarehouseManager []InvoiceInput `json:"-" gorm:"foreignKey:WarehouseManagerWorkerID"`
@@ -18,6 +20,9 @@ type Worker struct {
 
 	//Invoice Object
 	InvoiceObjectsSupervisor []InvoiceObject `json:"-" gorm:"foreignKey:SupervisorWorkerID"`
+
+	//Invoice Return
+	InvoiceReturns []InvoiceReturn `json:"-" gorm:"foreignKey:AcceptedByWorkerID"`
 
 	//Invoice Output
 	InvoiceOutputsWarehouseManager []InvoiceOutput `json:"-" gorm:"foreignKey:WarehouseManagerWorkerID"`

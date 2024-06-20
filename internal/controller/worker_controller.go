@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,6 +30,8 @@ type IWorkerController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	GetTemplateFile(c *gin.Context)
+	Import(c *gin.Context)
 }
 
 func (controller *workerController) GetAll(c *gin.Context) {
@@ -173,4 +176,33 @@ func (controller *workerController) Delete(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, "deleted")
+}
+
+func (controller *workerController) GetTemplateFile(c *gin.Context) {
+	filepath := "./pkg/excels/templates/Шаблон для импорта Рабочего Персонала.xlsx"
+	c.FileAttachment(filepath, "Шаблон для импорта Рабочего Персонала.xlsx")
+}
+
+func (controller *workerController) Import(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сформирован, проверьте файл: %v", err))
+		return
+	}
+
+	date := time.Now()
+	filePath := "./pkg/excels/temp/" + date.Format("2006-01-02 15-04-05") + file.Filename
+	err = c.SaveUploadedFile(file, filePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
+		return
+	}
+
+	err = controller.workerService.Import(filePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, true)
 }

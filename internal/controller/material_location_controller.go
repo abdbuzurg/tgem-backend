@@ -7,6 +7,7 @@ import (
 	"backend-v2/pkg/response"
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +33,7 @@ type IMaterialLocationController interface {
 	GetMaterialInLocation(c *gin.Context)
 	UniqueObjects(c *gin.Context)
 	UniqueTeams(c *gin.Context)
-  ReportBalance(c *gin.Context)
+	ReportBalance(c *gin.Context)
 }
 
 func (controller *materialLocationController) GetAll(c *gin.Context) {
@@ -234,17 +235,22 @@ func (controller *materialLocationController) UniqueObjects(c *gin.Context) {
 
 func (controller *materialLocationController) ReportBalance(c *gin.Context) {
 
-  var data dto.ReportBalanceFilterRequest
-  if err := c.ShouldBindJSON(&data); err != nil {
-    response.ResponseError(c, fmt.Sprintf("Invalid body request: %v", err))
-    return
-  }
+	var data dto.ReportBalanceFilterRequest
+	if err := c.ShouldBindJSON(&data); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid body request: %v", err))
+		return
+	}
 
-  fileName, err := controller.materialLocationService.BalanceReport(data)
-  if err != nil {
-    response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
-    return
-  }
+  projectID := c.GetUint("projectID")
 
-	c.FileAttachment("./pkg/excels/report/"+fileName, fileName)
+	fileName, err := controller.materialLocationService.BalanceReport(projectID, data)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	filePath := "./pkg/excels/temp/" + fileName
+
+	c.FileAttachment(filePath, fileName)
+  os.Remove(filePath)
 }

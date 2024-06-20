@@ -17,7 +17,10 @@ func Permission(db *gorm.DB) gin.HandlerFunc {
 
 		path := c.Request.URL.Path
 		splittedpath := strings.Split(path, "/")
-		resourceUrl := "/" + splittedpath[1]
+		resourceUrl := "/" + splittedpath[2]
+
+    fmt.Println(splittedpath)
+    fmt.Println(resourceUrl)
 
 		var permission model.Permission
 		err := db.Raw(`

@@ -32,7 +32,9 @@ type IObjectController interface {
 }
 
 func (controller *objectController) GetAll(c *gin.Context) {
-	data, err := controller.objectService.GetAll()
+  projectID := c.GetUint("projectID")
+
+	data, err := controller.objectService.GetAll(projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get Object data: %v", err))
 		return

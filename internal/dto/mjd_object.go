@@ -11,7 +11,6 @@ type MJDObjectPaginatedQuery struct {
 	AmountStores     uint   `json:"amountStores"`
 	AmountEntrances  uint   `json:"amountEntrances"`
 	HasBasement      bool   `json:"hasBasement"`
-	SupervisorName   string `json:"supervisorName"`
 }
 
 type MJDObjectPaginated struct {
@@ -24,10 +23,12 @@ type MJDObjectPaginated struct {
 	AmountEntrances  uint     `json:"amountEntrances"`
 	HasBasement      bool     `json:"hasBasement"`
 	Supervisors      []string `json:"supervisors"`
+	Teams            []string `json:"teams"`
 }
 
 type MJDObjectCreate struct {
 	BaseInfo     model.Object     `json:"baseInfo"`
 	DetailedInfo model.MJD_Object `json:"detailedInfo"`
 	Supervisors  []uint           `json:"supervisors"`
+	Teams        []uint           `json:"teams"`
 }

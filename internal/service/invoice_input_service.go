@@ -12,13 +12,14 @@ import (
 )
 
 type invoiceInputService struct {
-	invoiceInputRepo     repository.IInovoiceInputRepository
-	invoiceMaterialRepo  repository.IInvoiceMaterialsRepository
-	materailLocationRepo repository.IMaterialLocationRepository
-	workerRepo           repository.IWorkerRepository
-	materialCostRepo     repository.IMaterialCostRepository
-	materialRepo         repository.IMaterialRepository
-	serialNumberRepo     repository.ISerialNumberRepository
+	invoiceInputRepo         repository.IInovoiceInputRepository
+	invoiceMaterialRepo      repository.IInvoiceMaterialsRepository
+	materialLocationRepo     repository.IMaterialLocationRepository
+	workerRepo               repository.IWorkerRepository
+	materialCostRepo         repository.IMaterialCostRepository
+	materialRepo             repository.IMaterialRepository
+	serialNumberRepo         repository.ISerialNumberRepository
+	serialNumberMovementRepo repository.ISerialNumberMovementRepository
 }
 
 func InitInvoiceInputService(
@@ -29,15 +30,17 @@ func InitInvoiceInputService(
 	materialCostRepo repository.IMaterialCostRepository,
 	materialRepo repository.IMaterialRepository,
 	serialNumberRepo repository.ISerialNumberRepository,
+	serialNumberMovementRepo repository.ISerialNumberMovementRepository,
 ) IInvoiceInputService {
 	return &invoiceInputService{
-		invoiceInputRepo:     invoiceInputRepo,
-		invoiceMaterialRepo:  invoiceMaterialRepo,
-		materailLocationRepo: materialLocationRepo,
-		workerRepo:           workerRepo,
-		materialCostRepo:     materialCostRepo,
-		materialRepo:         materialRepo,
-		serialNumberRepo:     serialNumberRepo,
+		invoiceInputRepo:         invoiceInputRepo,
+		invoiceMaterialRepo:      invoiceMaterialRepo,
+		materialLocationRepo:     materialLocationRepo,
+		workerRepo:               workerRepo,
+		materialCostRepo:         materialCostRepo,
+		materialRepo:             materialRepo,
+		serialNumberRepo:         serialNumberRepo,
+		serialNumberMovementRepo: serialNumberMovementRepo,
 	}
 }
 
@@ -45,7 +48,9 @@ type IInvoiceInputService interface {
 	GetAll() ([]model.InvoiceInput, error)
 	GetPaginated(page, limit int, data model.InvoiceInput) ([]dto.InvoiceInputPaginated, error)
 	GetByID(id uint) (model.InvoiceInput, error)
-	Create(data dto.InvoiceInput) (dto.InvoiceInput, error)
+	GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error)
+	GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error)
+	Create(data dto.InvoiceInput) (model.InvoiceInput, error)
 	// Update(data dto.InvoiceInput) (dto.InvoiceInput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
@@ -70,56 +75,117 @@ func (service *invoiceInputService) GetByID(id uint) (model.InvoiceInput, error)
 	return service.invoiceInputRepo.GetByID(id)
 }
 
-func (service *invoiceInputService) Create(data dto.InvoiceInput) (dto.InvoiceInput, error) {
+func (service *invoiceInputService) GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error) {
+	return service.invoiceMaterialRepo.GetInvoiceMaterialsWithoutSerialNumbers(id, "input")
+}
+
+func (service *invoiceInputService) GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error) {
+	queryData, err := service.invoiceMaterialRepo.GetInvoiceMaterialsWithSerialNumbers(id, "input")
+	if err != nil {
+		return []dto.InvoiceMaterialsWithSerialNumberView{}, err
+	}
+
+	result := []dto.InvoiceMaterialsWithSerialNumberView{}
+	current := dto.InvoiceMaterialsWithSerialNumberView{}
+	for index, materialInfo := range queryData {
+		if index == 0 {
+			current = dto.InvoiceMaterialsWithSerialNumberView{
+				ID:            materialInfo.ID,
+				MaterialName:  materialInfo.MaterialName,
+				MaterialUnit:  materialInfo.MaterialUnit,
+				SerialNumbers: []string{},
+				Amount:        materialInfo.Amount,
+				CostM19:       materialInfo.CostM19,
+				Notes:         materialInfo.Notes,
+			}
+		}
+
+		if current.MaterialName == materialInfo.MaterialName && current.CostM19.Equal(materialInfo.CostM19) {
+			if len(current.SerialNumbers) == 0 {
+				current.SerialNumbers = append(current.SerialNumbers, materialInfo.SerialNumber)
+				continue
+			}
+
+			if current.SerialNumbers[len(current.SerialNumbers)-1] != materialInfo.SerialNumber {
+				current.SerialNumbers = append(current.SerialNumbers, materialInfo.SerialNumber)
+			}
+
+		} else {
+			result = append(result, current)
+			current = dto.InvoiceMaterialsWithSerialNumberView{
+				ID:            materialInfo.ID,
+				MaterialName:  materialInfo.MaterialName,
+				MaterialUnit:  materialInfo.MaterialUnit,
+				SerialNumbers: []string{materialInfo.SerialNumber},
+				Amount:        materialInfo.Amount,
+				CostM19:       materialInfo.CostM19,
+				Notes:         materialInfo.Notes,
+			}
+		}
+	}
+
+	if len(queryData) != 0 {
+		result = append(result, current)
+	}
+
+	return result, nil
+}
+
+func (service *invoiceInputService) Create(data dto.InvoiceInput) (model.InvoiceInput, error) {
 
 	count, err := service.invoiceInputRepo.Count(data.Details.ProjectID)
 	if err != nil {
-		return dto.InvoiceInput{}, err
+		return model.InvoiceInput{}, err
 	}
 
 	code := utils.UniqueCodeGeneration("П", count+1, data.Details.ProjectID)
 	data.Details.DeliveryCode = code
 
-	invoiceInput, err := service.invoiceInputRepo.Create(data.Details)
-	if err != nil {
-		return dto.InvoiceInput{}, err
-	}
-	data.Details = invoiceInput
-
+	var invoiceMaterials []model.InvoiceMaterials
+	var serialNumbers []model.SerialNumber
+	var serialNumberMovements []model.SerialNumberMovement
 	for _, item := range data.Items {
-		invoiceMaterial, err := service.invoiceMaterialRepo.Create(model.InvoiceMaterials{
+		invoiceMaterials = append(invoiceMaterials, model.InvoiceMaterials{
 			ProjectID:      data.Details.ProjectID,
 			MaterialCostID: item.MaterialData.MaterialCostID,
-			InvoiceID:      invoiceInput.ID,
 			IsDefected:     item.MaterialData.IsDefected,
-			InvoiceType:    item.MaterialData.InvoiceType,
+			InvoiceType:    "input",
 			Amount:         item.MaterialData.Amount,
 			Notes:          item.MaterialData.Notes,
 		})
-		if err != nil {
-			return dto.InvoiceInput{}, err
-		}
 
 		if len(item.SerialNumbers) == 0 {
 			continue
 		}
 
-		var serialNumbers []model.SerialNumber
 		for _, serialNumber := range item.SerialNumbers {
 			serialNumbers = append(serialNumbers, model.SerialNumber{
 				Code:           serialNumber,
-				Status:         "pending",
-				StatusID:       invoiceMaterial.ID,
-				MaterialCostID: invoiceMaterial.MaterialCostID,
+				ProjectID:      data.Details.ProjectID,
+				MaterialCostID: item.MaterialData.MaterialCostID,
+			})
+
+			serialNumberMovements = append(serialNumberMovements, model.SerialNumberMovement{
+				ProjectID:    data.Details.ProjectID,
+				InvoiceType:  "input",
+				IsDefected:   false,
+				Confirmation: false,
 			})
 		}
-		_, err = service.serialNumberRepo.CreateInBatches(serialNumbers)
-		if err != nil {
-			return dto.InvoiceInput{}, err
-		}
+
 	}
 
-	return data, nil
+	invoiceInput, err := service.invoiceInputRepo.Create(dto.InvoiceInputCreateQueryData{
+		InvoiceData:          data.Details,
+		InvoiceMaterials:     invoiceMaterials,
+		SerialNumbers:        serialNumbers,
+		SerialNumberMovement: serialNumberMovements,
+	})
+	if err != nil {
+		return model.InvoiceInput{}, err
+	}
+
+	return invoiceInput, nil
 }
 
 // func (service *invoiceInputService) Update(data dto.InvoiceInput) (dto.InvoiceInput, error) {
@@ -175,48 +241,65 @@ func (service *invoiceInputService) Confirmation(id, projectID uint) error {
 	}
 	invoiceInput.Confirmed = true
 
-	invoiceInput, err = service.invoiceInputRepo.Update(invoiceInput)
-	if err != nil {
-		return err
-	}
-
 	invoiceMaterials, err := service.invoiceMaterialRepo.GetByInvoice(invoiceInput.ProjectID, invoiceInput.ID, "input")
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(invoiceMaterials)
+	materialsInWarehouse, err := service.materialLocationRepo.GetMaterialsInLocationBasedOnInvoiceID(0, "warehouse", id, "input")
+	if err != nil {
+		return err
+	}
 
+	toBeUpdated := []model.MaterialLocation{}
+	toBeCreated := []model.MaterialLocation{}
 	for _, invoiceMaterial := range invoiceMaterials {
-
-		fmt.Println(invoiceMaterial)
-		materialLocation, err := service.materailLocationRepo.GetByMaterialCostIDOrCreate(invoiceInput.ProjectID, invoiceMaterial.MaterialCostID, "warehouse", 0)
-		if err != nil {
-			return err
-		}
-
-		materialLocation.Amount += invoiceMaterial.Amount
-		_, err = service.materailLocationRepo.Update(materialLocation)
-		if err != nil {
-			return err
-		}
-
-		serialNumbers, err := service.serialNumberRepo.GetByStatus("pending", invoiceMaterial.ID)
-		if err != nil {
-			return err
-		}
-
-		for _, serialNumber := range serialNumbers {
-			serialNumber.Status = "warehouse"
-			serialNumber.StatusID = materialLocation.ID
-			_, err := service.serialNumberRepo.Update(serialNumber)
-			if err != nil {
-				return err
+		indexOfExistingMaterial := -1
+		for index, oneMaterialInWarehouse := range materialsInWarehouse {
+			if oneMaterialInWarehouse.MaterialCostID == invoiceMaterial.MaterialCostID {
+				indexOfExistingMaterial = index
+				break
 			}
+		}
+
+		if indexOfExistingMaterial == -1 {
+			toBeCreated = append(toBeCreated, model.MaterialLocation{
+				ID:             0,
+				MaterialCostID: invoiceMaterial.MaterialCostID,
+				ProjectID:      invoiceInput.ProjectID,
+				LocationID:     0,
+				LocationType:   "warehouse",
+				Amount:         invoiceMaterial.Amount,
+			})
+		} else {
+			materialsInWarehouse[indexOfExistingMaterial].Amount += invoiceMaterial.Amount
+			toBeUpdated = append(toBeUpdated, materialsInWarehouse[indexOfExistingMaterial])
 		}
 	}
 
-	return nil
+	serialNumberMovements, err := service.serialNumberMovementRepo.GetByInvoice(id, "input")
+	if err != nil {
+		return err
+	}
+
+	serialNumberLocations := []model.SerialNumberLocation{}
+	for _, serialNumberMovement := range serialNumberMovements {
+		serialNumberLocations = append(serialNumberLocations, model.SerialNumberLocation{
+			SerialNumberID: serialNumberMovement.SerialNumberID,
+			ProjectID:      projectID,
+			LocationID:     0,
+			LocationType:   "warehouse",
+		})
+	}
+
+	err = service.invoiceInputRepo.Confirmation(dto.InvoiceInputConfirmationQueryData{
+		InvoiceData:          invoiceInput,
+		ToBeUpdatedMaterials: toBeUpdated,
+		ToBeCreatedMaterials: toBeCreated,
+		SerialNumbers:        serialNumberLocations,
+	})
+
+	return err
 }
 
 func (service *invoiceInputService) UniqueCode(projectID uint) ([]string, error) {
@@ -311,8 +394,7 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 			return "", err
 		}
 
-		fmt.Println(invoiceMaterials)
-		for index, invoiceMaterial := range invoiceMaterials {
+		for _, invoiceMaterial := range invoiceMaterials {
 			materialCost, err := service.materialCostRepo.GetByID(invoiceMaterial.MaterialCostID)
 			if err != nil {
 				return "", nil
@@ -323,31 +405,23 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 				return "", nil
 			}
 
-			fmt.Println(materialCost, material)
-			if index == 0 {
-				f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
+			f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
 
-				warehouseManager, err := service.workerRepo.GetByID(invoice.WarehouseManagerWorkerID)
-				if err != nil {
-					return "", err
-				}
-				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), warehouseManager.Name)
-
-				released, err := service.workerRepo.GetByID(invoice.ReleasedWorkerID)
-				if err != nil {
-					return "", err
-				}
-
-				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), released.Name)
-				dateOfInvoice := invoice.DateOfInvoice.String()
-				dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
-				f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
-			} else {
-				f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), "-")
-				f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), "-")
+			warehouseManager, err := service.workerRepo.GetByID(invoice.WarehouseManagerWorkerID)
+			if err != nil {
+				return "", err
 			}
+			f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), warehouseManager.Name)
+
+			released, err := service.workerRepo.GetByID(invoice.ReleasedWorkerID)
+			if err != nil {
+				return "", err
+			}
+
+			f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), released.Name)
+			dateOfInvoice := invoice.DateOfInvoice.String()
+			dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
+			f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
 
 			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), material.Name)
 			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), material.Unit)
@@ -355,7 +429,6 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 			f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), materialCost.CostM19)
 			f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.Notes)
 			rowCount++
-
 		}
 	}
 

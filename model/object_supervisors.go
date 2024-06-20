@@ -1,6 +1,6 @@
 package model
 
-type SupervisorObjects struct {
+type ObjectSupervisors struct {
 	ID                 uint `json:"id" gorm:"primaryKey"`
 	SupervisorWorkerID uint `json:"supervisorWorkerID"`
 	ObjectID           uint `json:"objectID"`

@@ -22,6 +22,7 @@ type IKL04KVObjectRepository interface {
 	GetPaginated(page, limit int, projectID uint) ([]dto.KL04KVObjectPaginatedQuery, error)
 	GetByID(id uint) (model.KL04KV_Object, error)
 	Create(data dto.KL04KVObjectCreate) (model.KL04KV_Object, error)
+	CreateInBatches(objects []model.Object, kl04kvs []model.KL04KV_Object, supervisors []uint) ([]model.KL04KV_Object, error)
 	Delete(projectID, id uint) error
 	Count(projectID uint) (int64, error)
 	Update(data dto.KL04KVObjectCreate) (model.KL04KV_Object, error)
@@ -42,12 +43,9 @@ func (repo *kl04kvObjectRepository) GetPaginated(page, limit int, projectID uint
       objects.name as name,
       objects.status as status,
       kl04_kv_objects.length as length,
-      kl04_kv_objects.nourashes as nourashes,
-      workers.name as supervisor_name
+      kl04_kv_objects.nourashes as nourashes
     FROM objects
       INNER JOIN kl04_kv_objects ON objects.object_detailed_id = kl04_kv_objects.id
-      INNER JOIN supervisor_objects ON objects.id = supervisor_objects.object_id
-      INNER JOIN workers ON workers.id = supervisor_objects.supervisor_worker_id
     WHERE
       objects.type = 'kl04kv_objects' AND
       objects.project_id = ?
@@ -79,16 +77,32 @@ func (repo *kl04kvObjectRepository) Create(data dto.KL04KVObjectCreate) (model.K
 			return err
 		}
 
-		supervisorsObject := []model.SupervisorObjects{}
-		for _, supervisorWorkerID := range data.Supervisors {
-			supervisorsObject = append(supervisorsObject, model.SupervisorObjects{
-				ObjectID:           object.ID,
-				SupervisorWorkerID: supervisorWorkerID,
-			})
+		if len(data.Supervisors) != 0 {
+			objectSupervisors := []model.ObjectSupervisors{}
+			for _, supervisorWorkerID := range data.Supervisors {
+				objectSupervisors = append(objectSupervisors, model.ObjectSupervisors{
+					ObjectID:           object.ID,
+					SupervisorWorkerID: supervisorWorkerID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&objectSupervisors, 5).Error; err != nil {
+				return err
+			}
 		}
 
-		if err := tx.CreateInBatches(&supervisorsObject, 5).Error; err != nil {
-			return err
+		if len(data.Teams) != 0 {
+			objectTeams := []model.ObjectTeams{}
+			for _, teamID := range data.Teams {
+				objectTeams = append(objectTeams, model.ObjectTeams{
+					TeamID:   teamID,
+					ObjectID: object.ID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&objectTeams, 5).Error; err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -100,8 +114,8 @@ func (repo *kl04kvObjectRepository) Create(data dto.KL04KVObjectCreate) (model.K
 func (repo *kl04kvObjectRepository) Delete(projectID, id uint) error {
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Exec(`
-      DELETE FROM supervisor_objects
-      WHERE supervisor_objects.object_id = (
+      DELETE FROM object_supervisors
+      WHERE object_supervisors.object_id = (
         SELECT DISTINCT(objects.id)
         FROM objects
           INNER JOIN kl04_kv_objects ON kl04_kv_objects.id = objects.object_detailed_id
@@ -112,6 +126,22 @@ func (repo *kl04kvObjectRepository) Delete(projectID, id uint) error {
       );
     `, projectID, id).Error
 
+		if err != nil {
+			return err
+		}
+
+		err = tx.Exec(`
+      DELETE FROM object_teams
+      WHERE object_teams.object_id = (
+        SELECT DISTINCT(objects.id)
+        FROM objects
+          INNER JOIN kl04_kv_objects ON kl04_kv_objects.id = objects.object_detailed_id
+        WHERE
+          objects.project_id = ? AND
+          kl04_kv_objects.id = ? AND
+          objects.type = 'kl04kv_objects'
+      );
+    `).Error
 		if err != nil {
 			return err
 		}
@@ -168,24 +198,64 @@ func (repo *kl04kvObjectRepository) Update(data dto.KL04KVObjectCreate) (model.K
 			return err
 		}
 
-		if err := tx.Delete(&model.SupervisorObjects{}, "object_id = ?", object.ID).Error; err != nil {
+		if err := tx.Delete(&model.ObjectSupervisors{}, "object_id = ?", object.ID).Error; err != nil {
 			return err
 		}
 
-		supervisorsObject := []model.SupervisorObjects{}
-		for _, supervisorWorkerID := range data.Supervisors {
-			supervisorsObject = append(supervisorsObject, model.SupervisorObjects{
-				ObjectID:           object.ID,
-				SupervisorWorkerID: supervisorWorkerID,
-			})
+		if len(data.Supervisors) != 0 {
+			objectSupervisors := []model.ObjectSupervisors{}
+			for _, supervisorWorkerID := range data.Supervisors {
+				objectSupervisors = append(objectSupervisors, model.ObjectSupervisors{
+					ObjectID:           object.ID,
+					SupervisorWorkerID: supervisorWorkerID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&objectSupervisors, 5).Error; err != nil {
+				return err
+			}
 		}
 
-		if err := tx.CreateInBatches(&supervisorsObject, 5).Error; err != nil {
+		if err := tx.Delete(&model.ObjectTeams{}, "object_id = ?", object.ID).Error; err != nil {
 			return err
+		}
+
+		if len(data.Teams) != 0 {
+			objectTeams := []model.ObjectTeams{}
+			for _, teamID := range data.Teams {
+				objectTeams = append(objectTeams, model.ObjectTeams{
+					ObjectID: object.ID,
+					TeamID:   teamID,
+				})
+			}
+
+			if err := tx.CreateInBatches(&objectTeams, 5).Error; err != nil {
+				return err
+			}
 		}
 
 		return nil
 	})
 
 	return kl04kv, err
+}
+
+func (repo *kl04kvObjectRepository) CreateInBatches(objects []model.Object, kl04kvs []model.KL04KV_Object, supervisors []uint) ([]model.KL04KV_Object, error) {
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.CreateInBatches(&kl04kvs, 10).Error; err != nil {
+			return err
+		}
+
+		for index := range objects {
+			objects[index].ObjectDetailedID = kl04kvs[index].ID
+		}
+
+		if err := tx.CreateInBatches(&objects, 10).Error; err != nil {
+			return err
+		}
+		
+		return nil
+	})
+
+	return kl04kvs, err
 }

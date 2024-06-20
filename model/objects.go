@@ -11,11 +11,12 @@ type Object struct {
 	Status           string `json:"status" gorm:"tinyText"`
 	ProjectID        uint   `json:"projectID"`
 
-	SupervisorObjectss []SupervisorObjects `json:"-" gorm:"foreignKey:ObjectID"`
-	TeamObjectss       []TeamObjects       `json:"-" gorm:"foreignKey:ObjectID"`
-	ObjectOperations   []ObjectOperation   `json:"-" gorm:"foreignKey:ObjectID"`
-	InvoiceOutputs     []InvoiceOutput     `json:"-" gorm:"foreignKey:ObjectID"`
-	InvoiceObject      []InvoiceObject     `json:"-" gorm:"foreignKey:ObjectID"`
+	ObjectTeams       []ObjectTeams       `json:"-" gorm:"foreignKey:ObjectID"`
+	ObjectSupervisors []ObjectSupervisors `json:"-" gorm:"foreignKey:ObjectID"`
+
+	ObjectOperations []ObjectOperation `json:"-" gorm:"foreignKey:ObjectID"`
+	InvoiceOutputs   []InvoiceOutput   `json:"-" gorm:"foreignKey:ObjectID"`
+	InvoiceObject    []InvoiceObject   `json:"-" gorm:"foreignKey:ObjectID"`
 }
 
 type MJD_Object struct {
@@ -48,4 +49,10 @@ type KL04KV_Object struct {
 	ID        uint    `json:"id" gorm:"primaryKey"`
 	Length    float64 `json:"length"`
 	Nourashes string  `json:"nourashes" gorm:"tinyText"`
+}
+
+type Substation_Object struct {
+	ID                   uint   `json:"id" gorm:"primaryKey"`
+	VoltageClass         string `json:"voltageClass"`
+	NumberOfTransformers uint   `json:"numberOfTransformers"`
 }

@@ -23,8 +23,9 @@ func InitInvoiceCorrectionController(
 
 type IInvoiceCorrectionController interface {
 	GetAll(c *gin.Context)
-	GetMaterialsFromInvoiceObjectForCorrection(c *gin.Context)
 	GetTotalMaterialInTeamByTeamNumber(c *gin.Context)
+  GetInvoiceMaterialsByInvoiceObjectID(c *gin.Context)
+  GetSerialNumbersOfMaterial(c *gin.Context)
 }
 
 func (controller *invoiceCorrectionController) GetAll(c *gin.Context) {
@@ -32,25 +33,6 @@ func (controller *invoiceCorrectionController) GetAll(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 
 	data, err := controller.invoiceCorrectionService.GetAll(projectID)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
-		return
-	}
-
-	response.ResponseSuccess(c, data)
-}
-
-func (controller *invoiceCorrectionController) GetMaterialsFromInvoiceObjectForCorrection(c *gin.Context) {
-	invoiceIDRaw := c.Param("invoiceID")
-	invoiceID, err := strconv.ParseUint(invoiceIDRaw, 10, 64)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
-		return
-	}
-
-	projectID := c.GetUint("projectID")
-
-	data, err := controller.invoiceCorrectionService.GetMaterialsFromInvoiceObjectForCorrection(projectID, uint(invoiceID))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
 		return
@@ -78,4 +60,45 @@ func (controller *invoiceCorrectionController) GetTotalMaterialInTeamByTeamNumbe
 	}
 
 	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceCorrectionController) GetInvoiceMaterialsByInvoiceObjectID(c *gin.Context) {
+
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceCorrectionService.GetInvoiceMaterialsByInvoiceObjectID(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
+}
+
+func (controller *invoiceCorrectionController) GetSerialNumbersOfMaterial(c *gin.Context) {
+	materialIDRaw := c.Param("materialID")
+	materialID, err := strconv.ParseUint(materialIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	teamNumber := c.Param("teamNumber")
+
+	projectID := c.GetUint("projectID")
+
+	data, err := controller.invoiceCorrectionService.GetSerialNumberOfMaterialInTeam(projectID, uint(materialID), teamNumber)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
 }

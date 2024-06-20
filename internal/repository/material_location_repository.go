@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/model"
 
 	"gorm.io/gorm"
@@ -36,6 +37,9 @@ type IMaterialLocationRepository interface {
 	GetUniqueMaterialTotalAmount(projectID, materialCostID, locationID uint, locationType string) (float64, error)
 	GetTotalAmountInLocation(projectID, materialID, locationID uint, locationType string) (float64, error)
 	GetTotalAmountInTeamsByTeamNumber(projectID, materialID uint, teamNumber string) (float64, error)
+	GetDataForBalanceReport(projectID uint, locationType string, locationID uint) ([]dto.BalanceReportQueryResult, error)
+  GetMaterialAmountSortedByCostM19InLocation(projectID, materialID uint, locationType string, locationID uint) ([]dto.MaterialAmountSortedByCostM19QueryResult, error)
+  GetMaterialsInLocationBasedOnInvoiceID(locationID uint, locationType string, invoiceID uint, invoiceType string) ([]model.MaterialLocation, error)
 }
 
 func (repo *materialLocationRepository) GetAll() ([]model.MaterialLocation, error) {
@@ -144,7 +148,8 @@ func (repo *materialLocationRepository) GetByLocationTypeAndID(
     FROM material_locations 
     WHERE 
       location_type = ? AND
-      (nullif(?, 0) IS NULL OR location_id = ?)
+      (nullif(?, 0) IS NULL OR location_id = ?)  
+    ORDER BY material_locations.location_id DESC
   `, locationType, locationID, locationID).Scan(&data).Error
 
 	return data, err
@@ -184,7 +189,8 @@ func (repo *materialLocationRepository) GetUniqueMaterialsFromLocation(
     WHERE 
       material_locations.project_id = ? AND
       material_locations.location_id = ? AND
-      material_locations.location_type = ?
+      material_locations.location_type = ? AND
+      material_locations.amount > 0
     `, projectID, locationID, locationType).Scan(&data).Error
 
 	return data, err
@@ -272,4 +278,78 @@ func (repo *materialLocationRepository) GetTotalAmountInTeamsByTeamNumber(
     `, projectID, materialID, teamNumber).Scan(&data).Error
 
 	return data, err
+}
+
+func (repo *materialLocationRepository) GetDataForBalanceReport(projectID uint, locationType string, locationID uint) ([]dto.BalanceReportQueryResult, error) {
+	data := []dto.BalanceReportQueryResult{}
+	err := repo.db.Raw(`
+    SELECT 
+      material_locations.location_id AS location_id,
+      materials.code AS material_code,
+      materials.name AS material_name,
+      materials.unit AS material_unit,
+      material_locations.amount AS total_amount,
+      material_defects.amount AS defect_amount,
+      material_costs.cost_m19 AS material_cost_m19,
+      material_locations.amount * material_costs.cost_m19 AS total_cost,
+      material_defects.amount * material_costs.cost_m19 AS total_defect_cost
+    FROM material_locations
+    INNER JOIN material_costs ON material_costs.id = material_locations.material_cost_id
+    INNER JOIN materials ON materials.id = material_costs.material_id
+    LEFT JOIN material_defects ON material_defects.material_location_id = material_locations.id
+    WHERE 
+      material_locations.project_id = ? AND
+      material_locations.location_type = ? AND
+      (nullif(?, 0) IS NULL OR material_locations.location_id = ?) AND
+      material_locations.amount <> 0
+    ORDER BY material_locations.id
+    `, 
+    projectID, 
+    locationType, 
+    locationID, locationID).Scan(&data).Error
+
+	return data, err
+}
+
+func(repo *materialLocationRepository) GetMaterialAmountSortedByCostM19InLocation(projectID, materialID uint, locationType string, locationID uint) ([]dto.MaterialAmountSortedByCostM19QueryResult, error) {
+  data := []dto.MaterialAmountSortedByCostM19QueryResult{}
+  err := repo.db.Raw(`
+    SELECT 
+      materials.id AS material_id,
+      material_costs.id AS material_cost_id,
+      material_costs.cost_m19 AS material_cost_m19,
+      material_locations.amount AS material_amount
+    FROM material_locations
+    INNER JOIN material_costs ON material_costs.id = material_locations.material_cost_id
+    INNER JOIN materials ON materials.id = material_costs.material_id
+    WHERE 
+      material_locations.project_id = ? AND
+      material_locations.location_type = ? AND
+      material_locations.location_id = ? AND
+      materials.id = ? AND
+      material_locations.amount > 0
+    ORDER BY material_costs.cost_m19 DESC;
+  `, projectID, locationType, locationID, materialID).Scan(&data).Error
+
+  return data, err
+}
+
+func(repo *materialLocationRepository) GetMaterialsInLocationBasedOnInvoiceID(locationID uint, locationType string, invoiceID uint, invoiceType string) ([]model.MaterialLocation, error) {
+  data := []model.MaterialLocation{}
+  err := repo.db.Raw(`
+    SELECT *
+    FROM material_locations
+    WHERE 
+      material_locations.location_type = ? AND
+      material_locations.location_id = ? AND
+      material_locations.material_cost_id IN (
+        SELECT invoice_materials.material_cost_id
+        FROM invoice_materials
+        WHERE 
+          invoice_materials.invoice_type = ? AND
+          invoice_materials.invoice_id = ?
+      )
+    `, locationType, locationID, invoiceType, invoiceID).Scan(&data).Error
+
+  return data, err
 }
