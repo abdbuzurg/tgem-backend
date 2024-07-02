@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -241,7 +242,7 @@ func (controller *materialLocationController) ReportBalance(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
+	projectID := c.GetUint("projectID")
 
 	fileName, err := controller.materialLocationService.BalanceReport(projectID, data)
 	if err != nil {
@@ -249,8 +250,8 @@ func (controller *materialLocationController) ReportBalance(c *gin.Context) {
 		return
 	}
 
-	filePath := "./pkg/excels/temp/" + fileName
+	filePath := filepath.Join("./pkg/excels/temp/", fileName)
 
 	c.FileAttachment(filePath, fileName)
-  os.Remove(filePath)
+	os.Remove(filePath)
 }

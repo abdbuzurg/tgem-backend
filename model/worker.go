@@ -1,15 +1,18 @@
 package model
 
 type Worker struct {
-	ID           uint   `json:"id" gorm:"primaryKey"`
-	Name         string `json:"name" gorm:"tinyText"`
-	JobTitle     string `json:"jobTitle" gorm:"tinyText"`
-	MobileNumber string `json:"mobileNumber" gorm:"tinyText"`
+	ID                uint   `json:"id" gorm:"primaryKey"`
+	ProjectID         uint   `json:"projectID"`
+	Name              string `json:"name" gorm:"tinyText"`
+	CompanyWorkerID   string `json:"companyWorkerID"`
+	JobTitleInCompany string `json:"jobTitleInCompany"`
+	JobTitleInProject string `json:"jobTitleInProject" gorm:"tinyText"`
+	MobileNumber      string `json:"mobileNumber" gorm:"tinyText"`
 
 	User User `json:"-" gorm:"foreignKey:WorkerID"`
 
 	//Object Workers
-	ObjectSupervisors  []ObjectSupervisors `json:"-" gorm:"foreignKey:SupervisorWorkerID"`
+	ObjectSupervisors []ObjectSupervisors `json:"-" gorm:"foreignKey:SupervisorWorkerID"`
 
 	//Team Leaders
 	TeamLeaderss []TeamLeaders `json:"-" gorm:"foreignKey:LeaderWorkerID"`
@@ -28,4 +31,7 @@ type Worker struct {
 	InvoiceOutputsWarehouseManager []InvoiceOutput `json:"-" gorm:"foreignKey:WarehouseManagerWorkerID"`
 	InvoiceOutputsReleased         []InvoiceOutput `json:"-" gorm:"foreignKey:ReleasedWorkerID"`
 	InvoiceOutputsRecipient        []InvoiceOutput `json:"-" gorm:"foreignKey:RecipientWorkerID"`
+
+	//Invoice Output out of project
+	InvoiceOutputOutOfProjectReleased []InvoiceOutputOutOfProject `json:"-" gorm:"foreignKey:ReleasedWorkerID"`
 }

@@ -3,7 +3,6 @@ package service
 import (
 	"backend-v2/internal/repository"
 	"backend-v2/model"
-	"backend-v2/pkg/utils"
 	"fmt"
 	"os"
 	"strings"
@@ -37,11 +36,11 @@ func (service *materialService) GetAll() ([]model.Material, error) {
 }
 
 func (service *materialService) GetPaginated(page, limit int, data model.Material) ([]model.Material, error) {
-	if !(utils.IsEmptyFields(data)) {
+	// if !(utils.IsEmptyFields(data)) {
 		return service.materialRepo.GetPaginatedFiltered(page, limit, data)
-	}
+	// }
 
-	return service.materialRepo.GetPaginated(page, limit)
+	// return service.materialRepo.GetPaginated(page, limit)
 }
 
 func (service *materialService) GetByID(id uint) (model.Material, error) {

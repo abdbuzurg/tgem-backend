@@ -141,7 +141,7 @@ func (repo *kl04kvObjectRepository) Delete(projectID, id uint) error {
           kl04_kv_objects.id = ? AND
           objects.type = 'kl04kv_objects'
       );
-    `).Error
+    `, projectID, id).Error
 		if err != nil {
 			return err
 		}

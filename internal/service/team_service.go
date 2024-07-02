@@ -115,7 +115,7 @@ func (service *teamService) TemplateFile(projectID uint, filepath string) error 
 	}
 
 	teamLeaderSheetName := "Бригадиры"
-	teamLeaders, err := service.workerRepo.GetByJobTitle("Бригадир")
+	teamLeaders, err := service.workerRepo.GetByJobTitleInProject("Бригадир")
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("Данные бригадиров недоступны: %v", err)

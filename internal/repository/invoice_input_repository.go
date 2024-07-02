@@ -61,7 +61,7 @@ func (repo *invoiceInputRespository) GetPaginatedFiltered(page, limit int, filte
         INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_inputs.warehouse_manager_worker_id
         INNER JOIN workers AS released ON released.id = invoice_inputs.released_worker_id
       WHERE 
-        project_id = ? AND
+        invoice_inputs.project_id = ? AND
         (nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
         (nullif(?, 0) IS NULL OR released_worker_id = ?) AND
         (nullif(?, '') IS NULL OR delivery_code = ?) ORDER BY invoice_inputs.id DESC LIMIT ? OFFSET ?;

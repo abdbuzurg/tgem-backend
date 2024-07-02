@@ -50,6 +50,7 @@ type IInvoiceObjectService interface {
 	GetSerialNumberOfMaterial(projectID, materialID uint, locationID uint) ([]string, error)
 	GetAvailableMaterialAmount(projectID, materialID, teamID uint) (float64, error)
 	Count(projectID uint) (int64, error)
+	GetTeamsFromObjectID(objectID uint) ([]model.Team, error)
 }
 
 func (service *invoiceObjectService) GetInvoiceObjectDescriptiveDataByID(id uint) (dto.InvoiceObjectWithMaterialsDescriptive, error) {
@@ -136,7 +137,7 @@ func (service *invoiceObjectService) Create(data dto.InvoiceObjectCreate) (model
 	serialNumberMovements := []model.SerialNumberMovement{}
 	for _, invoiceMaterial := range data.Items {
 		if len(invoiceMaterial.SerialNumbers) == 0 {
-			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "teams", data.Details.TeamID)
+			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "team", data.Details.TeamID)
 			if err != nil {
 				return model.InvoiceObject{}, err
 			}
@@ -243,7 +244,7 @@ func (service *invoiceObjectService) GetObjects(projectID, userID, roleID uint) 
 }
 
 func (service *invoiceObjectService) GetTeamsMaterials(projectID, teamID uint) ([]model.Material, error) {
-	return service.materialLocationRepo.GetUniqueMaterialsFromLocation(projectID, teamID, "teams")
+	return service.materialLocationRepo.GetUniqueMaterialsFromLocation(projectID, teamID, "team")
 }
 
 func (service *invoiceObjectService) GetSerialNumberOfMaterial(projectID, materialID uint, locationID uint) ([]string, error) {
@@ -251,9 +252,13 @@ func (service *invoiceObjectService) GetSerialNumberOfMaterial(projectID, materi
 }
 
 func (service *invoiceObjectService) GetAvailableMaterialAmount(projectID, materialID, teamID uint) (float64, error) {
-	return service.materialLocationRepo.GetTotalAmountInLocation(projectID, materialID, teamID, "teams")
+	return service.materialLocationRepo.GetTotalAmountInLocation(projectID, materialID, teamID, "team")
 }
 
 func (service *invoiceObjectService) Count(projectID uint) (int64, error) {
 	return service.invoiceObjectRepo.Count(projectID)
+}
+
+func (service *invoiceObjectService) GetTeamsFromObjectID(objectID uint) ([]model.Team, error) {
+	return service.invoiceObjectRepo.GetTeamsFromObjectID(objectID)
 }

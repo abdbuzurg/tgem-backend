@@ -5,7 +5,10 @@ import (
 	"backend-v2/internal/service"
 	"backend-v2/pkg/response"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -148,9 +151,12 @@ func (controller *invoiceReturnController) Confirmation(c *gin.Context) {
 		response.ResponseError(c, fmt.Sprintf("cannot form file: %v", err))
 		return
 	}
-	file.Filename = invoiceReturn.DeliveryCode
 
-	filePath := "./pkg/excels/return/" + file.Filename + ".xlsx"
+	fileNameAndExtension := strings.Split(file.Filename, ".")
+	fileExtension := fileNameAndExtension[1]
+	file.Filename = invoiceReturn.DeliveryCode + "." + fileExtension
+	filePath := filepath.Join("./pkg/excels/return/", file.Filename)
+
 	err = c.SaveUploadedFile(file, filePath)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("cannot save file: %v", err))
@@ -168,6 +174,19 @@ func (controller *invoiceReturnController) Confirmation(c *gin.Context) {
 
 func (controller *invoiceReturnController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
+
+  filePath := filepath.Join("./pkg/excels/return/", deliveryCode)
+	fileGlob, err := filepath.Glob(filePath + ".*")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+  filePath = fileGlob[0]
+  pathSeparated := strings.Split(filePath, ".")
+  deliveryCodeExtension := pathSeparated[len(pathSeparated) - 1]
+
+	c.FileAttachment(filePath, deliveryCode + "." + deliveryCodeExtension)
 	c.FileAttachment("./pkg/excels/return/"+deliveryCode+".xlsx", deliveryCode+".xlsx")
 }
 
@@ -218,8 +237,9 @@ func (controller *invoiceReturnController) Report(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment("./pkg/excels/report/"+filename, filename)
-}
+	filePath := filepath.Join("./pkg/excels/temp/", filename)
+	c.FileAttachment(filePath, filename)
+  os.Remove(filePath)}
 
 func (controller *invoiceReturnController) GetUniqueMaterialCostsFromLocation(c *gin.Context) {
 

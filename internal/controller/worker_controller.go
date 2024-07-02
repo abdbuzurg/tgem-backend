@@ -5,7 +5,6 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/response"
 	"fmt"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -26,7 +25,7 @@ type IWorkerController interface {
 	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	GetByID(c *gin.Context)
-	GetByJobTitle(c *gin.Context)
+	GetByJobTitleInProject(c *gin.Context)
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
@@ -59,31 +58,8 @@ func (controller *workerController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	name := c.DefaultQuery("name", "")
-	name, err = url.QueryUnescape(name)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for name: %v", err))
-		return
-	}
-
-	jobTitle := c.DefaultQuery("jobTitle", "")
-	jobTitle, err = url.QueryUnescape(jobTitle)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for jobTitle: %v", err))
-		return
-	}
-
-	mobileNumber := c.DefaultQuery("mobileNumber", "")
-	mobileNumber, err = url.QueryUnescape(mobileNumber)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for mobileNumber: %v", err))
-		return
-	}
-
 	filter := model.Worker{
-		Name:         name,
-		JobTitle:     jobTitle,
-		MobileNumber: mobileNumber,
+    ProjectID: c.GetUint("projectID"),
 	}
 
 	data, err := controller.workerService.GetPaginated(page, limit, filter)
@@ -118,9 +94,10 @@ func (controller *workerController) GetByID(c *gin.Context) {
 	response.ResponseSuccess(c, data)
 }
 
-func (controller *workerController) GetByJobTitle(c *gin.Context) {
-	jobTitle := c.Param("jobTitle")
-	data, err := controller.workerService.GetByJobTitle(jobTitle)
+func (controller *workerController) GetByJobTitleInProject(c *gin.Context) {
+	jobTitleInProject := c.Param("jobTitleInProject")
+
+	data, err := controller.workerService.GetByJobTitleInProject(jobTitleInProject)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Cannot get workers by the job title: %v", err))
 		return
@@ -135,6 +112,8 @@ func (controller *workerController) Create(c *gin.Context) {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
 	}
+
+  createData.ProjectID = c.GetUint("projectID")
 
 	data, err := controller.workerService.Create(createData)
 	if err != nil {
@@ -151,6 +130,8 @@ func (controller *workerController) Update(c *gin.Context) {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
 	}
+
+  updateData.ProjectID = c.GetUint("projectID")
 
 	data, err := controller.workerService.Update(updateData)
 	if err != nil {
@@ -198,7 +179,9 @@ func (controller *workerController) Import(c *gin.Context) {
 		return
 	}
 
-	err = controller.workerService.Import(filePath)
+  projectID := c.GetUint("projectID")
+
+	err = controller.workerService.Import(filePath, projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return

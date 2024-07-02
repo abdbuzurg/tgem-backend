@@ -222,7 +222,7 @@ func (repo *mjdObjectRepository) Delete(id, projectID uint) error {
           mjd_objects.id = ? AND
           objects.type = 'mjd_objects'
       );
-    `).Error
+    `, projectID, id).Error
 
     if err != nil {
       return err

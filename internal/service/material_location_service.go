@@ -6,6 +6,7 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -171,8 +172,8 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 		LocationType: data.Type,
 	}
 
-	f, err := excelize.OpenFile("./pkg/excels/templates/Отчет Остатка.xlsx")
-	defer f.Close()
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Отчет Остатка.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -181,7 +182,7 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 	rowCount := 2
 
 	switch data.Type {
-	case "teams":
+	case "team":
 		f.SetCellValue(sheetName, "I1", "№ Бригады")
 		f.SetCellValue(sheetName, "J1", "Бригадир")
 		if data.Team != "" {
@@ -196,7 +197,7 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 
 		filter.LocationID = 0
 		break
-	case "objects":
+	case "object":
 		f.SetCellValue(sheetName, "I1", "Объект")
 		f.SetCellValue(sheetName, "J1", "Супервайзер")
 		if data.Object != "" {
@@ -239,7 +240,7 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 			locationInformation.LocationID = entry.LocationID
 			locationInformation.LocationOwnerName = ""
 
-			if filter.LocationType == "teams" {
+			if filter.LocationType == "team" {
 
 				//teamData has TeamNumber and TeamLeaderName
 				//the TeamNumber is repeated but TeamLeaderName is not
@@ -260,7 +261,7 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 
 			}
 
-			if filter.LocationType == "objects" {
+			if filter.LocationType == "object" {
 				// objectData has objectName and supervisorName
 				// the objectName is repeated but supervisorName is not repeated
 				objectData, err := service.objectSupervisorsRepo.GetSupervisorAndObjectNamesByObjectID(projectID, entry.LocationID)
@@ -322,7 +323,8 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 
 	}
 
-	f.SaveAs("./pkg/excels/temp/" + fileName)
+  tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
+	f.SaveAs(tempFilePath)
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}

@@ -11,4 +11,5 @@ type InvoiceObject struct {
 	TeamID              uint      `json:"teamID"`
 	DateOfInvoice       time.Time `json:"dateOfInvoice"`
 	ConfirmedByOperator bool      `json:"confirmedByOperator"`
+	DateOfCorrection    time.Time `json:"dateOfCorrection"`
 }

@@ -86,11 +86,14 @@ func (controller *materialController) GetPaginated(c *gin.Context) {
 		return
 	}
 
+  projectID := c.GetUint("projectID")
+
 	filter := model.Material{
 		Category: category,
 		Code:     code,
 		Name:     name,
 		Unit:     unit,
+    ProjectID: projectID,
 	}
 
 	data, err := controller.materialService.GetPaginated(page, limit, filter)
@@ -132,6 +135,9 @@ func (controller *materialController) Create(c *gin.Context) {
 		return
 	}
 
+  projectID := c.GetUint("projectID")
+  createData.ProjectID = projectID
+
 	data, err := controller.materialService.Create(createData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Material: %v", err))
@@ -147,6 +153,9 @@ func (controller *materialController) Update(c *gin.Context) {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
 	}
+
+  projectID := c.GetUint("projectID")
+  updateData.ProjectID = projectID
 
 	data, err := controller.materialService.Update(updateData)
 	if err != nil {

@@ -8,7 +8,10 @@ import (
 	"backend-v2/pkg/useraction"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -551,8 +554,11 @@ func (controller *invoiceInputController) Confirmation(c *gin.Context) {
 
 	}
 
-	file.Filename = invoiceInput.DeliveryCode
-	filePath := "./pkg/excels/input/" + file.Filename + ".xlsx"
+	fileNameAndExtension := strings.Split(file.Filename, ".")
+	fileExtension := fileNameAndExtension[1]
+	file.Filename = invoiceInput.DeliveryCode + "." + fileExtension
+	filePath := filepath.Join("./pkg/excels/input/", file.Filename)
+
 	err = c.SaveUploadedFile(file, filePath)
 	if err != nil {
 
@@ -619,8 +625,19 @@ func (controller *invoiceInputController) GetDocument(c *gin.Context) {
 		ActionID:            0,
 		ActionType:          "Запрос на получение файла",
 	})
-	c.FileAttachment("./pkg/excels/input/"+deliveryCode+".xlsx", deliveryCode+".xlsx")
 
+	filePath := filepath.Join("./pkg/excels/input/", deliveryCode)
+	fileGlob, err := filepath.Glob(filePath + ".*")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+  filePath = fileGlob[0]
+  pathSeparated := strings.Split(filePath, ".")
+  deliveryCodeExtension := pathSeparated[len(pathSeparated) - 1]
+
+	c.FileAttachment(filePath, deliveryCode + "." + deliveryCodeExtension)
 }
 
 func (controller *invoiceInputController) UniqueCode(c *gin.Context) {
@@ -784,7 +801,10 @@ func (controller *invoiceInputController) Report(c *gin.Context) {
 		ActionID:            0,
 		ActionType:          "Запрос на получение отсчетного файла накладной приход",
 	})
-	c.FileAttachment("./pkg/excels/report/"+filename, filename)
+
+  filePath := filepath.Join("./pkg/excels/temp/", filename)
+	c.FileAttachment(filePath, filename)
+  os.Remove(filePath)
 	// response.ResponseSuccess(c, true)
 }
 

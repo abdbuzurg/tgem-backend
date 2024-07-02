@@ -6,7 +6,9 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
 	"fmt"
+	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -381,7 +383,8 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 		return "", err
 	}
 
-	f, err := excelize.OpenFile("./pkg/excels/report/Invoice Input Report.xlsx")
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Invoice Input Report.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -425,15 +428,25 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 
 			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), material.Name)
 			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), material.Unit)
-			f.SetCellValue(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.Amount)
-			f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), materialCost.CostM19)
+			f.SetCellFloat(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.Amount, 2, 64)
+
+			costM19, _ := materialCost.CostM19.Float64()
+			f.SetCellFloat(sheetName, "H"+fmt.Sprint(rowCount), costM19, 2, 64)
 			f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.Notes)
 			rowCount++
 		}
 	}
 
-	fileName := "Invoice Input Report " + fmt.Sprint(rowCount) + ".xlsx"
-	f.SaveAs("./pkg/excels/report/" + fileName)
+	currentTime := time.Now()
+  fileName := fmt.Sprintf(
+		"Отсчет накладной приход - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+
+	tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
+
+	f.SaveAs(tempFilePath)
+
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}

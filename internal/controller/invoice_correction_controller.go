@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
 	"backend-v2/pkg/response"
 	"fmt"
@@ -24,8 +25,9 @@ func InitInvoiceCorrectionController(
 type IInvoiceCorrectionController interface {
 	GetAll(c *gin.Context)
 	GetTotalMaterialInTeamByTeamNumber(c *gin.Context)
-  GetInvoiceMaterialsByInvoiceObjectID(c *gin.Context)
-  GetSerialNumbersOfMaterial(c *gin.Context)
+	GetInvoiceMaterialsByInvoiceObjectID(c *gin.Context)
+	GetSerialNumbersOfMaterial(c *gin.Context)
+	Create(c *gin.Context)
 }
 
 func (controller *invoiceCorrectionController) GetAll(c *gin.Context) {
@@ -89,11 +91,16 @@ func (controller *invoiceCorrectionController) GetSerialNumbersOfMaterial(c *gin
 		return
 	}
 
-	teamNumber := c.Param("teamNumber")
+	teamIDRaw := c.Param("teamID")
+	teamID, err := strconv.ParseUint(teamIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
 
 	projectID := c.GetUint("projectID")
 
-	data, err := controller.invoiceCorrectionService.GetSerialNumberOfMaterialInTeam(projectID, uint(materialID), teamNumber)
+	data, err := controller.invoiceCorrectionService.GetSerialNumberOfMaterialInTeam(projectID, uint(materialID), uint(teamID))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return
@@ -101,4 +108,20 @@ func (controller *invoiceCorrectionController) GetSerialNumbersOfMaterial(c *gin
 
 	response.ResponseSuccess(c, data)
 
+}
+
+func (controller *invoiceCorrectionController) Create(c *gin.Context) {
+	var createData dto.InvoiceCorrectionCreate
+	if err := c.ShouldBindJSON(&createData); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceCorrectionService.Create(createData)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+  response.ResponseSuccess(c, data)
 }

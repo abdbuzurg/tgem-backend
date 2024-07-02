@@ -1,10 +1,10 @@
 package controller
 
 import (
-	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
 	"backend-v2/pkg/useraction"
+	"backend-v2/internal/service"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -170,7 +170,7 @@ func (controller *districtController) GetPaginated(c *gin.Context) {
 			ActionID:            0,
 			ActionType:          fmt.Sprintf("Запрос данных с разбивкой на страницы для справочника районов: страница %d", page),
 		})
-		response.ResponseError(c,  fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 
 	}
@@ -263,7 +263,7 @@ func (controller *districtController) Create(c *gin.Context) {
 			ActionID:            0,
 			ActionType:          "Запрос на создание нового райнона в справочнике районов",
 		})
-    response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
 		return
 	}
 
@@ -280,97 +280,97 @@ func (controller *districtController) Create(c *gin.Context) {
 			ActionID:            0,
 			ActionType:          "Запрос на создание нового райнона в справочнике районов",
 		})
-    response.ResponseError(c, fmt.Sprintf("Внутрення ошибка сервера: %v", err))
+		response.ResponseError(c, fmt.Sprintf("Внутрення ошибка сервера: %v", err))
 		return
 	}
 
-  controller.userActionService.Create(model.UserAction{
-    UserID:              userID,
-    ProjectID:           projectID,
-    DateOfAction:        time.Now(),
-    ActionURL:           c.Request.URL.Path,
-    ActionStatus:        true,
-    ActionStatusMessage: useraction.POST_SUCCESS,
-    ActionID:            data.ID,
-    ActionType:          "Запрос на создание нового райнона в справочнике районов",
-  })
+	controller.userActionService.Create(model.UserAction{
+		UserID:              userID,
+		ProjectID:           projectID,
+		DateOfAction:        time.Now(),
+		ActionURL:           c.Request.URL.Path,
+		ActionStatus:        true,
+		ActionStatusMessage: useraction.POST_SUCCESS,
+		ActionID:            data.ID,
+		ActionType:          "Запрос на создание нового райнона в справочнике районов",
+	})
 	response.ResponseSuccess(c, data)
 
 }
 
 func (controller *districtController) Update(c *gin.Context) {
 
-  projectID := c.GetUint("projectID")
-  userID := c.GetUint("userID")
+	projectID := c.GetUint("projectID")
+	userID := c.GetUint("userID")
 
 	var updateData model.District
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 
-    controller.userActionService.Create(model.UserAction{
-      UserID:              userID,
-      ProjectID:           projectID,
-      DateOfAction:        time.Now(),
-      ActionURL:           c.Request.URL.Path,
-      ActionStatus:        false,
-      ActionStatusMessage: useraction.INCORRECT_BODY,
-      ActionID:            0,
-      ActionType:          "Запрос на изменение данных одного райнона в справочнике районов",
-    })
-    response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		controller.userActionService.Create(model.UserAction{
+			UserID:              userID,
+			ProjectID:           projectID,
+			DateOfAction:        time.Now(),
+			ActionURL:           c.Request.URL.Path,
+			ActionStatus:        false,
+			ActionStatusMessage: useraction.INCORRECT_BODY,
+			ActionID:            0,
+			ActionType:          "Запрос на изменение данных одного райнона в справочнике районов",
+		})
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
 		return
 	}
 
 	data, err := controller.districtService.Update(updateData)
 	if err != nil {
 
-    controller.userActionService.Create(model.UserAction{
-      UserID:              userID,
-      ProjectID:           projectID,
-      DateOfAction:        time.Now(),
-      ActionURL:           c.Request.URL.Path,
-      ActionStatus:        false,
-      ActionStatusMessage: useraction.INTERNAL_SERVER_ERROR,
-      ActionID:            updateData.ID,
-      ActionType:          "Запрос на изменение данных одного райнона в справочнике районов",
-    })
-    response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		controller.userActionService.Create(model.UserAction{
+			UserID:              userID,
+			ProjectID:           projectID,
+			DateOfAction:        time.Now(),
+			ActionURL:           c.Request.URL.Path,
+			ActionStatus:        false,
+			ActionStatusMessage: useraction.INTERNAL_SERVER_ERROR,
+			ActionID:            updateData.ID,
+			ActionType:          "Запрос на изменение данных одного райнона в справочнике районов",
+		})
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-  controller.userActionService.Create(model.UserAction{
-    UserID:              userID,
-    ProjectID:           projectID,
-    DateOfAction:        time.Now(),
-    ActionURL:           c.Request.URL.Path,
-    ActionStatus:        true,
-    ActionStatusMessage: useraction.PATCH_SUCCESS,
-    ActionID:            data.ID,
-    ActionType:          "Запрос на изменение данных одного райнона в справочнике районов",
-  })
+	controller.userActionService.Create(model.UserAction{
+		UserID:              userID,
+		ProjectID:           projectID,
+		DateOfAction:        time.Now(),
+		ActionURL:           c.Request.URL.Path,
+		ActionStatus:        true,
+		ActionStatusMessage: useraction.PATCH_SUCCESS,
+		ActionID:            data.ID,
+		ActionType:          "Запрос на изменение данных одного райнона в справочнике районов",
+	})
 	response.ResponseSuccess(c, data)
 
 }
 
 func (controller *districtController) Delete(c *gin.Context) {
-	
-  projectID := c.GetUint("projectID")
-  userID := c.GetUint("userID")
 
-  idRaw := c.Param("id")
+	projectID := c.GetUint("projectID")
+	userID := c.GetUint("userID")
+
+	idRaw := c.Param("id")
 	id, err := strconv.ParseUint(idRaw, 10, 64)
 	if err != nil {
 
-    controller.userActionService.Create(model.UserAction{
-      UserID:              userID,
-      ProjectID:           projectID,
-      DateOfAction:        time.Now(),
-      ActionURL:           c.Request.URL.Path,
-      ActionStatus:        false,
-      ActionStatusMessage: fmt.Sprintf(useraction.INCORRECT_PARAMETER, "ID"),
-      ActionID:            0,
-      ActionType:          "Запрос на удаление одиночных данных из справочника районов",
-    })
-    response.ResponseError(c, fmt.Sprintf("Неправильный параметер запроса: %v", err))
+		controller.userActionService.Create(model.UserAction{
+			UserID:              userID,
+			ProjectID:           projectID,
+			DateOfAction:        time.Now(),
+			ActionURL:           c.Request.URL.Path,
+			ActionStatus:        false,
+			ActionStatusMessage: fmt.Sprintf(useraction.INCORRECT_PARAMETER, "ID"),
+			ActionID:            0,
+			ActionType:          "Запрос на удаление одиночных данных из справочника районов",
+		})
+		response.ResponseError(c, fmt.Sprintf("Неправильный параметер запроса: %v", err))
 		return
 
 	}
@@ -378,30 +378,30 @@ func (controller *districtController) Delete(c *gin.Context) {
 	err = controller.districtService.Delete(uint(id))
 	if err != nil {
 
-    controller.userActionService.Create(model.UserAction{
-      UserID:              userID,
-      ProjectID:           projectID,
-      DateOfAction:        time.Now(),
-      ActionURL:           c.Request.URL.Path,
-      ActionStatus:        false,
-      ActionStatusMessage: useraction.INTERNAL_SERVER_ERROR,
-      ActionID:            uint(id),
-      ActionType:          "Запрос на удаление одиночных данных из справочника районов",
-    })
-    response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		controller.userActionService.Create(model.UserAction{
+			UserID:              userID,
+			ProjectID:           projectID,
+			DateOfAction:        time.Now(),
+			ActionURL:           c.Request.URL.Path,
+			ActionStatus:        false,
+			ActionStatusMessage: useraction.INTERNAL_SERVER_ERROR,
+			ActionID:            uint(id),
+			ActionType:          "Запрос на удаление одиночных данных из справочника районов",
+		})
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 
 	}
 
-  controller.userActionService.Create(model.UserAction{
-    UserID:              userID,
-    ProjectID:           projectID,
-    DateOfAction:        time.Now(),
-    ActionURL:           c.Request.URL.Path,
-    ActionStatus:        true,
-    ActionStatusMessage: useraction.DELETE_SUCCESS,
-    ActionID:            uint(id),
-    ActionType:          "Запрос на удаление одиночных данных из справочника районов",
-  })
+	controller.userActionService.Create(model.UserAction{
+		UserID:              userID,
+		ProjectID:           projectID,
+		DateOfAction:        time.Now(),
+		ActionURL:           c.Request.URL.Path,
+		ActionStatus:        true,
+		ActionStatusMessage: useraction.DELETE_SUCCESS,
+		ActionID:            uint(id),
+		ActionType:          "Запрос на удаление одиночных данных из справочника районов",
+	})
 	response.ResponseSuccess(c, "deleted")
 }

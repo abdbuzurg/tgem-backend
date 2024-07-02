@@ -269,6 +269,7 @@ func InitInvoiceCorrectionRoutes(router *gin.RouterGroup, controller controller.
 	invoiceCorrectionRoutes.GET("/materials/:id", controller.GetInvoiceMaterialsByInvoiceObjectID)
 	invoiceCorrectionRoutes.GET("/total-amount/:materialID/team/:teamNumber", controller.GetTotalMaterialInTeamByTeamNumber)
 	invoiceCorrectionRoutes.GET("/serial-number/material/:materialID/teams/:teamNumber", controller.GetSerialNumbersOfMaterial)
+  invoiceCorrectionRoutes.POST("/", controller.Create)
 }
 
 func InitInvoiceObjectRoutes(router *gin.RouterGroup, controller controller.IInvoiceObjectController, db *gorm.DB) {
@@ -283,6 +284,7 @@ func InitInvoiceObjectRoutes(router *gin.RouterGroup, controller controller.IInv
 	invoiceObjectRoutes.GET("/materials/team/:teamID", controller.GetTeamsMaterials)
 	invoiceObjectRoutes.GET("/serial-number/material/:materialID/teams/:teamID", controller.GetSerialNumbersOfMaterial)
 	invoiceObjectRoutes.GET("/material/:materialID/team/:teamID", controller.GetMaterialAmountInTeam)
+  invoiceObjectRoutes.GET("/object/:objectID", controller.GetTeamsFromObjectID)
 	invoiceObjectRoutes.POST("/", controller.Create)
 }
 
@@ -521,7 +523,7 @@ func InitWorkerRoutes(router *gin.RouterGroup, controller controller.IWorkerCont
 	workerRoutes.GET("/all", controller.GetAll)
 	workerRoutes.GET("/paginated", controller.GetPaginated)
 	workerRoutes.GET("/:id", controller.GetByID)
-	workerRoutes.GET("/job-title/:jobTitle", controller.GetByJobTitle)
+	workerRoutes.GET("/job-title/:jobTitleInProject", controller.GetByJobTitleInProject)
 	workerRoutes.GET("/document/template", controller.GetTemplateFile)
 	workerRoutes.POST("/", controller.Create)
 	workerRoutes.POST("/document/import", controller.Import)

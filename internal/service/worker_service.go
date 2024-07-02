@@ -3,7 +3,6 @@ package service
 import (
 	"backend-v2/internal/repository"
 	"backend-v2/model"
-	"backend-v2/pkg/utils"
 	"fmt"
 	"os"
 
@@ -24,12 +23,12 @@ type IWorkerService interface {
 	GetAll() ([]model.Worker, error)
 	GetPaginated(page, limit int, data model.Worker) ([]model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
-	GetByJobTitle(jobTitle string) ([]model.Worker, error)
+	GetByJobTitleInProject(jobTitleInProject string) ([]model.Worker, error)
 	Create(data model.Worker) (model.Worker, error)
 	Update(data model.Worker) (model.Worker, error)
 	Delete(id uint) error
 	Count() (int64, error)
-	Import(filepath string) error
+	Import(filepath string, projectID uint) error
 }
 
 func (service *workerService) GetAll() ([]model.Worker, error) {
@@ -37,19 +36,19 @@ func (service *workerService) GetAll() ([]model.Worker, error) {
 }
 
 func (service *workerService) GetPaginated(page, limit int, data model.Worker) ([]model.Worker, error) {
-	if !(utils.IsEmptyFields(data)) {
-		return service.workerRepo.GetPaginatedFiltered(page, limit, data)
-	}
+	// if !(utils.IsEmptyFields(data)) {
+	return service.workerRepo.GetPaginatedFiltered(page, limit, data)
+	// }
 
-	return service.workerRepo.GetPaginated(page, limit)
+	// return service.workerRepo.GetPaginated(page, limit)
 }
 
 func (service *workerService) GetByID(id uint) (model.Worker, error) {
 	return service.workerRepo.GetByID(id)
 }
 
-func (service *workerService) GetByJobTitle(jobTitle string) ([]model.Worker, error) {
-	return service.workerRepo.GetByJobTitle(jobTitle)
+func (service *workerService) GetByJobTitleInProject(jobTitleInProject string) ([]model.Worker, error) {
+	return service.workerRepo.GetByJobTitleInProject(jobTitleInProject)
 }
 
 func (service *workerService) Create(data model.Worker) (model.Worker, error) {
@@ -68,7 +67,7 @@ func (service *workerService) Count() (int64, error) {
 	return service.workerRepo.Count()
 }
 
-func (service *workerService) Import(filepath string) error {
+func (service *workerService) Import(filepath string, projectID uint) error {
 
 	f, err := excelize.OpenFile(filepath)
 	if err != nil {
@@ -94,7 +93,9 @@ func (service *workerService) Import(filepath string) error {
 	workers := []model.Worker{}
 	index := 1
 	for len(rows) > index {
-		worker := model.Worker{}
+		worker := model.Worker{
+      ProjectID: projectID,
+    }
 
 		worker.Name, err = f.GetCellValue(sheetName, "A"+fmt.Sprint(index+1))
 		if err != nil {
@@ -102,8 +103,7 @@ func (service *workerService) Import(filepath string) error {
 			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке А%d: %v", index+1, err)
 		}
-
-		worker.JobTitle, err = f.GetCellValue(sheetName, "B"+fmt.Sprint(index+1))
+		worker.JobTitleInProject, err = f.GetCellValue(sheetName, "B"+fmt.Sprint(index+1))
 		if err != nil {
 			f.Close()
 			os.Remove(filepath)
@@ -111,6 +111,20 @@ func (service *workerService) Import(filepath string) error {
 		}
 
 		worker.MobileNumber, err = f.GetCellValue(sheetName, "C"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filepath)
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке C%d: %v", index+1, err)
+		}
+
+		worker.JobTitleInCompany, err = f.GetCellValue(sheetName, "D"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filepath)
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке B%d: %v", index+1, err)
+		}
+
+		worker.CompanyWorkerID, err = f.GetCellValue(sheetName, "E"+fmt.Sprint(index+1))
 		if err != nil {
 			f.Close()
 			os.Remove(filepath)

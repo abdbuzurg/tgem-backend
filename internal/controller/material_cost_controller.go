@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 )
 
 type materialCostController struct {
@@ -28,7 +27,7 @@ type IMaterialCostController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
-GetAllMaterialCostByMaterialID(c *gin.Context) 
+	GetAllMaterialCostByMaterialID(c *gin.Context)
 }
 
 func (controller *materialCostController) GetAll(c *gin.Context) {
@@ -56,45 +55,9 @@ func (controller *materialCostController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	materialIDStr := c.DefaultQuery("materialID", "")
-	materialID := 0
-	if materialIDStr != "" {
-		materialID, err = strconv.Atoi(materialIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode materialID parameter: %v", err))
-			return
-		}
-	}
+  projectID := c.GetUint("projectID")
 
-	costPrimerStr := c.DefaultQuery("costPrimer", "")
-	costPrime, err := decimal.NewFromString(costPrimerStr)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Cannot get the costPrime parameter: %v", err))
-		return
-	}
-
-	costM19Str := c.DefaultQuery("costM19", "")
-	costM19, err := decimal.NewFromString(costM19Str)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Cannot get the costM19 parameter: %v", err))
-		return
-	}
-
-	costWithCustomerStr := c.DefaultQuery("costWithCustomer", "")
-	costWithCustomer, err := decimal.NewFromString(costWithCustomerStr)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Cannot get the costWithCustomer parameter: %v", err))
-		return
-	}
-
-	filter := model.MaterialCost{
-		MaterialID:       uint(materialID),
-		CostPrime:        costPrime,
-		CostM19:          costM19,
-		CostWithCustomer: costWithCustomer,
-	}
-
-	data, err := controller.materialCostService.GetPaginated(page, limit, filter)
+	data, err := controller.materialCostService.GetPaginated(page, limit, projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of MaterialCost: %v", err))
 		return

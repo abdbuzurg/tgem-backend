@@ -80,7 +80,7 @@ func (service *userService) GetPaginated(page, limit int, data model.User) ([]dt
     result = append(result, dto.UserPaginated{
       Username: user.Username,
       WorkerName: worker.Name,
-      WorkerJobTitle: worker.JobTitle,
+      WorkerJobTitle: worker.JobTitleInProject,
       WorkerMobileNumber: worker.MobileNumber,
       RoleName: role.Name,
     })

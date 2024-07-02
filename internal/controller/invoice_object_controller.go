@@ -30,6 +30,7 @@ type IInvoiceObjectController interface {
 	Create(c *gin.Context)
 	GetMaterialAmountInTeam(c *gin.Context)
 	GetPaginated(c *gin.Context)
+	GetTeamsFromObjectID(c *gin.Context)
 }
 
 func (controller *invoiceObjectController) GetInvoiceObjectDescriptiveDataByID(c *gin.Context) {
@@ -191,6 +192,24 @@ func (controller *invoiceObjectController) GetMaterialAmountInTeam(c *gin.Contex
 	}
 
 	data, err := controller.invoiceObjectService.GetAvailableMaterialAmount(projectID, uint(materialID), uint(teamID))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceObjectController) GetTeamsFromObjectID(c *gin.Context) {
+
+	objectIDRaw := c.Param("objectID")
+	objectID, err := strconv.ParseUint(objectIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceObjectService.GetTeamsFromObjectID(uint(objectID))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return

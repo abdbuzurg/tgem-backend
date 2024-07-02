@@ -6,7 +6,9 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
 	"fmt"
+	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -584,7 +586,8 @@ func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilter
 		return "", err
 	}
 
-	f, err := excelize.OpenFile("./pkg/excels/report/Invoice Output Report.xlsx")
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Invoice Output Report.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -647,8 +650,16 @@ func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilter
 		}
 	}
 
-	fileName := "Invoice Output Report " + fmt.Sprint(rowCount) + ".xlsx"
-	f.SaveAs("./pkg/excels/report/" + fileName)
+	currentTime := time.Now()
+	fileName := fmt.Sprintf(
+		"Отсчет накладной отпуск - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+
+	tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
+
+	f.SaveAs(tempFilePath)
+
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}

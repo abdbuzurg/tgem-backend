@@ -101,7 +101,7 @@ func (service *substationObjectService) TemplateFile(filepath string) error {
 	}
 
 	sheetName := "Супервайзеры"
-	allSupervisors, err := service.workerRepo.GetByJobTitle("Супервайзер")
+	allSupervisors, err := service.workerRepo.GetByJobTitleInProject("Супервайзер")
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("Данные супервайзеров недоступны: %v", err)

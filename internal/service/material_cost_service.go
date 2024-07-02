@@ -1,9 +1,9 @@
 package service
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/repository"
 	"backend-v2/model"
-	"backend-v2/pkg/utils"
 )
 
 type materialCostService struct {
@@ -18,25 +18,21 @@ func InitMaterialCostService(materialCostRepo repository.IMaterialCostRepository
 
 type IMaterialCostService interface {
 	GetAll() ([]model.MaterialCost, error)
-	GetPaginated(page, limit int, data model.MaterialCost) ([]model.MaterialCost, error)
+	GetPaginated(page, limit int, projectID uint) ([]dto.MaterialCostView, error)
 	GetByID(id uint) (model.MaterialCost, error)
 	Create(data model.MaterialCost) (model.MaterialCost, error)
 	Update(data model.MaterialCost) (model.MaterialCost, error)
 	Delete(id uint) error
 	Count() (int64, error)
-  GetByMaterialID(materialID uint) ([]model.MaterialCost, error)
+	GetByMaterialID(materialID uint) ([]model.MaterialCost, error)
 }
 
 func (service *materialCostService) GetAll() ([]model.MaterialCost, error) {
 	return service.materialCostRepo.GetAll()
 }
 
-func (service *materialCostService) GetPaginated(page, limit int, data model.MaterialCost) ([]model.MaterialCost, error) {
-	if !(utils.IsEmptyFields(data)) {
-		return service.materialCostRepo.GetPaginatedFiltered(page, limit, data)
-	}
-
-	return service.materialCostRepo.GetPaginated(page, limit)
+func (service *materialCostService) GetPaginated(page, limit int, projectID uint) ([]dto.MaterialCostView, error) {
+	return service.materialCostRepo.GetPaginatedFiltered(page, limit, projectID)
 }
 
 func (service *materialCostService) GetByID(id uint) (model.MaterialCost, error) {
@@ -60,5 +56,5 @@ func (service *materialCostService) Count() (int64, error) {
 }
 
 func (service *materialCostService) GetByMaterialID(materialID uint) ([]model.MaterialCost, error) {
-  return service.materialCostRepo.GetByMaterialIDSorted(materialID) 
+	return service.materialCostRepo.GetByMaterialIDSorted(materialID)
 }

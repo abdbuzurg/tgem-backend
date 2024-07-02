@@ -6,6 +6,8 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
 	"fmt"
+	"path/filepath"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -502,8 +504,8 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 		DateTo:   filter.DateTo,
 	}
 
-	if filter.ReturnerType == "teams" {
-		newFilter.ReturnerType = "teams"
+	if filter.ReturnerType == "team" {
+		newFilter.ReturnerType = "team"
 		if filter.Returner != "" {
 			team, err := service.teamRepo.GetByNumber(filter.Returner)
 			if err != nil {
@@ -516,8 +518,8 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 		}
 	}
 
-	if filter.ReturnerType == "objects" {
-		newFilter.ReturnerType = "objects"
+	if filter.ReturnerType == "object" {
+		newFilter.ReturnerType = "object"
 		if filter.Returner != "" {
 			object, err := service.objectRepo.GetByName(filter.Returner)
 			if err != nil {
@@ -540,7 +542,8 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 		return "", err
 	}
 
-	f, err := excelize.OpenFile("./pkg/excels/report/Invoice Return Report.xlsx")
+  templateFilePath := filepath.Join("./pkg/excels/report/", "Invoice Return Report.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -567,7 +570,7 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 
 			f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
 
-			if invoice.ReturnerType == "teams" {
+			if invoice.ReturnerType == "team" {
 				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
 
 				team, err := service.teamRepo.GetByID(invoice.ReturnerID)
@@ -576,7 +579,9 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 				}
 
 				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), team.Number)
-			} else {
+			} 
+
+      if invoice.ReturnerType == "object" {
 				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
 
 				object, err := service.objectRepo.GetByID(invoice.ReturnerID)
@@ -600,8 +605,15 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 		}
 	}
 
-	fileName := "Invoice Return Report " + fmt.Sprint(rowCount) + ".xlsx"
-	f.SaveAs("./pkg/excels/report/" + fileName)
+	currentTime := time.Now()
+  fileName := fmt.Sprintf(
+		"Отсчет накладной возврат - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+
+	tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
+
+	f.SaveAs(tempFilePath)
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}

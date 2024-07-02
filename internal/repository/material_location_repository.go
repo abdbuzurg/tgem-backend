@@ -127,13 +127,13 @@ func (repo *materialLocationRepository) GetUniqueMaterialCostsByLocation(
 
 func (repo *materialLocationRepository) UniqueObjectIDs() ([]uint, error) {
 	var data []uint
-	err := repo.db.Raw("SELECT DISTINCT(location_id) FROM material_locations WHERE location_type='objects'").Scan(&data).Error
+	err := repo.db.Raw("SELECT DISTINCT(location_id) FROM material_locations WHERE location_type='object'").Scan(&data).Error
 	return data, err
 }
 
 func (repo *materialLocationRepository) UniqueTeamIDs() ([]uint, error) {
 	var data []uint
-	err := repo.db.Raw("SELECT DISTINCT(location_id) FROM material_locations WHERE location_type='teams'").Scan(&data).Error
+	err := repo.db.Raw("SELECT DISTINCT(location_id) FROM material_locations WHERE location_type='team' AND amount > 0").Scan(&data).Error
 	return data, err
 }
 
@@ -148,9 +148,9 @@ func (repo *materialLocationRepository) GetByLocationTypeAndID(
     FROM material_locations 
     WHERE 
       location_type = ? AND
-      (nullif(?, 0) IS NULL OR location_id = ?)  
-    ORDER BY material_locations.location_id DESC
-  `, locationType, locationID, locationID).Scan(&data).Error
+      location_id = ?  
+    
+  `, locationType, locationID).Scan(&data).Error
 
 	return data, err
 }

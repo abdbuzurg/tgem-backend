@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/model"
 
 	"gorm.io/gorm"
@@ -19,7 +20,7 @@ func InitMaterialCostRepository(db *gorm.DB) IMaterialCostRepository {
 type IMaterialCostRepository interface {
 	GetAll() ([]model.MaterialCost, error)
 	GetPaginated(page, limit int) ([]model.MaterialCost, error)
-	GetPaginatedFiltered(page, limit int, filter model.MaterialCost) ([]model.MaterialCost, error)
+	GetPaginatedFiltered(page, limit int, projectID uint) ([]dto.MaterialCostView, error)
 	GetByID(id uint) (model.MaterialCost, error)
 	GetByMaterialID(materialID uint) ([]model.MaterialCost, error)
   GetByMaterialIDSorted(materialID uint) ([]model.MaterialCost, error)
@@ -41,18 +42,21 @@ func (repo *materialCostRepository) GetPaginated(page, limit int) ([]model.Mater
 	return data, err
 }
 
-func (repo *materialCostRepository) GetPaginatedFiltered(page, limit int, filter model.MaterialCost) ([]model.MaterialCost, error) {
-	data := []model.MaterialCost{}
+func (repo *materialCostRepository) GetPaginatedFiltered(page, limit int, projectID uint) ([]dto.MaterialCostView, error) {
+	data := []dto.MaterialCostView{}
 	err := repo.db.
-		Raw(`SELECT * FROM materials WHERE
-			(nullif(?, '') IS NULL OR material_id = ?) AND
-			(nullif(?, '') IS NULL OR cost_prime = ?) AND
-			(nullif(?, '') IS NULL OR cost_m19 = ?) AND
-			(nullif(?, '') IS NULL OR cost_with_customer = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.MaterialID, filter.MaterialID,
-			filter.CostPrime, filter.CostPrime,
-			filter.CostM19, filter.CostM19,
-			filter.CostWithCustomer, filter.CostWithCustomer,
+		Raw(`
+      SELECT 
+        material_costs.id as id,
+        material_costs.cost_prime as cost_prime,
+        material_costs.cost_m19 as cost_m19,
+        material_costs.cost_with_customer as cost_with_customer,
+        materials.name as material_name
+      FROM material_costs 
+      INNER JOIN materials ON materials.id = material_costs.material_id
+      WHERE materials.project_id = ? 
+      ORDER BY id DESC LIMIT ? OFFSET ?`,
+      projectID,
 			limit, (page-1)*limit,
 		).
 		Scan(&data).Error
@@ -86,7 +90,7 @@ func (repo *materialCostRepository) Create(data model.MaterialCost) (model.Mater
 }
 
 func (repo *materialCostRepository) Update(data model.MaterialCost) (model.MaterialCost, error) {
-	err := repo.db.Model(&model.MaterialCost{}).Select("*").Updates(&data).Error
+	err := repo.db.Model(&model.MaterialCost{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
 	return data, err
 }
 
