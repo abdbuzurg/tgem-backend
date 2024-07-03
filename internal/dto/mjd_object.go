@@ -24,11 +24,13 @@ type MJDObjectPaginated struct {
 	HasBasement      bool     `json:"hasBasement"`
 	Supervisors      []string `json:"supervisors"`
 	Teams            []string `json:"teams"`
+	TPNames          []string `json:"tpNames"`
 }
 
 type MJDObjectCreate struct {
-	BaseInfo     model.Object     `json:"baseInfo"`
-	DetailedInfo model.MJD_Object `json:"detailedInfo"`
-	Supervisors  []uint           `json:"supervisors"`
-	Teams        []uint           `json:"teams"`
+	BaseInfo              model.Object     `json:"baseInfo"`
+	DetailedInfo          model.MJD_Object `json:"detailedInfo"`
+	Supervisors           []uint           `json:"supervisors"`
+	Teams                 []uint           `json:"teams"`
+	NourashedByTPObjectID []uint           `json:"nourashedByTP"`
 }

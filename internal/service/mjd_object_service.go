@@ -16,6 +16,7 @@ type mjdObjectService struct {
 	workerRepo            repository.IWorkerRepository
 	objectSupervisorsRepo repository.IObjectSupervisorsRepository
 	objectTeamsRepo       repository.IObjectTeamsRepository
+	tpNourashesObjects    repository.ITPNourashesObjectsRepository
 }
 
 func InitMJDObjectService(
@@ -23,12 +24,14 @@ func InitMJDObjectService(
 	workerRepo repository.IWorkerRepository,
 	objectSupervisorsRepo repository.IObjectSupervisorsRepository,
 	objectTeamsRepo repository.IObjectTeamsRepository,
+	tpNourashesObjects repository.ITPNourashesObjectsRepository,
 ) IMJDObjectService {
 	return &mjdObjectService{
 		mjdObjectRepo:         mjdObjectRepo,
 		workerRepo:            workerRepo,
 		objectSupervisorsRepo: objectSupervisorsRepo,
 		objectTeamsRepo:       objectTeamsRepo,
+		tpNourashesObjects:    tpNourashesObjects,
 	}
 }
 
@@ -62,6 +65,11 @@ func (service *mjdObjectService) GetPaginated(page, limit int, projectID uint) (
 			return []dto.MJDObjectPaginated{}, err
 		}
 
+		tpNames, err := service.tpNourashesObjects.GetTPObjectNames(oneEntry.ObjectID, "kl04kv_objects")
+		if err != nil {
+			return []dto.MJDObjectPaginated{}, err
+		}
+
 		result = append(result, dto.MJDObjectPaginated{
 			ObjectID:         oneEntry.ObjectID,
 			ObjectDetailedID: oneEntry.ObjectDetailedID,
@@ -73,6 +81,7 @@ func (service *mjdObjectService) GetPaginated(page, limit int, projectID uint) (
 			HasBasement:      oneEntry.HasBasement,
 			Supervisors:      supervisorNames,
 			Teams:            teamNumbers,
+      TPNames: tpNames,
 		})
 	}
 	return result, nil

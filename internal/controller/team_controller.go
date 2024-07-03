@@ -33,7 +33,7 @@ type ITeamController interface {
 }
 
 func (controller *teamController) GetAll(c *gin.Context) {
-  projectID := c.GetUint("projectID")
+	projectID := c.GetUint("projectID")
 
 	data, err := controller.teamService.GetAll(projectID)
 	if err != nil {
@@ -59,7 +59,7 @@ func (controller *teamController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
+	projectID := c.GetUint("projectID")
 
 	data, err := controller.teamService.GetPaginated(page, limit, projectID)
 	if err != nil {
@@ -104,6 +104,17 @@ func (controller *teamController) Create(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	createData.ProjectID = projectID
 
+	exist, err := controller.teamService.DoesTeamNumberAlreadyExistForCreate(createData.Number)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not perform team number check-up: %v", err))
+		return
+	}
+
+	if exist {
+		response.ResponseError(c, fmt.Sprintf("Бригада с таким номером уже существует"))
+		return
+	}
+
 	data, err := controller.teamService.Create(createData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Team: %v", err))
@@ -121,8 +132,19 @@ func (controller *teamController) Update(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
-  updateData.ProjectID = projectID
+	projectID := c.GetUint("projectID")
+	updateData.ProjectID = projectID
+
+	exist, err := controller.teamService.DoesTeamNumberAlreadyExistForUpdate(updateData.Number, updateData.ID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not perform team number check-up: %v", err))
+		return
+	}
+
+	if exist {
+		response.ResponseError(c, fmt.Sprintf("Бригада с таким номером уже существует"))
+		return
+	}
 
 	data, err := controller.teamService.Update(updateData)
 	if err != nil {
@@ -152,7 +174,7 @@ func (controller *teamController) Delete(c *gin.Context) {
 
 func (controller *teamController) GetTemplateFile(c *gin.Context) {
 	filepath := "./pkg/excels/templates/Шаблон для импорта Бригады.xlsx"
-  projectID := c.GetUint("projectID")
+	projectID := c.GetUint("projectID")
 
 	if err := controller.teamService.TemplateFile(projectID, filepath); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
@@ -177,7 +199,7 @@ func (controller *teamController) Import(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
+	projectID := c.GetUint("projectID")
 
 	err = controller.teamService.Import(projectID, filePath)
 	if err != nil {

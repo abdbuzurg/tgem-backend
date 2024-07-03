@@ -81,5 +81,6 @@ func AutoMigrate(db *gorm.DB) {
 		model.STVT_Object{},
     model.Substation_Object{},
 		model.TP_Object{},
+    model.TPNourashesObjects{},
 	)
 }

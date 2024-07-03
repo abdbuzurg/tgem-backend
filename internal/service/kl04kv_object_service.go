@@ -16,6 +16,7 @@ type kl04kvObjectService struct {
 	workerRepo            repository.IWorkerRepository
 	objectSupervisorsRepo repository.IObjectSupervisorsRepository
 	objectTeamsRepo       repository.IObjectTeamsRepository
+	tpNourashesObjects    repository.ITPNourashesObjectsRepository
 }
 
 func InitKL04KVObjectService(
@@ -23,12 +24,14 @@ func InitKL04KVObjectService(
 	workerRepo repository.IWorkerRepository,
 	objectSupervisorsRepo repository.IObjectSupervisorsRepository,
 	objectTeamsRepo repository.IObjectTeamsRepository,
+	tpNourashesObjects repository.ITPNourashesObjectsRepository,
 ) IKL04KVObjectService {
 	return &kl04kvObjectService{
 		kl04kvObjectRepo:      kl04kvObjectRepo,
 		workerRepo:            workerRepo,
 		objectSupervisorsRepo: objectSupervisorsRepo,
 		objectTeamsRepo:       objectTeamsRepo,
+		tpNourashesObjects:    tpNourashesObjects,
 	}
 }
 
@@ -61,6 +64,11 @@ func (service *kl04kvObjectService) GetPaginated(page, limit int, projectID uint
 			return []dto.KL04KVObjectPaginated{}, err
 		}
 
+		tpNames, err := service.tpNourashesObjects.GetTPObjectNames(oneEntry.ObjectID, "kl04kv_objects")
+		if err != nil {
+			return []dto.KL04KVObjectPaginated{}, err
+		}
+
 		result = append(result, dto.KL04KVObjectPaginated{
 			ObjectID:         oneEntry.ObjectID,
 			ObjectDetailedID: oneEntry.ObjectDetailedID,
@@ -70,6 +78,7 @@ func (service *kl04kvObjectService) GetPaginated(page, limit int, projectID uint
 			Length:           oneEntry.Length,
 			Supervisors:      supervisorNames,
 			Teams:            teamNumbers,
+			TPNames:          tpNames,
 		})
 	}
 

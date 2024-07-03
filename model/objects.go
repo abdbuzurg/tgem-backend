@@ -17,6 +17,8 @@ type Object struct {
 	ObjectOperations []ObjectOperation `json:"-" gorm:"foreignKey:ObjectID"`
 	InvoiceOutputs   []InvoiceOutput   `json:"-" gorm:"foreignKey:ObjectID"`
 	InvoiceObject    []InvoiceObject   `json:"-" gorm:"foreignKey:ObjectID"`
+
+	TPNourashesObjects []TPNourashesObjects `json:"-" gorm:"foreignKey:TP_ObjectID"`
 }
 
 type MJD_Object struct {
@@ -55,4 +57,11 @@ type Substation_Object struct {
 	ID                   uint   `json:"id" gorm:"primaryKey"`
 	VoltageClass         string `json:"voltageClass"`
 	NumberOfTransformers uint   `json:"numberOfTransformers"`
+}
+
+type TPNourashesObjects struct {
+	ID          uint   `json:"id" gorm:"primaryKey"`
+	TP_ObjectID uint   `json:"tpObjectID"`
+	TargetID    uint   `json:"targetID"`
+	TargetType  string `json:"targetType"`
 }

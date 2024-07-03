@@ -121,6 +121,21 @@ func (repo *mjdObjectRepository) Create(data dto.MJDObjectCreate) (model.MJD_Obj
 			}
 		}
 
+		if len(data.NourashedByTPObjectID) != 0 {
+			tpNourashesObjects := []model.TPNourashesObjects{}
+			for _, tpObjectID := range data.NourashedByTPObjectID {
+				tpNourashesObjects = append(tpNourashesObjects, model.TPNourashesObjects{
+					TP_ObjectID: tpObjectID,
+					TargetID:    object.ID,
+					TargetType:  "kl04kv_objects",
+				})
+
+				if err := tx.CreateInBatches(&tpNourashesObjects, 5).Error; err != nil {
+					return err
+				}
+			}
+		}
+
 		return nil
 	})
 
@@ -173,6 +188,10 @@ func (repo *mjdObjectRepository) Update(data dto.MJDObjectCreate) (model.MJD_Obj
 			}
 		}
 
+		if err := tx.Delete(&model.ObjectTeams{}, "object_id = ?", object.ID).Error; err != nil {
+			return err
+		}
+
 		if len(data.Teams) != 0 {
 			objectTeams := []model.ObjectTeams{}
 			for _, teamID := range data.Teams {
@@ -186,6 +205,27 @@ func (repo *mjdObjectRepository) Update(data dto.MJDObjectCreate) (model.MJD_Obj
 				return err
 			}
 		}
+
+		if err := tx.Delete(&model.TPNourashesObjects{}, "target_id = ? AND target_type = 'kl04kv_objects'", object.ID).Error; err != nil {
+			return err
+		}
+
+		if len(data.NourashedByTPObjectID) != 0 {
+			tpNourashesObjects := []model.TPNourashesObjects{}
+			for _, tpObjectID := range data.NourashedByTPObjectID {
+				tpNourashesObjects = append(tpNourashesObjects, model.TPNourashesObjects{
+					TP_ObjectID: tpObjectID,
+					TargetID:    object.ID,
+					TargetType:  "kl04kv_objects",
+				})
+
+				if err := tx.CreateInBatches(&tpNourashesObjects, 5).Error; err != nil {
+					return err
+				}
+			}
+
+		}
+
 		return nil
 	})
 
@@ -211,7 +251,7 @@ func (repo *mjdObjectRepository) Delete(id, projectID uint) error {
 			return err
 		}
 
-    err = tx.Exec(`
+		err = tx.Exec(`
       DELETE FROM object_teams
       WHERE object_teams.object_id = (
         SELECT DISTINCT(objects.id)
@@ -224,9 +264,9 @@ func (repo *mjdObjectRepository) Delete(id, projectID uint) error {
       );
     `, projectID, id).Error
 
-    if err != nil {
-      return err
-    }
+		if err != nil {
+			return err
+		}
 
 		if err := tx.Table("mjd_objects").Delete(&model.MJD_Object{}, "id = ?", id).Error; err != nil {
 			return err

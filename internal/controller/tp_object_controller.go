@@ -22,12 +22,25 @@ func InitTPObjectController(tpObjectService service.ITPObjectService) ITPObjectC
 }
 
 type ITPObjectController interface {
+	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
+}
+
+func (controller *tpObjectController) GetAll(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+
+	data, err := controller.tpObjectService.GetAllOnlyObjects(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+  response.ResponseSuccess(c, data)
 }
 
 func (controller *tpObjectController) GetPaginated(c *gin.Context) {

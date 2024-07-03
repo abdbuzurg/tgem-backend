@@ -28,6 +28,7 @@ type IObjectRepository interface {
 	Delete(id uint) error
 	Count() (int64, error)
 	GetByName(name string) (model.Object, error)
+  GetAllObjectBasedOnType(projectID uint, objecType string) ([]model.Object, error)
 }
 
 func (repo *objectRepository) GetAll(projectID uint) ([]model.Object, error) {
@@ -35,6 +36,13 @@ func (repo *objectRepository) GetAll(projectID uint) ([]model.Object, error) {
 	err := repo.db.Order("id desc").Find(&data, "project_id = ?", projectID).Error
 	return data, err
 }
+
+func (repo *objectRepository) GetAllObjectBasedOnType(projectID uint, objectType string) ([]model.Object, error){
+	data := []model.Object{}
+	err := repo.db.Order("id desc").Find(&data, "project_id = ? and type = ?", projectID, objectType).Error
+	return data, err
+}
+
 
 func (repo *objectRepository) GetPaginated(page, limit int) ([]model.Object, error) {
 	data := []model.Object{}

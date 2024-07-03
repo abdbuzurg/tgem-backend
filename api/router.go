@@ -64,6 +64,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	invoiceObjectRepo := repository.InitInvoiceObjectRepository(db)
 	invoiceCorrectionRepo := repository.InitInvoiceCorrectionRepository(db)
 	substationObjectRepo := repository.InitSubstationObjectRepository(db)
+  tpNourashesObjectsRepo := repository.InitTPNourashesObjectsRepository(db)
 
 	//Initialization of Services
 	invoiceInputService := service.InitInvoiceInputService(
@@ -123,6 +124,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		workerRepo,
 		objectSupervisorsRepo,
 		objectTeamsRepo,
+    tpNourashesObjectsRepo,
 	)
 	materialCostService := service.InitMaterialCostService(materialCostRepo)
 	// materialForProjectService := service.InitMaterialForProjectService(materialForProjectRepo)
@@ -142,6 +144,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		workerRepo,
 		objectSupervisorsRepo,
 		objectTeamsRepo,
+    tpNourashesObjectsRepo,
 	)
 	// objectOperationService := service.InitObjectOperationService(objectOperationRepo)
 	objectService := service.InitObjectService(
@@ -177,6 +180,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		workerRepo,
 		objectSupervisorsRepo,
 		objectTeamsRepo,
+    objectRepo,
 	)
 	userService := service.InitUserService(
 		userRepo,
@@ -444,6 +448,7 @@ func InitTPObjectRoutes(router *gin.RouterGroup, controller controller.ITPObject
 	)
 	tpObjectRoutes.GET("/paginated", controller.GetPaginated)
 	tpObjectRoutes.GET("/document/template", controller.GetTemplateFile)
+  tpObjectRoutes.GET("/", controller.GetAll)
 	tpObjectRoutes.POST("/", controller.Create)
 	tpObjectRoutes.POST("/document/import", controller.Import)
 	tpObjectRoutes.PATCH("/", controller.Update)

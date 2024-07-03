@@ -105,6 +105,21 @@ func (repo *kl04kvObjectRepository) Create(data dto.KL04KVObjectCreate) (model.K
 			}
 		}
 
+		if len(data.NourashedByTPObjectID) != 0 {
+			tpNourashesObjects := []model.TPNourashesObjects{}
+			for _, tpObjectID := range data.NourashedByTPObjectID {
+				tpNourashesObjects = append(tpNourashesObjects, model.TPNourashesObjects{
+					TP_ObjectID: tpObjectID,
+					TargetID:    object.ID,
+					TargetType:  "kl04kv_objects",
+				})
+
+				if err := tx.CreateInBatches(&tpNourashesObjects, 5).Error; err != nil {
+					return err
+				}
+			}
+		}
+
 		return nil
 	})
 
@@ -234,6 +249,26 @@ func (repo *kl04kvObjectRepository) Update(data dto.KL04KVObjectCreate) (model.K
 			}
 		}
 
+		if err := tx.Delete(&model.TPNourashesObjects{}, "target_id = ? AND target_type = 'kl04kv_objects'", object.ID).Error; err != nil {
+			return err
+		}
+
+    if len(data.NourashedByTPObjectID) != 0 {
+			tpNourashesObjects := []model.TPNourashesObjects{}
+			for _, tpObjectID := range data.NourashedByTPObjectID {
+				tpNourashesObjects = append(tpNourashesObjects, model.TPNourashesObjects{
+					TP_ObjectID: tpObjectID,
+					TargetID:    object.ID,
+					TargetType:  "kl04kv_objects",
+				})
+
+				if err := tx.CreateInBatches(&tpNourashesObjects, 5).Error; err != nil {
+					return err
+				}
+			}
+
+    }
+
 		return nil
 	})
 
@@ -253,7 +288,7 @@ func (repo *kl04kvObjectRepository) CreateInBatches(objects []model.Object, kl04
 		if err := tx.CreateInBatches(&objects, 10).Error; err != nil {
 			return err
 		}
-		
+
 		return nil
 	})
 

@@ -15,6 +15,7 @@ type tpObjectService struct {
 	workerRepo            repository.IWorkerRepository
 	objectSupervisorsRepo repository.IObjectSupervisorsRepository
 	objectTeamsRepo       repository.IObjectTeamsRepository
+  objectRepo repository.IObjectRepository
 }
 
 func InitTPObjectService(
@@ -22,16 +23,19 @@ func InitTPObjectService(
 	workerRepo repository.IWorkerRepository,
 	objectSupervisorsRepo repository.IObjectSupervisorsRepository,
 	objectTeamsRepo repository.IObjectTeamsRepository,
+  objectRepo repository.IObjectRepository,
 ) ITPObjectService {
 	return &tpObjectService{
 		tpObjectRepo:          tpObjectRepo,
 		workerRepo:            workerRepo,
 		objectSupervisorsRepo: objectSupervisorsRepo,
 		objectTeamsRepo:       objectTeamsRepo,
+    objectRepo: objectRepo,
 	}
 }
 
 type ITPObjectService interface {
+  GetAllOnlyObjects(projectID uint) ([]model.Object, error)
 	GetPaginated(page, limit int, projectID uint) ([]dto.TPObjectPaginated, error)
 	Count(projectID uint) (int64, error)
 	Create(data dto.TPObjectCreate) (model.TP_Object, error)
@@ -39,6 +43,10 @@ type ITPObjectService interface {
 	Delete(id, projectID uint) error
 	TemplateFile(filepath string) error
 	Import(projectID uint, filepath string) error
+}
+
+func(service *tpObjectService) GetAllOnlyObjects(projectID  uint) ([]model.Object, error) {
+  return service.objectRepo.GetAllObjectBasedOnType(projectID, "tp_objects") 
 }
 
 func (service *tpObjectService) GetPaginated(page, limit int, projectID uint) ([]dto.TPObjectPaginated, error) {

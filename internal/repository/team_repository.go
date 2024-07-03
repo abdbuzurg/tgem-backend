@@ -29,6 +29,8 @@ type ITeamRepository interface {
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
 	GetTeamNumberAndTeamLeadersByID(projectID, id uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error)
+	DoesTeamNumberAlreadyExistForCreate(teamNumber string) (bool, error)
+	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint) (bool, error)
 }
 
 func (repo *teamRepository) GetAll(projectID uint) ([]model.Team, error) {
@@ -224,4 +226,26 @@ func (repo *teamRepository) GetTeamNumberAndTeamLeadersByID(projectID, id uint) 
 	  `, projectID, id).Scan(&data).Error
 
 	return data, err
+}
+
+func (repo *teamRepository) DoesTeamNumberAlreadyExistForCreate(teamNumber string) (bool, error) {
+	result := false
+	err := repo.db.Raw(`
+    SELECT true
+    FROM teams
+    WHERE teams.number = ?;
+    `, teamNumber).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *teamRepository) DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint) (bool, error) {
+	result := false
+	err := repo.db.Raw(`
+    SELECT true
+    FROM teams
+    WHERE teams.number = ? AND teams.id <> ?;
+    `, teamNumber, id).Scan(&result).Error
+
+	return result, err
 }
