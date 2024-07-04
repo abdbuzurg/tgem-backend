@@ -17,10 +17,10 @@ type ObjectPaginatedQuery struct {
 }
 
 type ObjectCreate struct {
-	Type   string `json:"type" gorm:"tinyText"`
-	Name   string `json:"name" gorm:"tinyText"`
-	Status string `json:"status" gorm:"tinyText"`
-  ProjectID uint `json:"projectID"`
+	Type      string `json:"type" gorm:"tinyText"`
+	Name      string `json:"name" gorm:"tinyText"`
+	Status    string `json:"status" gorm:"tinyText"`
+	ProjectID uint   `json:"projectID"`
 
 	Model          string  `json:"model" gorm:"tinyText"`
 	AmountStores   uint    `json:"amountStores"`
@@ -33,4 +33,10 @@ type ObjectCreate struct {
 	Length         float64 `json:"length"`
 
 	Supervisors []uint `json:"supervisors"`
+}
+
+type TeamDataForSelect struct {
+	ID             uint   `json:"id"`
+	TeamNumber     string `json:"teamNumber"`
+	TeamLeaderName string `json:"teamLeaderName"`
 }

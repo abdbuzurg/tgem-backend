@@ -47,7 +47,7 @@ type IObjectService interface {
 	Update(data model.Object) (model.Object, error)
 	Delete(id uint) error
 	Count() (int64, error)
-	GetTeamsByObjectID(objectID uint) ([]model.Team, error)
+	GetTeamsByObjectID(objectID uint) ([]dto.TeamDataForSelect, error)
 }
 
 func (service *objectService) GetAll(projectID uint) ([]model.Object, error) {
@@ -135,6 +135,6 @@ func (service *objectService) Count() (int64, error) {
 	return service.objectRepo.Count()
 }
 
-func(service *objectService) GetTeamsByObjectID(objectID uint) ([]model.Team, error) {
+func(service *objectService) GetTeamsByObjectID(objectID uint) ([]dto.TeamDataForSelect, error) {
   return service.objectTeamsRepo.GetTeamsByObjectID(objectID)
 }

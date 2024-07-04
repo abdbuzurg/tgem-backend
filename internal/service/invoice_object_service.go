@@ -16,6 +16,7 @@ type invoiceObjectService struct {
 	serialNumberRepo     repository.ISerialNumberRepository
 	materialCostRepo     repository.IMaterialCostRepository
 	invoiceMaterialRepo  repository.IInvoiceMaterialsRepository
+	objectTeamsRepo      repository.IObjectTeamsRepository
 }
 
 func InitInvoiceObjectService(
@@ -27,6 +28,7 @@ func InitInvoiceObjectService(
 	serialNumberRepo repository.ISerialNumberRepository,
 	materialCostRepo repository.IMaterialCostRepository,
 	invoiceMaterialRepo repository.IInvoiceMaterialsRepository,
+	objectTeamsRepo repository.IObjectTeamsRepository,
 ) IInvoiceObjectService {
 	return &invoiceObjectService{
 		invoiceObjectRepo:    invoiceObjectRepo,
@@ -37,6 +39,7 @@ func InitInvoiceObjectService(
 		serialNumberRepo:     serialNumberRepo,
 		materialCostRepo:     materialCostRepo,
 		invoiceMaterialRepo:  invoiceMaterialRepo,
+		objectTeamsRepo:      objectTeamsRepo,
 	}
 }
 
@@ -50,7 +53,7 @@ type IInvoiceObjectService interface {
 	GetSerialNumberOfMaterial(projectID, materialID uint, locationID uint) ([]string, error)
 	GetAvailableMaterialAmount(projectID, materialID, teamID uint) (float64, error)
 	Count(projectID uint) (int64, error)
-	GetTeamsFromObjectID(objectID uint) ([]model.Team, error)
+	GetTeamsFromObjectID(objectID uint) ([]dto.TeamDataForSelect, error)
 }
 
 func (service *invoiceObjectService) GetInvoiceObjectDescriptiveDataByID(id uint) (dto.InvoiceObjectWithMaterialsDescriptive, error) {
@@ -259,6 +262,6 @@ func (service *invoiceObjectService) Count(projectID uint) (int64, error) {
 	return service.invoiceObjectRepo.Count(projectID)
 }
 
-func (service *invoiceObjectService) GetTeamsFromObjectID(objectID uint) ([]model.Team, error) {
-	return service.invoiceObjectRepo.GetTeamsFromObjectID(objectID)
+func (service *invoiceObjectService) GetTeamsFromObjectID(objectID uint) ([]dto.TeamDataForSelect, error) {
+	return service.objectTeamsRepo.GetTeamsByObjectID(objectID)
 }

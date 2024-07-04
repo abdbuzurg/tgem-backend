@@ -110,6 +110,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		serialNumberRepo,
 		materialCostRepo,
 		invoiceMaterialRepo,
+    objectTeamsRepo,
 	)
 	invoiceCorrectionService := service.InitInvoiceCorrectionService(
 		invoiceCorrectionRepo,
