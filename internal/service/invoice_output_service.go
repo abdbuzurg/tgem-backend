@@ -252,7 +252,8 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.Invoi
 		return model.InvoiceOutput{}, err
 	}
 
-	f, err := excelize.OpenFile("./pkg/excels/templates/output.xlsx")
+  templateFilePath := filepath.Join("./pkg/excels/templates/output.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
 	if err != nil {
 		return model.InvoiceOutput{}, err
 	}
@@ -273,9 +274,9 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.Invoi
 			{Type: "bottom", Color: "#000000", Style: 1},
 		},
 		Alignment: &excelize.Alignment{
-			Horizontal: "left",
-			WrapText:   true,
-			Vertical:   "center",
+			Horizontal:  "left",
+			WrapText:    true,
+			Vertical:    "center",
 		},
 	})
 
@@ -290,9 +291,9 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.Invoi
 			{Type: "bottom", Color: "#000000", Style: 1},
 		},
 		Alignment: &excelize.Alignment{
-			Horizontal: "left",
-			Vertical:   "center",
-			WrapText:   true,
+			Horizontal:  "left",
+			Vertical:    "center",
+			WrapText:    true,
 		},
 	})
 
@@ -301,41 +302,50 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.Invoi
 		return model.InvoiceOutput{}, err
 	}
 
-	f.SetCellValue(sheetName, "E1", fmt.Sprintf(`НАКЛАДНАЯ № %s
+	f.SetCellValue(sheetName, "E1", fmt.Sprintf(`НАКЛАДНАЯ 
+№ %s
 от %s года       
 на отпуск материала 
 `, invoiceOutput.DeliveryCode, utils.DateConverter(invoiceOutputDescriptive.DateOfInvoice)))
 
-	f.SetCellValue(sheetName, "I1", fmt.Sprintf(`%s
+	f.SetCellStr(sheetName, "I1", fmt.Sprintf(`%s
 Регион: %s `, invoiceOutputDescriptive.ProjectName, invoiceOutputDescriptive.DistrictName))
-	f.SetCellValue(sheetName, "D2", fmt.Sprintf("%s", utils.ObjectTypeConverter(invoiceOutputDescriptive.ObjectType)))
-	f.SetCellValue(sheetName, "D3", invoiceOutputDescriptive.ObjectName)
+	f.SetCellStr(sheetName, "D2", fmt.Sprintf("%s", utils.ObjectTypeConverter(invoiceOutputDescriptive.ObjectType)))
+	f.SetCellStr(sheetName, "D3", invoiceOutputDescriptive.ObjectName)
 
 	for index, oneEntry := range data.Items {
 		material, err := service.materialRepo.GetByID(oneEntry.MaterialID)
 		if err != nil {
 			return model.InvoiceOutput{}, err
 		}
-
-		f.MergeCell(sheetName, "D"+fmt.Sprint(startingRow+index), "F"+fmt.Sprint(startingRow+index))
-		f.MergeCell(sheetName, "I"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index))
-
 		f.SetCellStyle(sheetName, "A"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index), defaultStyle)
 		f.SetCellStyle(sheetName, "B"+fmt.Sprint(startingRow+index), "B"+fmt.Sprint(startingRow+index), namingStyle)
 
-		f.SetCellValue(sheetName, "A"+fmt.Sprint(startingRow+index), index+1)
-		f.SetCellValue(sheetName, "B"+fmt.Sprint(startingRow+index), material.Code)
-		f.SetCellValue(sheetName, "D"+fmt.Sprint(startingRow+index), material.Name)
-		f.SetCellValue(sheetName, "G"+fmt.Sprint(startingRow+index), material.Unit)
-		f.SetCellValue(sheetName, "H"+fmt.Sprint(startingRow+index), oneEntry.Amount)
-		f.SetCellValue(sheetName, "I"+fmt.Sprint(startingRow+index), oneEntry.Notes)
+		f.MergeCell(sheetName, "I"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index))
+
+		f.SetCellInt(sheetName, "A"+fmt.Sprint(startingRow+index), index+1)
+		f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), material.Code)
+		f.SetCellStr(sheetName, "D"+fmt.Sprint(startingRow+index), material.Name)
+		f.SetCellStr(sheetName, "G"+fmt.Sprint(startingRow+index), material.Unit)
+		f.SetCellFloat(sheetName, "H"+fmt.Sprint(startingRow+index), oneEntry.Amount, 3, 64)
+		f.SetCellStr(sheetName, "I"+fmt.Sprint(startingRow+index), oneEntry.Notes)
+
+    rowHeight, err := f.GetRowHeight(sheetName, startingRow + index)
+    if err != nil {
+      return model.InvoiceOutput{}, err
+    }
+
+		f.MergeCell(sheetName, "D"+fmt.Sprint(startingRow+index), "F"+fmt.Sprint(startingRow+index))
+    f.SetRowHeight(sheetName, startingRow + index, rowHeight)
 	}
 
-	f.SetCellValue(sheetName, "D"+fmt.Sprint(9+len(data.Items)), invoiceOutputDescriptive.ReleasedName)
-	f.SetCellValue(sheetName, "I"+fmt.Sprint(6+len(data.Items)), invoiceOutputDescriptive.TeamLeaderName)
-	f.SetCellValue(sheetName, "I"+fmt.Sprint(9+len(data.Items)), invoiceOutputDescriptive.RecipientName)
+	f.SetCellStr(sheetName, "D"+fmt.Sprint(9+len(data.Items)), invoiceOutputDescriptive.ReleasedName)
+	f.SetCellStr(sheetName, "I"+fmt.Sprint(6+len(data.Items)), invoiceOutputDescriptive.TeamLeaderName)
+	f.SetCellStr(sheetName, "I"+fmt.Sprint(9+len(data.Items)), invoiceOutputDescriptive.RecipientName)
 
-	f.SaveAs("./pkg/excels/output/" + data.Details.DeliveryCode + ".xlsx")
+  
+  filePath := filepath.Join("./pkg/excels/output/", data.Details.DeliveryCode + ".xlsx")
+	f.SaveAs(filePath)
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}
