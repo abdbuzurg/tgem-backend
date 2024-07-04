@@ -29,10 +29,11 @@ type IObjectController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	GetTeamsByObject(c *gin.Context)
 }
 
 func (controller *objectController) GetAll(c *gin.Context) {
-  projectID := c.GetUint("projectID")
+	projectID := c.GetUint("projectID")
 
 	data, err := controller.objectService.GetAll(projectID)
 	if err != nil {
@@ -90,10 +91,10 @@ func (controller *objectController) GetPaginated(c *gin.Context) {
 	}
 
 	filter := model.Object{
-		ObjectDetailedID:   uint(objectDetailedID),
-		Type:               objectType,
-		Name:               name,
-		Status:             status,
+		ObjectDetailedID: uint(objectDetailedID),
+		Type:             objectType,
+		Name:             name,
+		Status:           status,
 	}
 
 	data, err := controller.objectService.GetPaginated(page, limit, filter)
@@ -175,4 +176,21 @@ func (controller *objectController) Delete(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, "deleted")
+}
+
+func (controller *objectController) GetTeamsByObject(c *gin.Context) {
+	objectIDRaw := c.Param("objectID")
+	objectID, err := strconv.ParseUint(objectIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	data, err := controller.objectService.GetTeamsByObjectID(uint(objectID))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not perform the deletion of Object: %v", err))
+		return
+	}
+
+  response.ResponseSuccess(c, data)
 }

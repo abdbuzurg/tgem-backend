@@ -155,6 +155,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		sipObjectRepo,
 		stvtObjectRepo,
 		tpObjectRepo,
+    objectTeamsRepo,
 	)
 	// operationService := service.InitOperationService(operationRepo)
 	projectService := service.InitProjectService(projectRepo)
@@ -436,6 +437,7 @@ func InitObjectRoutes(router *gin.RouterGroup, controller controller.IObjectCont
 	objectRoutes.GET("/all", controller.GetAll)
 	objectRoutes.GET("/paginated", controller.GetPaginated)
 	objectRoutes.GET("/:id", controller.GetByID)
+  objectRoutes.GET("/teams/:objectID", controller.GetTeamsByObject)
 	objectRoutes.POST("/", controller.Create)
 	objectRoutes.PATCH("/", controller.Update)
 	objectRoutes.DELETE("/:id", controller.Delete)

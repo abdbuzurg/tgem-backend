@@ -14,6 +14,7 @@ type objectService struct {
 	sipObjectRepo         repository.ISIPObjectRepository
 	stvtObjectRepo        repository.ISTVTObjectRepository
 	tpObjectRepo          repository.ITPObjectRepository
+	objectTeamsRepo       repository.IObjectTeamsRepository
 }
 
 func InitObjectService(
@@ -24,6 +25,7 @@ func InitObjectService(
 	sipObjectRepo repository.ISIPObjectRepository,
 	stvtObjectRepo repository.ISTVTObjectRepository,
 	tpObjectRepo repository.ITPObjectRepository,
+	objectTeamsRepo repository.IObjectTeamsRepository,
 ) IObjectService {
 	return &objectService{
 		objectRepo:            objectRepo,
@@ -33,6 +35,7 @@ func InitObjectService(
 		sipObjectRepo:         sipObjectRepo,
 		stvtObjectRepo:        stvtObjectRepo,
 		tpObjectRepo:          tpObjectRepo,
+		objectTeamsRepo:       objectTeamsRepo,
 	}
 }
 
@@ -44,6 +47,7 @@ type IObjectService interface {
 	Update(data model.Object) (model.Object, error)
 	Delete(id uint) error
 	Count() (int64, error)
+	GetTeamsByObjectID(objectID uint) ([]model.Team, error)
 }
 
 func (service *objectService) GetAll(projectID uint) ([]model.Object, error) {
@@ -111,11 +115,10 @@ func (service *objectService) Create(data dto.ObjectCreate) (model.Object, error
 		ProjectID:        data.ProjectID,
 	}
 
-  object, err := service.objectRepo.Create(object)
+	object, err := service.objectRepo.Create(object)
 	if err != nil {
 		return model.Object{}, err
 	}
-	
 
 	return object, nil
 }
@@ -130,4 +133,8 @@ func (service *objectService) Delete(id uint) error {
 
 func (service *objectService) Count() (int64, error) {
 	return service.objectRepo.Count()
+}
+
+func(service *objectService) GetTeamsByObjectID(objectID uint) ([]model.Team, error) {
+  return service.objectTeamsRepo.GetTeamsByObjectID(objectID)
 }
