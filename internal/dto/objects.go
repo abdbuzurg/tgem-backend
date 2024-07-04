@@ -40,3 +40,9 @@ type TeamDataForSelect struct {
 	TeamNumber     string `json:"teamNumber"`
 	TeamLeaderName string `json:"teamLeaderName"`
 }
+
+type ObjectDataForSelect struct {
+  ID uint `json:"id"`
+  ObjectName string `json:"objectName"`
+  ObjectType string `json:"objectType"`
+}

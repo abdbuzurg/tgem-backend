@@ -3,9 +3,9 @@ package dto
 import "github.com/shopspring/decimal"
 
 type ReportBalanceFilterRequest struct {
-	Type   string `json:"type"`
-	Team   string `json:"team"`
-	Object string `json:"object"`
+	Type     string `json:"type"`
+	TeamID   uint `json:"teamID"`
+	ObjectID uint `json:"objectID"`
 }
 
 type ReportBalanceFilter struct {

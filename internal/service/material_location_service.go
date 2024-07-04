@@ -17,7 +17,7 @@ type materialLocationService struct {
 	materialLocationRepo  repository.IMaterialLocationRepository
 	materialCostRepo      repository.IMaterialCostRepository
 	teamRepo              repository.ITeamRepository
-  materialRepo          repository.IMaterialRepository
+	materialRepo          repository.IMaterialRepository
 	objectRepo            repository.IObjectRepository
 	materialDefectRepo    repository.IMaterialDefectRepository
 	objectSupervisorsRepo repository.IObjectSupervisorsRepository
@@ -33,12 +33,12 @@ func InitMaterialLocationService(
 	objectSupervisorsRepo repository.IObjectSupervisorsRepository,
 ) IMaterialLocationService {
 	return &materialLocationService{
-		materialLocationRepo: materialLocationRepo,
-		materialCostRepo:     materialCostRepo,
-		materialRepo:         materialRepo,
-		teamRepo:             teamRepo,
-		objectRepo:           objectRepo,
-		materialDefectRepo:   materialDefectRepo,
+		materialLocationRepo:  materialLocationRepo,
+		materialCostRepo:      materialCostRepo,
+		materialRepo:          materialRepo,
+		teamRepo:              teamRepo,
+		objectRepo:            objectRepo,
+		materialDefectRepo:    materialDefectRepo,
 		objectSupervisorsRepo: objectSupervisorsRepo,
 	}
 }
@@ -52,8 +52,8 @@ type IMaterialLocationService interface {
 	Delete(id uint) error
 	Count() (int64, error)
 	GetMaterialsInLocation(locationType string, locationID uint) ([]model.Material, error)
-	UniqueObjects() ([]string, error)
-	UniqueTeams() ([]string, error)
+	UniqueObjects() ([]dto.ObjectDataForSelect, error)
+	UniqueTeams() ([]dto.TeamDataForSelect, error)
 	BalanceReport(projectID uint, data dto.ReportBalanceFilterRequest) (string, error)
 }
 
@@ -126,44 +126,12 @@ func (service *materialLocationService) GetMaterialsInLocation(
 	return result, nil
 }
 
-func (service *materialLocationService) UniqueTeams() ([]string, error) {
-
-	teamIDs, err := service.materialLocationRepo.UniqueTeamIDs()
-	if err != nil {
-		return []string{}, err
-	}
-
-	teams, err := service.teamRepo.GetByRangeOfIDs(teamIDs)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, team := range teams {
-		result = append(result, team.Number)
-	}
-
-	return result, nil
+func (service *materialLocationService) UniqueTeams() ([]dto.TeamDataForSelect, error) {
+	return service.materialLocationRepo.UniqueTeams()
 }
 
-func (service *materialLocationService) UniqueObjects() ([]string, error) {
-
-	objectIDs, err := service.materialLocationRepo.UniqueObjectIDs()
-	if err != nil {
-		return []string{}, err
-	}
-
-	objects, err := service.objectRepo.GetByRangeOfIDs(objectIDs)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, object := range objects {
-		result = append(result, object.Name)
-	}
-
-	return result, err
+func (service *materialLocationService) UniqueObjects() ([]dto.ObjectDataForSelect, error) {
+	return service.materialLocationRepo.UniqueObjects()
 }
 
 func (service *materialLocationService) BalanceReport(projectID uint, data dto.ReportBalanceFilterRequest) (string, error) {
@@ -185,35 +153,31 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 	case "team":
 		f.SetCellValue(sheetName, "I1", "№ Бригады")
 		f.SetCellValue(sheetName, "J1", "Бригадир")
-		if data.Team != "" {
-			team, err := service.teamRepo.GetByNumber(data.Team)
-			if err != nil {
-				return "", err
-			}
-
-			filter.LocationID = team.ID
+		if data.TeamID != 0 {
+			filter.LocationID = data.TeamID
 			break
 		}
 
 		filter.LocationID = 0
 		break
+
 	case "object":
-		f.SetCellValue(sheetName, "I1", "Объект")
-		f.SetCellValue(sheetName, "J1", "Супервайзер")
-		if data.Object != "" {
-			object, err := service.objectRepo.GetByName(data.Object)
-			if err != nil {
-				return "", err
-			}
+		f.SetCellValue(sheetName, "I1", "Супервайзер")
+		f.SetCellValue(sheetName, "J1", "Объект")
+		f.SetCellValue(sheetName, "K1", "Тип Объекта")
 
-			filter.LocationID = object.ID
+		if data.ObjectID != 0 {
+			filter.LocationID = data.ObjectID
 			break
 		}
 
 		filter.LocationID = 0
 		break
+
 	case "warehouse":
 		filter.LocationID = 0
+		break
+
 	default:
 		return "", fmt.Errorf("incorrect type")
 	}
@@ -227,10 +191,12 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 		LocationID        uint
 		LocationName      string
 		LocationOwnerName string
+		LocationType      string
 	}{
 		LocationID:        0,
 		LocationName:      "",
 		LocationOwnerName: "",
+		LocationType:      "",
 	}
 
 	for _, entry := range materialsData {
@@ -269,6 +235,7 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 					return "", fmt.Errorf("Ошибка базы: %v", err)
 				}
 				locationInformation.LocationName = objectData[0].ObjectName
+        locationInformation.LocationType = utils.ObjectTypeConverter(objectData[0].ObjectType)
 
 				for index, entry := range objectData {
 					if index == len(objectData)-1 {
@@ -283,21 +250,22 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 			}
 		}
 
-		f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), entry.MaterialCode)
-		f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), entry.MaterialName)
-		f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), entry.MaterialUnit)
-		f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), entry.TotalAmount)
-		f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), entry.DefectAmount)
+		f.SetCellStr(sheetName, "A"+fmt.Sprint(rowCount), entry.MaterialCode)
+		f.SetCellStr(sheetName, "B"+fmt.Sprint(rowCount), entry.MaterialName)
+		f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), entry.MaterialUnit)
+		f.SetCellFloat(sheetName, "D"+fmt.Sprint(rowCount), entry.TotalAmount, 2, 64)
+		f.SetCellFloat(sheetName, "E"+fmt.Sprint(rowCount), entry.DefectAmount, 2, 64)
 
 		costM19, _ := entry.MaterialCostM19.Float64()
 		totalCost, _ := entry.TotalCost.Float64()
 		totalDefectCost, _ := entry.TotalDefectCost.Float64()
-		f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), costM19)
-		f.SetCellValue(sheetName, "G"+fmt.Sprint(rowCount), totalCost)
-		f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), totalDefectCost)
+		f.SetCellFloat(sheetName, "F"+fmt.Sprint(rowCount), costM19, 2, 64)
+		f.SetCellFloat(sheetName, "G"+fmt.Sprint(rowCount), totalCost, 2, 64)
+		f.SetCellFloat(sheetName, "H"+fmt.Sprint(rowCount), totalDefectCost, 2, 64)
 
-		f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), locationInformation.LocationName)
-		f.SetCellValue(sheetName, "J"+fmt.Sprint(rowCount), locationInformation.LocationOwnerName)
+		f.SetCellStr(sheetName, "I"+fmt.Sprint(rowCount), locationInformation.LocationOwnerName)
+		f.SetCellStr(sheetName, "J"+fmt.Sprint(rowCount), locationInformation.LocationName)
+		f.SetCellStr(sheetName, "K"+fmt.Sprint(rowCount), locationInformation.LocationType)
 
 		rowCount++
 	}
@@ -323,7 +291,7 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 
 	}
 
-  tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
+	tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
 	f.SaveAs(tempFilePath)
 	if err := f.Close(); err != nil {
 		fmt.Println(err)

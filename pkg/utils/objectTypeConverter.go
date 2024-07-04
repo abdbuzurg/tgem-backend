@@ -12,6 +12,8 @@ func ObjectTypeConverter(objectType string) string {
 		return "СИП"
 	case "stvt_objects":
 		return "СТВТ"
+	case "substation_objects":
+		return "Подстанция"
 	default:
 		return "Другое"
 	}

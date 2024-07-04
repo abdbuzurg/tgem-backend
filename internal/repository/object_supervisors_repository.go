@@ -59,6 +59,7 @@ func (repo *objectSupervisorsRepository) GetSupervisorAndObjectNamesByObjectID(p
 	err := repo.db.Raw(`
     SELECT 
       objects.name as object_name,
+      objects.type as object_type,
       workers.name as supervisor_name
     FROM object_supervisors
     INNER JOIN objects ON objects.id = object_supervisors.object_id

@@ -28,8 +28,8 @@ type IMaterialLocationRepository interface {
 	Delete(id uint) error
 	Count() (int64, error)
 	GetUniqueMaterialCostsByLocation(locationType string, locationID uint) ([]uint, error)
-	UniqueObjectIDs() ([]uint, error)
-	UniqueTeamIDs() ([]uint, error)
+	UniqueObjects() ([]dto.ObjectDataForSelect, error)
+	UniqueTeams() ([]dto.TeamDataForSelect, error)
 	GetByLocationTypeAndID(locationType string, locationID uint) ([]model.MaterialLocation, error)
 	GetTotalAmountInWarehouse(projectID, materialID uint) (float64, error)
 	GetUniqueMaterialsFromLocation(projectID, locationID uint, locationType string) ([]model.Material, error)
@@ -125,15 +125,39 @@ func (repo *materialLocationRepository) GetUniqueMaterialCostsByLocation(
 	return data, err
 }
 
-func (repo *materialLocationRepository) UniqueObjectIDs() ([]uint, error) {
-	var data []uint
-	err := repo.db.Raw("SELECT DISTINCT(location_id) FROM material_locations WHERE location_type='object'").Scan(&data).Error
+func (repo *materialLocationRepository) UniqueObjects() ([]dto.ObjectDataForSelect, error) {
+  data := []dto.ObjectDataForSelect{}
+	err := repo.db.Raw(`
+    SELECT 
+      objects.id as id,
+      objects.name as object_name,
+      objects.type as object_type
+    FROM objects
+    WHERE objects.id IN (
+      SELECT DISTINCT(location_id)
+      FROM material_locations
+      WHERE location_type='object' AND amount > 0
+    )
+    `).Scan(&data).Error
 	return data, err
 }
 
-func (repo *materialLocationRepository) UniqueTeamIDs() ([]uint, error) {
-	var data []uint
-	err := repo.db.Raw("SELECT DISTINCT(location_id) FROM material_locations WHERE location_type='team' AND amount > 0").Scan(&data).Error
+func (repo *materialLocationRepository) UniqueTeams() ([]dto.TeamDataForSelect, error) {
+  data := []dto.TeamDataForSelect{}
+	err := repo.db.Raw(`
+      SELECT 
+        teams.id,
+        teams.number as team_number,
+        workers.name as team_leader_name
+      FROM teams
+      INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+      INNER JOIN workers ON team_leaders.leader_worker_id = workers.id
+      WHERE teams.id IN (
+        SELECT DISTINCT(location_id)
+        FROM material_locations
+        WHERE location_type='team' AND amount > 0
+      )
+    `).Scan(&data).Error
 	return data, err
 }
 
