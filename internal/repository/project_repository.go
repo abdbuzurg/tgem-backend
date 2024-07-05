@@ -35,7 +35,7 @@ func (repo *projectRepository) GetAll() ([]model.Project, error) {
 
 func (repo *projectRepository) GetPaginated(page, limit int) ([]model.Project, error) {
 	data := []model.Project{}
-	err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data).Error
+	err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data, "name <> 'Администрирование'").Error
 	return data, err
 }
 
@@ -87,7 +87,18 @@ func (repo *projectRepository) Update(data model.Project) (model.Project, error)
 }
 
 func (repo *projectRepository) Delete(id uint) error {
-	return repo.db.Delete(&model.Project{}, "id = ?", id).Error
+  err := repo.db.Transaction(func(tx *gorm.DB) error {
+    if err := repo.db.Delete(&model.UserInProject{}, "project_id = ?", id).Error; err != nil {
+      return err
+    } 
+
+    if err := repo.db.Delete(&model.Project{}, "id = ?", id).Error; err != nil {
+      return nil
+    }
+
+    return nil
+  })
+	return err
 }
 
 func (repo *projectRepository) Count() (int64, error) {
