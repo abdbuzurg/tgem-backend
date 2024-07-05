@@ -3,7 +3,6 @@ package service
 import (
 	"backend-v2/internal/repository"
 	"backend-v2/model"
-	"backend-v2/pkg/utils"
 )
 
 type projectService struct {
@@ -18,7 +17,7 @@ func InitProjectService(projectRepo repository.IProjectRepository) IProjectServi
 
 type IProjectService interface {
 	GetAll() ([]model.Project, error)
-	GetPaginated(page, limit int, data model.Project) ([]model.Project, error)
+	GetPaginated(page, limit int) ([]model.Project, error)
 	GetByID(id uint) (model.Project, error)
 	Create(data model.Project) (model.Project, error)
 	Update(data model.Project) (model.Project, error)
@@ -30,11 +29,7 @@ func (service *projectService) GetAll() ([]model.Project, error) {
 	return service.projectRepo.GetAll()
 }
 
-func (service *projectService) GetPaginated(page, limit int, data model.Project) ([]model.Project, error) {
-	if !(utils.IsEmptyFields(data)) {
-		return service.projectRepo.GetPaginatedFiltered(page, limit, data)
-	}
-
+func (service *projectService) GetPaginated(page, limit int) ([]model.Project, error) {
 	return service.projectRepo.GetPaginated(page, limit)
 }
 

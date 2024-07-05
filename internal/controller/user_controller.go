@@ -170,13 +170,13 @@ func (controller *userController) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := controller.userService.Login(data)
+	result, err := controller.userService.Login(data)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not perform login operation: %v", err))
 		return
 	}
 
-	response.ResponseSuccess(c, token)
+	response.ResponseSuccess(c, result)
 }
 
 func (controller *userController) IsAuthenticated(c *gin.Context) {

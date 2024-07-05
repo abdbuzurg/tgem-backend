@@ -5,11 +5,9 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/response"
 	"fmt"
-	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 )
 
 type projectController struct {
@@ -56,42 +54,7 @@ func (controller *projectController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	name := c.DefaultQuery("name", "")
-	name, err = url.QueryUnescape(name)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for name: %v", err))
-		return
-	}
-
-	client := c.DefaultQuery("client", "")
-	client, err = url.QueryUnescape(client)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for client: %v", err))
-		return
-	}
-
-	budgetStr := c.DefaultQuery("budget", "")
-	budget, err := decimal.NewFromString(budgetStr)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Cannot get the budget parameter: %v", err))
-		return
-	}
-
-	description := c.DefaultQuery("description", "")
-	description, err = url.QueryUnescape(description)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for description: %v", err))
-		return
-	}
-
-	filter := model.Project{
-		Name:        name,
-		Client:      client,
-		Budget:      budget,
-		Description: description,
-	}
-
-	data, err := controller.projectService.GetPaginated(page, limit, filter)
+	data, err := controller.projectService.GetPaginated(page, limit)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of Project: %v", err))
 		return

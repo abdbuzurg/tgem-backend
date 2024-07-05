@@ -190,6 +190,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		workerRepo,
 		roleRepo,
 		userInProjects,
+    projectRepo,
 	)
 	workerService := service.InitWorkerService(workerRepo)
 	districtService := service.InitDistrictService(districtRepo)
@@ -366,6 +367,10 @@ func InitInvoiceInputRoutes(router *gin.RouterGroup, controller controller.IInvo
 func InitProjectRoutes(router *gin.RouterGroup, controller controller.IProjectController) {
 	projectRoutes := router.Group("/project")
 	projectRoutes.GET("/all", controller.GetAll)
+  projectRoutes.GET("/paginated", controller.GetPaginated)
+  projectRoutes.POST("/", controller.Create)
+  projectRoutes.PATCH("/", controller.Update)
+  projectRoutes.DELETE("/:id", controller.Delete)
 }
 
 func InitMaterialLocationRoutes(router *gin.RouterGroup, controller controller.IMaterialLocationController) {

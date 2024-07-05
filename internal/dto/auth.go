@@ -5,3 +5,8 @@ type LoginData struct {
 	Password string `json:"password"`
   ProjectID uint `json:"projectID"`
 }
+
+type LoginResponse struct {
+  Token string `json:"token"`
+  Admin bool `json:"admin"`
+}

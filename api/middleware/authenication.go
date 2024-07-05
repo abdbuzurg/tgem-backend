@@ -13,21 +13,21 @@ func Authentication() gin.HandlerFunc {
 
 		authHeader := c.GetHeader("Authorization")
 		if len(authHeader) == 0 {
-			response.ResponseError(c, "not authenticated based on first-level check")
+      response.ResponseError(c, "Ошибка идентификации: вы не являетесь пользователем")
 			c.Abort()
 			return
 		}
 
 		fields := strings.Fields(authHeader)
 		if len(fields) < 2 {
-			response.ResponseError(c, "not authenticated based on second-level check")
+      response.ResponseError(c, "Ошибка идентификации: неправильные учетные данные")
 			c.Abort()
 			return
 		}
 
 		authType := strings.ToLower(fields[0])
 		if authType != "bearer" {
-			response.ResponseError(c, "not authenticated based on third-level check")
+      response.ResponseError(c, "Ошибка идентификации: неправильная аутентификация")
 			c.Abort()
 			return
 		}
@@ -35,7 +35,7 @@ func Authentication() gin.HandlerFunc {
 		accessToken := fields[1]
 		payload, err := jwt.VerifyToken(accessToken)
 		if err != nil {
-			response.ResponseError(c, "not authenticated based on forth-level check")
+      response.ResponseError(c, "Ошибка идентификации: ключ аутентификации недействителен или срок действия ключа истек. Выполните вход в систему заново.")
 			c.Abort()
 			return
 		}

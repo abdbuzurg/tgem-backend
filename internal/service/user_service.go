@@ -19,6 +19,7 @@ type userService struct {
   workerRepo repository.IWorkerRepository
   roleRepo repository.IRoleRepository
   userInProjects repository.IUserInProjectRepository
+  projectRepo repository.IProjectRepository
 }
 
 func InitUserService(
@@ -27,6 +28,7 @@ func InitUserService(
   workerRepo repository.IWorkerRepository,
   roleRepo repository.IRoleRepository,
   userInProjects repository.IUserInProjectRepository,
+  projectRepo repository.IProjectRepository,
 ) IUserService {
 	return &userService{
 		userRepo: userRepo,
@@ -34,6 +36,7 @@ func InitUserService(
     workerRepo: workerRepo,
     roleRepo: roleRepo,
     userInProjects: userInProjectRepo,
+    projectRepo: projectRepo,
 	}
 }
 
@@ -45,7 +48,7 @@ type IUserService interface {
 	Update(data model.User) (model.User, error)
 	Delete(id uint) error
 	Count() (int64, error)
-	Login(data dto.LoginData) (string, error)
+	Login(data dto.LoginData) (dto.LoginResponse, error)
 }
 
 func (service *userService) GetAll() ([]model.User, error) {
@@ -126,23 +129,23 @@ func (service *userService) Count() (int64, error) {
 	return service.userRepo.Count()
 }
 
-func (service *userService) Login(data dto.LoginData) (string, error) {
+func (service *userService) Login(data dto.LoginData) (dto.LoginResponse, error) {
 	user, err := service.userRepo.GetByUsername(data.Username)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", fmt.Errorf("Неправильное имя пользователя")
+		return dto.LoginResponse{}, fmt.Errorf("Неправильное имя пользователя")
 	}
 	if err != nil {
-		return "", err
+		return dto.LoginResponse{}, err
 	}
 
 	err = security.VerifyPassword(user.Password, data.Password)
 	if err != nil {
-		return "", fmt.Errorf("Неправильный пароль")
+		return dto.LoginResponse{}, fmt.Errorf("Неправильный пароль")
 	}
 
   userInProjects, err := service.userInProjectRepo.GetByUserID(user.ID)
   if err != nil {
-    return "", fmt.Errorf("У вас нету доступа в выбранный проект")
+    return dto.LoginResponse{}, fmt.Errorf("У вас нету доступа в выбранный проект")
   }
   
   access := false
@@ -154,13 +157,28 @@ func (service *userService) Login(data dto.LoginData) (string, error) {
   }
 
   if (!access) {
-    return "", fmt.Errorf("У вас нету доступа в выбранный проект")
+    return dto.LoginResponse{}, fmt.Errorf("У вас нету доступа в выбранный проект")
+  }
+
+  result := dto.LoginResponse{
+    Admin: false,
   }
 
 	token, err := jwt.CreateToken(user.ID, user.WorkerID, user.RoleID, data.ProjectID)
 	if err != nil {
-		return "", err
+		return dto.LoginResponse{}, err
 	}
 
-	return token, nil
+  result.Token = token
+
+  project, err := service.projectRepo.GetByID(data.ProjectID)
+  if err != nil {
+    return dto.LoginResponse{}, err
+  }
+
+  if project.Name == "Администрирование" {
+    result.Admin = true
+  }
+
+	return result, nil
 }

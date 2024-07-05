@@ -13,14 +13,22 @@ import (
 func Permission(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
+		// var data dto.APIRequestFormat[interface{}]
+		// if err := c.ShouldBindJSON(&data); err != nil {
+		// 	response.ResponseError(c, fmt.Sprintf("Incorrect data recieved by server: %v", err))
+		// 	return
+		// }
+
+  //   fmt.Println(data)
+
 		roleID := c.GetUint("roleID")
 
 		path := c.Request.URL.Path
 		splittedpath := strings.Split(path, "/")
 		resourceUrl := "/" + splittedpath[2]
 
-    fmt.Println(splittedpath)
-    fmt.Println(resourceUrl)
+		fmt.Println(splittedpath)
+		fmt.Println(resourceUrl)
 
 		var permission model.Permission
 		err := db.Raw(`
@@ -41,7 +49,7 @@ func Permission(db *gorm.DB) gin.HandlerFunc {
 			Scan(&permission).
 			Error
 		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
+			response.ResponseError(c, fmt.Sprintf("Доступ запрещен: ошибка базы"))
 			c.Abort()
 			return
 		}
@@ -49,25 +57,25 @@ func Permission(db *gorm.DB) gin.HandlerFunc {
 		requestMethod := c.Request.Method
 
 		if requestMethod == "GET" && !permission.R {
-			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
+			response.ResponseError(c, fmt.Sprintf("Доступ запрещен для извлечение данных"))
 			c.Abort()
 			return
 		}
 
 		if requestMethod == "POST" && !permission.W {
-			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
+			response.ResponseError(c, fmt.Sprintf("Доступ запрещен для добавление данных"))
 			c.Abort()
 			return
 		}
 
 		if requestMethod == "PATCH" && !permission.U {
-			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
+			response.ResponseError(c, fmt.Sprintf("Доступ запрещен для изменение данных"))
 			c.Abort()
 			return
 		}
 
 		if requestMethod == "DELETE" && !permission.D {
-			response.ResponseError(c, fmt.Sprintf("Доступ запрещен"))
+			response.ResponseError(c, fmt.Sprintf("Доступ запрещен для удаление данных"))
 			c.Abort()
 			return
 		}

@@ -61,7 +61,23 @@ func (repo *projectRepository) GetByID(id uint) (model.Project, error) {
 }
 
 func (repo *projectRepository) Create(data model.Project) (model.Project, error) {
-	err := repo.db.Create(&data).Error
+
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		err := repo.db.Create(&data).Error
+    if err != nil {
+      return err
+    }
+
+    err = repo.db.Create(&model.UserInProject{
+      UserID: 1,
+      ProjectID: data.ID,
+    }).Error
+    if err != nil {
+      return err
+    }
+
+    return nil
+	})
 	return data, err
 }
 
