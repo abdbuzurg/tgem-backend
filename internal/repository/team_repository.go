@@ -29,8 +29,8 @@ type ITeamRepository interface {
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
 	GetTeamNumberAndTeamLeadersByID(projectID, id uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error)
-	DoesTeamNumberAlreadyExistForCreate(teamNumber string) (bool, error)
-	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint) (bool, error)
+	DoesTeamNumberAlreadyExistForCreate(teamNumber string, projectID uint) (bool, error)
+	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error)
 	GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error)
 }
 
@@ -229,24 +229,24 @@ func (repo *teamRepository) GetTeamNumberAndTeamLeadersByID(projectID, id uint) 
 	return data, err
 }
 
-func (repo *teamRepository) DoesTeamNumberAlreadyExistForCreate(teamNumber string) (bool, error) {
+func (repo *teamRepository) DoesTeamNumberAlreadyExistForCreate(teamNumber string, projectID uint) (bool, error) {
 	result := false
 	err := repo.db.Raw(`
     SELECT true
     FROM teams
-    WHERE teams.number = ?;
-    `, teamNumber).Scan(&result).Error
+    WHERE teams.number = ? AND teams.project_id = ?;
+    `, teamNumber, projectID).Scan(&result).Error
 
 	return result, err
 }
 
-func (repo *teamRepository) DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint) (bool, error) {
+func (repo *teamRepository) DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error) {
 	result := false
 	err := repo.db.Raw(`
     SELECT true
     FROM teams
-    WHERE teams.number = ? AND teams.id <> ?;
-    `, teamNumber, id).Scan(&result).Error
+    WHERE teams.number = ? AND teams.id <> ? AND teams.project_id = ?;
+    `, teamNumber, id, projectID).Scan(&result).Error
 
 	return result, err
 }

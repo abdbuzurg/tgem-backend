@@ -172,7 +172,7 @@ func (controller *userController) Login(c *gin.Context) {
 
 	result, err := controller.userService.Login(data)
 	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Could not perform login operation: %v", err))
+		response.ResponseError(c, fmt.Sprintf("Ошибка при входе: %v", err))
 		return
 	}
 

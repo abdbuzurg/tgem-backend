@@ -267,7 +267,7 @@ func (repo *materialLocationRepository) GetTotalAmountInLocation(
 	projectID, materialID, locationID uint,
 	locationType string,
 ) (float64, error) {
-	var data float64
+  data := float64(0)
 	err := repo.db.Raw(`
       SELECT SUM(material_locations.amount)
       FROM materials

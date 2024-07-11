@@ -34,7 +34,8 @@ type IMaterialController interface {
 }
 
 func (controller *materialController) GetAll(c *gin.Context) {
-	data, err := controller.materialService.GetAll()
+  projectID := c.GetUint("projectID")
+	data, err := controller.materialService.GetAll(projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get Material data: %v", err))
 		return

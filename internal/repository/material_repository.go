@@ -17,7 +17,7 @@ func InitMaterialRepository(db *gorm.DB) IMaterialRepository {
 }
 
 type IMaterialRepository interface {
-	GetAll() ([]model.Material, error)
+	GetAll(projectID uint) ([]model.Material, error)
 	GetPaginated(page, limit int) ([]model.Material, error)
 	GetPaginatedFiltered(page, limit int, filter model.Material) ([]model.Material, error)
 	GetByID(id uint) (model.Material, error)
@@ -28,9 +28,9 @@ type IMaterialRepository interface {
 	Count() (int64, error)
 }
 
-func (repo *materialRepository) GetAll() ([]model.Material, error) {
+func (repo *materialRepository) GetAll(projectID uint) ([]model.Material, error) {
 	data := []model.Material{}
-	err := repo.db.Order("id desc").Find(&data).Error
+	err := repo.db.Order("id desc").Find(&data, "project_id = ?", projectID).Error
 	return data, err
 }
 

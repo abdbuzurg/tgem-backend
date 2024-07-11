@@ -105,7 +105,7 @@ func (controller *teamController) Create(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	createData.ProjectID = projectID
 
-	exist, err := controller.teamService.DoesTeamNumberAlreadyExistForCreate(createData.Number)
+	exist, err := controller.teamService.DoesTeamNumberAlreadyExistForCreate(createData.Number, createData.ProjectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not perform team number check-up: %v", err))
 		return
@@ -136,7 +136,7 @@ func (controller *teamController) Update(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	updateData.ProjectID = projectID
 
-	exist, err := controller.teamService.DoesTeamNumberAlreadyExistForUpdate(updateData.Number, updateData.ID)
+	exist, err := controller.teamService.DoesTeamNumberAlreadyExistForUpdate(updateData.Number, updateData.ID, projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not perform team number check-up: %v", err))
 		return

@@ -39,8 +39,8 @@ type ITeamService interface {
 	Count(projectID uint) (int64, error)
 	TemplateFile(projectID uint, filepath string) error
 	Import(projectID uint, filepath string) error
-	DoesTeamNumberAlreadyExistForCreate(teamNumber string) (bool, error)
-	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint) (bool, error)
+	DoesTeamNumberAlreadyExistForCreate(teamNumber string, projectID uint) (bool, error)
+	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error)
 	GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error)
 }
 
@@ -253,12 +253,12 @@ func (service *teamService) Import(projectID uint, filepath string) error {
 	return nil
 }
 
-func (service *teamService) DoesTeamNumberAlreadyExistForCreate(teamNumber string) (bool, error) {
-	return service.teamRepo.DoesTeamNumberAlreadyExistForCreate(teamNumber)
+func (service *teamService) DoesTeamNumberAlreadyExistForCreate(teamNumber string, projectID uint) (bool, error) {
+	return service.teamRepo.DoesTeamNumberAlreadyExistForCreate(teamNumber, projectID)
 }
 
-func (service *teamService) DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint) (bool, error) {
-	return service.teamRepo.DoesTeamNumberAlreadyExistForUpdate(teamNumber, id)
+func (service *teamService) DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error) {
+	return service.teamRepo.DoesTeamNumberAlreadyExistForUpdate(teamNumber, id,projectID)
 }
 
 func (service *teamService) GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error) {

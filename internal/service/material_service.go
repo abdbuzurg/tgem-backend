@@ -21,7 +21,7 @@ func InitMaterialService(materialRepo repository.IMaterialRepository) IMaterialS
 }
 
 type IMaterialService interface {
-	GetAll() ([]model.Material, error)
+	GetAll(projectID uint) ([]model.Material, error)
 	GetPaginated(page, limit int, data model.Material) ([]model.Material, error)
 	GetByID(id uint) (model.Material, error)
 	Create(data model.Material) (model.Material, error)
@@ -31,8 +31,8 @@ type IMaterialService interface {
 	Import(projectID uint, filepath string) error
 }
 
-func (service *materialService) GetAll() ([]model.Material, error) {
-	return service.materialRepo.GetAll()
+func (service *materialService) GetAll(projectID uint) ([]model.Material, error) {
+	return service.materialRepo.GetAll(projectID)
 }
 
 func (service *materialService) GetPaginated(page, limit int, data model.Material) ([]model.Material, error) {
