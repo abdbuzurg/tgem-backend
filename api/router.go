@@ -328,7 +328,6 @@ func InitInvoiceOutputRoutes(router *gin.RouterGroup, controller controller.IInv
 	invoiceOutputRoutes.GET("/unique/code", controller.UniqueCode)
 	invoiceOutputRoutes.GET("/unique/recieved", controller.UniqueRecieved)
 	invoiceOutputRoutes.GET("/unique/warehouse-manager", controller.UniqueRecieved)
-	invoiceOutputRoutes.GET("/unique/object", controller.UniqueObject)
 	invoiceOutputRoutes.GET("/unique/team", controller.UniqueTeam)
 	invoiceOutputRoutes.GET("/document/:deliveryCode", controller.GetDocument)
 	invoiceOutputRoutes.GET("/material/available-in-warehouse", controller.GetAvailableMaterialsInWarehouse)
@@ -336,9 +335,11 @@ func InitInvoiceOutputRoutes(router *gin.RouterGroup, controller controller.IInv
 	invoiceOutputRoutes.GET("/serial-number/material/:materialID", controller.GetCodesByMaterialID)
 	invoiceOutputRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumbers)
 	invoiceOutputRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
+  invoiceOutputRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
 	invoiceOutputRoutes.POST("/report", controller.Report)
 	invoiceOutputRoutes.POST("/confirm/:id", controller.Confirmation)
 	invoiceOutputRoutes.POST("/", controller.Create)
+  invoiceOutputRoutes.PATCH("/", controller.Update)
 	invoiceOutputRoutes.DELETE("/:id", controller.Delete)
 }
 
@@ -356,11 +357,13 @@ func InitInvoiceInputRoutes(router *gin.RouterGroup, controller controller.IInvo
 	invoiceInputRoutes.GET("/document/:deliveryCode", controller.GetDocument)
 	invoiceInputRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumbers)
 	invoiceInputRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
+  invoiceInputRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
 	invoiceInputRoutes.POST("/", controller.Create)
 	invoiceInputRoutes.POST("/report", controller.Report)
 	invoiceInputRoutes.POST("/confirm/:id", controller.Confirmation)
 	invoiceInputRoutes.POST("/material/new", controller.NewMaterial)
 	invoiceInputRoutes.POST("/material-cost/new", controller.NewMaterialCost)
+  invoiceInputRoutes.PATCH("/", controller.Update)
 	invoiceInputRoutes.DELETE("/:id", controller.Delete)
 }
 
@@ -426,6 +429,7 @@ func InitTeamRoutes(router *gin.RouterGroup, controller controller.ITeamControll
 		middleware.Authentication(),
 	)
 	teamRoutes.GET("/all", controller.GetAll)
+  teamRoutes.GET("/all/for-select", controller.GetAllForSelect)
 	teamRoutes.GET("/paginated", controller.GetPaginated)
 	teamRoutes.GET("/:id", controller.GetByID)
 	teamRoutes.GET("/document/template", controller.GetTemplateFile)

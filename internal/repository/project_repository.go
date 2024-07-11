@@ -82,7 +82,7 @@ func (repo *projectRepository) Create(data model.Project) (model.Project, error)
 }
 
 func (repo *projectRepository) Update(data model.Project) (model.Project, error) {
-	err := repo.db.Model(&model.Project{}).Select("*").Updates(&data).Error
+	err := repo.db.Model(&model.Project{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
 	return data, err
 }
 

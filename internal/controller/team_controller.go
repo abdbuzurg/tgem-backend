@@ -30,6 +30,7 @@ type ITeamController interface {
 	Delete(c *gin.Context)
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
+  GetAllForSelect(c *gin.Context)
 }
 
 func (controller *teamController) GetAll(c *gin.Context) {
@@ -208,4 +209,16 @@ func (controller *teamController) Import(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, true)
+}
+
+func (controller *teamController) GetAllForSelect(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+
+	data, err := controller.teamService.GetAllForSelect(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not get Team data: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

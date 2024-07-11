@@ -11,6 +11,7 @@ type Project struct {
 	Name                 string          `json:"name" gorm:"tinyText"`
 	Client               string          `json:"client" gorm:"tinyText"`
 	Budget               decimal.Decimal `json:"budget" gorm:"type:decimal(20,2)"`
+	BudgetCurrency       string          `json:"budgetCurrency"`
 	Description          string          `json:"description"`
 	SignedDateOfContract time.Time       `json:"signedDateOfContract"`
 	DateStart            time.Time       `json:"dateStart"`

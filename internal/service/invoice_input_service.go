@@ -53,7 +53,7 @@ type IInvoiceInputService interface {
 	GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error)
 	GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error)
 	Create(data dto.InvoiceInput) (model.InvoiceInput, error)
-	// Update(data dto.InvoiceInput) (dto.InvoiceInput, error)
+	Update(data dto.InvoiceInput) (model.InvoiceInput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
 	Confirmation(id, projectID uint) error
@@ -63,6 +63,7 @@ type IInvoiceInputService interface {
 	Report(filter dto.InvoiceInputReportFilterRequest, projectID uint) (string, error)
 	NewMaterialCost(data model.MaterialCost) error
 	NewMaterialAndItsCost(data dto.NewMaterialDataFromInvoiceInput) error
+	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
 }
 
 func (service *invoiceInputService) GetAll() ([]model.InvoiceInput, error) {
@@ -190,43 +191,53 @@ func (service *invoiceInputService) Create(data dto.InvoiceInput) (model.Invoice
 	return invoiceInput, nil
 }
 
-// func (service *invoiceInputService) Update(data dto.InvoiceInput) (dto.InvoiceInput, error) {
-// 	data.Details.DateOfEdit = time.Now()
-// 	_, err := service.invoiceInputRepo.Update(data.Details)
-// 	if err != nil {
-// 		return dto.InvoiceInput{}, err
-// 	}
-//
-// 	previousInvoiceMaterials, err := service.invoiceMaterialRepo.GetByInvoice(data.Details.ID, "input")
-// 	if err != nil {
-// 		return dto.InvoiceInput{}, err
-// 	}
-//
-// 	indexesOfOldInvoiceMaterials, commonInvoiceMaterials, toBeAddedInvoiceMaterials, toBeDeletedInvoiceMaterials := utils.InvoiceMaterailsDevider(data.Items, previousInvoiceMaterials)
-// 	for index, invoiceMaterial := range commonInvoiceMaterials {
-// 		invoiceMaterial.ID = uint(indexesOfOldInvoiceMaterials[index])
-// 		invoiceMaterial, err = service.invoiceMaterialRepo.Update(invoiceMaterial)
-// 		if err != nil {
-// 			return dto.InvoiceInput{}, err
-// 		}
-// 	}
-//
-// 	for _, invoiceMaterial := range toBeAddedInvoiceMaterials {
-// 		_, err := service.invoiceMaterialRepo.Create(invoiceMaterial)
-// 		if err != nil {
-// 			return dto.InvoiceInput{}, err
-// 		}
-// 	}
-//
-// 	for _, invoiceMaterial := range toBeDeletedInvoiceMaterials {
-// 		err := service.invoiceMaterialRepo.Delete(invoiceMaterial.ID)
-// 		if err != nil {
-// 			return dto.InvoiceInput{}, err
-// 		}
-// 	}
-//
-// 	return data, nil
-// }
+func (service *invoiceInputService) Update(data dto.InvoiceInput) (model.InvoiceInput, error) {
+	var invoiceMaterials []model.InvoiceMaterials
+	var serialNumbers []model.SerialNumber
+	var serialNumberMovements []model.SerialNumberMovement
+	for _, item := range data.Items {
+		invoiceMaterials = append(invoiceMaterials, model.InvoiceMaterials{
+			ProjectID:      data.Details.ProjectID,
+			MaterialCostID: item.MaterialData.MaterialCostID,
+			IsDefected:     item.MaterialData.IsDefected,
+			InvoiceType:    "input",
+			Amount:         item.MaterialData.Amount,
+			Notes:          item.MaterialData.Notes,
+		})
+
+		if len(item.SerialNumbers) == 0 {
+			continue
+		}
+
+		for _, serialNumber := range item.SerialNumbers {
+			serialNumbers = append(serialNumbers, model.SerialNumber{
+				Code:           serialNumber,
+				ProjectID:      data.Details.ProjectID,
+				MaterialCostID: item.MaterialData.MaterialCostID,
+			})
+
+			serialNumberMovements = append(serialNumberMovements, model.SerialNumberMovement{
+				ProjectID:    data.Details.ProjectID,
+				InvoiceType:  "input",
+				IsDefected:   false,
+				Confirmation: false,
+			})
+		}
+
+	}
+
+	invoiceInput, err := service.invoiceInputRepo.Update(dto.InvoiceInputCreateQueryData{
+		InvoiceData:          data.Details,
+		InvoiceMaterials:     invoiceMaterials,
+		SerialNumbers:        serialNumbers,
+		SerialNumberMovement: serialNumberMovements,
+	})
+	if err != nil {
+		return model.InvoiceInput{}, err
+	}
+
+	return invoiceInput, nil
+}
 
 func (service *invoiceInputService) Delete(id uint) error {
 	return service.invoiceInputRepo.Delete(id)
@@ -438,7 +449,7 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 	}
 
 	currentTime := time.Now()
-  fileName := fmt.Sprintf(
+	fileName := fmt.Sprintf(
 		"Отсчет накладной приход - %s.xlsx",
 		currentTime.Format("02-01-2006"),
 	)
@@ -481,4 +492,8 @@ func (service *invoiceInputService) NewMaterialAndItsCost(data dto.NewMaterialDa
 	})
 
 	return err
+}
+
+func (service *invoiceInputService) GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error) {
+	return service.invoiceInputRepo.GetMaterialsForEdit(id)
 }

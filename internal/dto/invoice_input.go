@@ -35,10 +35,10 @@ type InvoiceInputCreateQueryData struct {
 }
 
 type InvoiceInputConfirmationQueryData struct {
-  InvoiceData model.InvoiceInput
-  ToBeUpdatedMaterials []model.MaterialLocation
-  ToBeCreatedMaterials []model.MaterialLocation
-  SerialNumbers []model.SerialNumberLocation
+	InvoiceData          model.InvoiceInput
+	ToBeUpdatedMaterials []model.MaterialLocation
+	ToBeCreatedMaterials []model.MaterialLocation
+	SerialNumbers        []model.SerialNumberLocation
 }
 
 type InvoiceInputReportFilterRequest struct {
@@ -69,4 +69,16 @@ type NewMaterialDataFromInvoiceInput struct {
 	CostPrime        decimal.Decimal `json:"costPrime" gorm:"type:decimal(20,4)"`
 	CostM19          decimal.Decimal `json:"costM19" gorm:"type:decimal(20,4)"`
 	CostWithCustomer decimal.Decimal `json:"costWithCustomer" gorm:"type:decimal(20,4)"`
+}
+
+type InvoiceInputMaterialForEdit struct {
+	MaterialID      uint            `json:"materialID"`
+	MaterialName    string          `json:"materialName"`
+	Unit            string          `json:"unit"`
+	Amount          float64         `json:"amount"`
+	MaterialCostID  uint            `json:"materialCostID"`
+	MaterialCost    float64 `json:"materialCost"`
+	Notes           string          `json:"notes"`
+	HasSerialNumber bool            `json:"hasSerialNumber"`
+	SerialNumbers   []string        `json:"serialNumbers"`
 }

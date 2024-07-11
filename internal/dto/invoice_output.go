@@ -13,7 +13,6 @@ type InvoiceOutputPaginated struct {
 	ReleasedName         string    `json:"releasedName"`
 	RecipientName        string    `json:"recipientName"`
 	TeamName             string    `json:"teamName"`
-	ObjectName           string    `json:"objectName"`
 	DistrictName         string    `json:"districtName"`
 	DeliveryCode         string    `json:"deliveryCode"`
 	Notes                string    `json:"notes"`
@@ -41,15 +40,15 @@ type InvoiceObject struct {
 }
 
 type InvoiceOutputCreateQueryData struct {
-	Invoice                       model.InvoiceOutput
-	InvoiceMaterials              []model.InvoiceMaterials
-	SerialNumberMovements         []model.SerialNumberMovement
+	Invoice               model.InvoiceOutput
+	InvoiceMaterials      []model.InvoiceMaterials
+	SerialNumberMovements []model.SerialNumberMovement
 }
 
 type InvoiceOutputConfirmationQueryData struct {
-  InvoiceData model.InvoiceOutput
-  WarehouseMaterials []model.MaterialLocation
-  TeamMaterials []model.MaterialLocation
+	InvoiceData        model.InvoiceOutput
+	WarehouseMaterials []model.MaterialLocation
+	TeamMaterials      []model.MaterialLocation
 }
 
 type InvoiceOutputReportFilterRequest struct {
@@ -68,7 +67,6 @@ type InvoiceOutputReportFilter struct {
 	Code               string
 	WarehouseManagerID uint
 	ReceivedID         uint
-	ObjectID           uint
 	TeamID             uint
 	DistrictID         uint
 	DateFrom           time.Time
@@ -97,15 +95,43 @@ type MaterialCostIDAndSNLocationIDQueryResult struct {
 }
 
 type InvoiceOutputDataForExcelQueryResult struct {
-  ID uint
-  ProjectName string
-  DeliveryCode string
-  DistrictName string
-  ObjectType string
-  ObjectName string
-  TeamLeaderName string
-  WarehouseManagerName string
-  ReleasedName string
-  RecipientName string
-  DateOfInvoice time.Time
+	ID                   uint
+	ProjectName          string
+	DeliveryCode         string
+	DistrictName         string
+	ObjectType           string
+	ObjectName           string
+	TeamLeaderName       string
+	WarehouseManagerName string
+	ReleasedName         string
+	RecipientName        string
+	DateOfInvoice        time.Time
+}
+
+type InvoiceOutputMaterialsForEdit struct {
+	MaterialID      uint     `json:"materialID"`
+	MaterialName    string   `json:"materialName"`
+	Unit            string   `json:"unit"`
+	WarehouseAmount float64  `json:"warehouseAmount"`
+	Amount          float64  `json:"amount"`
+	Notes           string   `json:"notes"`
+	HasSerialNumber bool     `json:"hasSerialNumber"`
+	SerialNumbers   []string `json:"serialNumbers"`
+}
+
+type InvoiceOutputDataForReport struct {
+	ID                   uint      `json:"id"`
+	DeliveryCode         string    `json:"deliveryCode"`
+	WarehouseManagerName string    `json:"warehouseManagerName"`
+	RecipientName        string    `json:"recipientName"`
+	TeamNumber           string    `json:"teamNumber"`
+	DateOfInvoice        time.Time `json:"dateOfInvoice"`
+}
+
+type InvoiceOutputMaterialDataForReport struct {
+  MaterialName string
+  MaterialUnit string
+  MaterialCostM19 decimal.Decimal
+  Notes string
+  Amount float64
 }

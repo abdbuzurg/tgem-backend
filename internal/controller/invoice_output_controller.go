@@ -6,7 +6,6 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/response"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,7 +28,7 @@ type IInvoiceOutputController interface {
 	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	Create(c *gin.Context)
-	// Update(c *gin.Context)
+	Update(c *gin.Context)
 	Delete(c *gin.Context)
 	GetDocument(c *gin.Context)
 	GetInvoiceMaterialsWithoutSerialNumbers(c *gin.Context)
@@ -39,12 +38,12 @@ type IInvoiceOutputController interface {
 	UniqueWarehouseManager(c *gin.Context)
 	UniqueRecieved(c *gin.Context)
 	UniqueDistrict(c *gin.Context)
-	UniqueObject(c *gin.Context)
 	UniqueTeam(c *gin.Context)
 	Report(c *gin.Context)
 	GetTotalAmountInWarehouse(c *gin.Context)
 	GetCodesByMaterialID(c *gin.Context)
 	GetAvailableMaterialsInWarehouse(c *gin.Context)
+	GetMaterialsForEdit(c *gin.Context)
 }
 
 func (controller *invoiceOutputController) GetAll(c *gin.Context) {
@@ -72,83 +71,9 @@ func (controller *invoiceOutputController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	districtIDStr := c.DefaultQuery("districtID", "")
-	districtID := 0
-	if districtIDStr != "" {
-		districtID, err = strconv.Atoi(districtIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode invoiceCo parameter: %v", err))
-			return
-		}
-	}
-
-	warehouseManagerWorkerIDStr := c.DefaultQuery("warehouseManagerWorkerID", "")
-	warehouseManagerWorkerID := 0
-	if warehouseManagerWorkerIDStr != "" {
-		warehouseManagerWorkerID, err = strconv.Atoi(warehouseManagerWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode invoiceCo parameter: %v", err))
-			return
-		}
-	}
-
-	releasedWorkerIDStr := c.DefaultQuery("releasedWorkerID", "")
-	releasedWorkerID := 0
-	if releasedWorkerIDStr != "" {
-		releasedWorkerID, err = strconv.Atoi(releasedWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode releasedWorkerID parameter: %v", err))
-			return
-		}
-	}
-
-	recipientWorkerIDStr := c.DefaultQuery("recipientWorkerID", "")
-	recipientWorkerID := 0
-	if recipientWorkerIDStr != "" {
-		recipientWorkerID, err = strconv.Atoi(recipientWorkerIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode recipientWorkerID parameter: %v", err))
-			return
-		}
-	}
-
-	teamIDStr := c.DefaultQuery("teamID", "")
-	teamID := 0
-	if teamIDStr != "" {
-		teamID, err = strconv.Atoi(teamIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode teamID parameter: %v", err))
-			return
-		}
-	}
-
-	objectIDStr := c.DefaultQuery("objectID", "")
-	objectID := 0
-	if objectIDStr != "" {
-		objectID, err = strconv.Atoi(objectIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode objectID parameter: %v", err))
-			return
-		}
-	}
-
-	deliveryCode := c.DefaultQuery("deliveryCode", "")
-	deliveryCode, err = url.QueryUnescape(deliveryCode)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for deliveryCode: %v", err))
-		return
-	}
-
 	projectID := c.GetUint("projectID")
 	filter := model.InvoiceOutput{
 		ProjectID:                projectID,
-		DistrictID:               uint(districtID),
-		WarehouseManagerWorkerID: uint(warehouseManagerWorkerID),
-		RecipientWorkerID:        uint(recipientWorkerID),
-		ReleasedWorkerID:         uint(releasedWorkerID),
-		TeamID:                   uint(teamID),
-		ObjectID:                 uint(objectID),
-		DeliveryCode:             deliveryCode,
 	}
 
 	data, err := controller.invoiceOutputService.GetPaginated(page, limit, filter)
@@ -271,6 +196,9 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 		return
 	}
 
+  excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode + ".xlsx") 
+  os.Remove(excelFilePath)
+
 	err = controller.invoiceOutputService.Confirmation(uint(id))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("cannot confirm invoice input with id %v: %v", id, err))
@@ -283,18 +211,18 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 func (controller *invoiceOutputController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
 
-  filePath := filepath.Join("./pkg/excels/output/", deliveryCode)
+	filePath := filepath.Join("./pkg/excels/output/", deliveryCode)
 	fileGlob, err := filepath.Glob(filePath + ".*")
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-  filePath = fileGlob[0]
-  pathSeparated := strings.Split(filePath, ".")
-  deliveryCodeExtension := pathSeparated[len(pathSeparated) - 1]
+	filePath = fileGlob[0]
+	pathSeparated := strings.Split(filePath, ".")
+	deliveryCodeExtension := pathSeparated[len(pathSeparated)-1]
 
-	c.FileAttachment(filePath, deliveryCode + "." + deliveryCodeExtension)
+	c.FileAttachment(filePath, deliveryCode+"."+deliveryCodeExtension)
 }
 
 func (controller *invoiceOutputController) UniqueCode(c *gin.Context) {
@@ -341,17 +269,6 @@ func (controller *invoiceOutputController) UniqueDistrict(c *gin.Context) {
 	response.ResponseSuccess(c, data)
 }
 
-func (controller *invoiceOutputController) UniqueObject(c *gin.Context) {
-	projectID := c.GetUint("projectID")
-	data, err := controller.invoiceOutputService.UniqueObject(projectID)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
-		return
-	}
-
-	response.ResponseSuccess(c, data)
-}
-
 func (controller *invoiceOutputController) UniqueTeam(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	data, err := controller.invoiceOutputService.UniqueTeam(projectID)
@@ -379,7 +296,7 @@ func (controller *invoiceOutputController) Report(c *gin.Context) {
 
 	filePath := filepath.Join("./pkg/excels/temp/", filename)
 	c.FileAttachment(filePath, filename)
-  os.Remove(filePath)
+	os.Remove(filePath)
 }
 
 func (controller *invoiceOutputController) GetTotalAmountInWarehouse(c *gin.Context) {
@@ -438,4 +355,39 @@ func (controller *invoiceOutputController) GetAvailableMaterialsInWarehouse(c *g
 
 	response.ResponseSuccess(c, data)
 
+}
+
+func (controller *invoiceOutputController) GetMaterialsForEdit(c *gin.Context) {
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+
+	result, err := controller.invoiceOutputService.GetMaterialsForEdit(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, result)
+}
+
+func (controller *invoiceOutputController) Update(c *gin.Context) {
+  var updateData dto.InvoiceOutput
+	if err := c.ShouldBindJSON(&updateData); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
+
+	workerID := c.GetUint("workerID")
+	updateData.Details.ReleasedWorkerID = workerID
+
+	projectID := c.GetUint("projectID")
+	updateData.Details.ProjectID = projectID
+
+	data, err := controller.invoiceOutputService.Update(updateData)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Invoice: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

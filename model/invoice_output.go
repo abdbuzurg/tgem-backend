@@ -12,7 +12,6 @@ type InvoiceOutput struct {
 	ReleasedWorkerID         uint      `json:"releasedWorkerID"`
 	RecipientWorkerID        uint      `json:"recipientWorkerID"`
 	TeamID                   uint      `json:"teamID"`
-	ObjectID                 uint      `json:"ObjectID"`
 	DeliveryCode             string    `json:"deliveryCode"`
 	DateOfInvoice            time.Time `json:"dateOfInvoice"`
 	Notes                    string    `json:"notes"`

@@ -31,6 +31,7 @@ type ITeamRepository interface {
 	GetTeamNumberAndTeamLeadersByID(projectID, id uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error)
 	DoesTeamNumberAlreadyExistForCreate(teamNumber string) (bool, error)
 	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint) (bool, error)
+	GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error)
 }
 
 func (repo *teamRepository) GetAll(projectID uint) ([]model.Team, error) {
@@ -246,6 +247,22 @@ func (repo *teamRepository) DoesTeamNumberAlreadyExistForUpdate(teamNumber strin
     FROM teams
     WHERE teams.number = ? AND teams.id <> ?;
     `, teamNumber, id).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *teamRepository) GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error) {
+	result := []dto.TeamDataForSelect{}
+	err := repo.db.Raw(`
+    SELECT 
+      teams.id as id,
+      teams.number as team_number,
+      workers.name as team_leader_name
+    FROM teams 
+    INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+    INNER JOIN workers ON workers.id = team_leaders.leader_worker_id
+    WHERE teams.project_id = ?
+    `, projectID).Scan(&result).Error
 
 	return result, err
 }

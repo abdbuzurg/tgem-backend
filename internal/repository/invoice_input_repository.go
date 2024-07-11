@@ -24,7 +24,7 @@ type IInovoiceInputRepository interface {
 	GetPaginatedFiltered(page, limit int, filter model.InvoiceInput) ([]dto.InvoiceInputPaginated, error)
 	GetByID(id uint) (model.InvoiceInput, error)
 	Create(data dto.InvoiceInputCreateQueryData) (model.InvoiceInput, error)
-	Update(data model.InvoiceInput) (model.InvoiceInput, error)
+	Update(data dto.InvoiceInputCreateQueryData) (model.InvoiceInput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
 	UniqueCode(projectID uint) ([]string, error)
@@ -32,6 +32,8 @@ type IInovoiceInputRepository interface {
 	UniqueReleased(projectID uint) ([]string, error)
 	ReportFilterData(filter dto.InvoiceInputReportFilter, projectID uint) ([]model.InvoiceInput, error)
 	Confirmation(data dto.InvoiceInputConfirmationQueryData) error
+	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
+	GetSerialNumbersForEdit(invoiceID uint, materialCostID uint) ([]string, error)
 }
 
 func (repo *invoiceInputRespository) GetAll() ([]model.InvoiceInput, error) {
@@ -118,9 +120,57 @@ func (repo *invoiceInputRespository) Create(data dto.InvoiceInputCreateQueryData
 	return result, err
 }
 
-func (repo *invoiceInputRespository) Update(data model.InvoiceInput) (model.InvoiceInput, error) {
-	err := repo.db.Model(&model.InvoiceInput{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
-	return data, err
+func (repo *invoiceInputRespository) Update(data dto.InvoiceInputCreateQueryData) (model.InvoiceInput, error) {
+	result := data.InvoiceData
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+
+		err := repo.db.Model(&result).Select("*").Where("id = ?", result.ID).Updates(&result).Error
+		if err != nil {
+			return err
+		}
+
+		err = repo.db.Exec(`
+      DELETE FROM invoice_materials
+      WHERE invoice_type = 'input' AND invoice_id = ?
+    `, result.ID).Error
+		if err != nil {
+			return err
+		}
+
+		for index := range data.InvoiceMaterials {
+			data.InvoiceMaterials[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
+			return err
+		}
+
+		err = repo.db.Exec(`
+      DELETE FROM serial_number_movements
+      WHERE invoice_type = 'input' AND invoice_id = ?
+      `, result.ID).Error
+		if err != nil {
+			return err
+		}
+
+		serialNumbers := data.SerialNumbers
+		if err := tx.CreateInBatches(&serialNumbers, 15).Error; err != nil {
+			return err
+		}
+
+		for index := range data.SerialNumberMovement {
+			data.SerialNumberMovement[index].SerialNumberID = serialNumbers[index].ID
+			data.SerialNumberMovement[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.SerialNumberMovement, 15).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return result, err
 }
 
 func (repo *invoiceInputRespository) Delete(id uint) error {
@@ -215,4 +265,43 @@ func (repo *invoiceInputRespository) Confirmation(data dto.InvoiceInputConfirmat
 
 		return nil
 	})
+}
+
+func (repo *invoiceInputRespository) GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error) {
+	result := []dto.InvoiceInputMaterialForEdit{}
+	err := repo.db.Raw(`
+    SELECT 
+      materials.id as material_id,
+      materials.name as material_name,
+      materials.unit as unit,
+      invoice_materials.amount as amount,
+      material_costs.id  as material_cost_id,
+      material_costs.cost_m19 as material_cost,
+      invoice_materials.notes as  notes,
+      materials.has_serial_number as has_serial_number
+    FROM invoice_materials
+    INNER JOIN material_costs ON invoice_materials.material_cost_id = material_costs.id
+    INNER JOIN materials ON material_costs.material_id = materials.id
+    WHERE
+      invoice_materials.invoice_type='input' AND
+      invoice_materials.invoice_id = ?;
+    `, id).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *invoiceInputRespository) GetSerialNumbersForEdit(invoiceID uint, materialCostID uint) ([]string, error) {
+	result := []string{}
+	err := repo.db.Raw(`
+    SELECT 
+      serial_numbers.code
+    FROM serial_number_movements
+    INNER JOIN serial_numbers ON serial_number_movements.serial_number_id = serial_numbers.id
+    WHERE
+      serial_number_movements.invoice_type = 'input' AND
+      serial_number_movements.invoice_id = ? AND
+      material_costs.id = ?;
+    `, invoiceID, materialCostID).Scan(&result).Error
+
+	return result, err
 }

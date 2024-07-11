@@ -27,7 +27,7 @@ type IInvoiceOutputRepository interface {
 	GetAvailableMaterialsInWarehouse(projectID uint) ([]dto.AvailableMaterialsInWarehouse, error)
 	GetDataForExcel(id uint) (dto.InvoiceOutputDataForExcelQueryResult, error)
 	Create(data dto.InvoiceOutputCreateQueryData) (model.InvoiceOutput, error)
-	Update(data model.InvoiceOutput) (model.InvoiceOutput, error)
+	Update(data dto.InvoiceOutputCreateQueryData) (model.InvoiceOutput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
 	UniqueCode(projectID uint) ([]string, error)
@@ -36,8 +36,10 @@ type IInvoiceOutputRepository interface {
 	UniqueDistrict(projectID uint) ([]string, error)
 	UniqueObject(projectID uint) ([]string, error)
 	UniqueTeam(projectID uint) ([]string, error)
-	ReportFilterData(filter dto.InvoiceOutputReportFilter, projectID uint) ([]model.InvoiceOutput, error)
+	ReportFilterData(filter dto.InvoiceOutputReportFilter, projectID uint) ([]dto.InvoiceOutputDataForReport, error)
 	Confirmation(data dto.InvoiceOutputConfirmationQueryData) error
+	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
+	GetMaterialDataForReport(invoiceID uint) ([]dto.InvoiceOutputMaterialDataForReport, error)
 }
 
 func (repo *invoiceOutputRepository) GetAll() ([]model.InvoiceOutput, error) {
@@ -60,7 +62,6 @@ func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filte
         invoice_outputs.id as id,
         invoice_outputs.delivery_code as delivery_code,
         districts.name as district_name,
-        objects.name as object_name,
         teams.number as team_name,
         warehouse_manager.name as warehouse_manager_name,
         released.name as released_name,
@@ -71,7 +72,6 @@ func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filte
       FROM invoice_outputs
         INNER JOIN districts ON districts.id = invoice_outputs.district_id
         INNER JOIN teams ON teams.id = invoice_outputs.team_id
-        INNER JOIN objects ON objects.id = invoice_outputs.object_id
         INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_outputs.warehouse_manager_worker_id
         INNER JOIN workers AS released ON released.id = invoice_outputs.released_worker_id
         INNER JOIN workers AS recipient ON recipient.id = invoice_outputs.recipient_worker_id
@@ -82,7 +82,6 @@ func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filte
         (nullif(?, 0) IS NULL OR invoice_outputs.released_worker_id = ?) AND
         (nullif(?, 0) IS NULL OR invoice_outputs.recipient_worker_id = ?) AND
         (nullif(?, 0) IS NULL OR invoice_outputs.team_id = ?) AND
-        (nullif(?, 0) IS NULL OR invoice_outputs.object_id = ?) AND
         (nullif(?, '') IS NULL OR invoice_outputs.delivery_code = ?) ORDER BY invoice_outputs.id DESC LIMIT ? OFFSET ?;
 
       `,
@@ -92,7 +91,6 @@ func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filte
 			filter.ReleasedWorkerID, filter.ReleasedWorkerID,
 			filter.RecipientWorkerID, filter.RecipientWorkerID,
 			filter.TeamID, filter.TeamID,
-			filter.ObjectID, filter.ObjectID,
 			filter.DeliveryCode, filter.DeliveryCode,
 			limit, (page-1)*limit,
 		).
@@ -137,9 +135,42 @@ func (repo *invoiceOutputRepository) Create(data dto.InvoiceOutputCreateQueryDat
 	return result, err
 }
 
-func (repo *invoiceOutputRepository) Update(data model.InvoiceOutput) (model.InvoiceOutput, error) {
-	err := repo.db.Model(&model.InvoiceOutput{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
-	return data, err
+func (repo *invoiceOutputRepository) Update(data dto.InvoiceOutputCreateQueryData) (model.InvoiceOutput, error) {
+	result := data.Invoice
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&model.InvoiceOutput{}).Select("*").Where("id = ?", result.ID).Updates(&result).Error
+		if err != nil {
+			return err
+		}
+
+		if err = tx.Delete(model.InvoiceMaterials{}, "invoice_id = ? AND invoice_type='output'", result.ID).Error; err != nil {
+			return nil
+		}
+
+		for index := range data.InvoiceMaterials {
+			data.InvoiceMaterials[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
+			return err
+		}
+
+		if err = tx.Delete(model.SerialNumberMovement{}, "invoice_id = ? AND invoice_type='output'", result.ID).Error; err != nil {
+			return err
+		}
+
+		for index := range data.SerialNumberMovements {
+			data.SerialNumberMovements[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.SerialNumberMovements, 15).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return result, err
 }
 
 func (repo *invoiceOutputRepository) Delete(id uint) error {
@@ -194,31 +225,39 @@ func (repo *invoiceOutputRepository) UniqueTeam(projectID uint) ([]string, error
 	return data, err
 }
 
-func (repo *invoiceOutputRepository) ReportFilterData(filter dto.InvoiceOutputReportFilter, projectID uint) ([]model.InvoiceOutput, error) {
-	data := []model.InvoiceOutput{}
+func (repo *invoiceOutputRepository) ReportFilterData(filter dto.InvoiceOutputReportFilter, projectID uint) ([]dto.InvoiceOutputDataForReport, error) {
+	data := []dto.InvoiceOutputDataForReport{}
 	dateFrom := filter.DateFrom.String()
 	dateFrom = dateFrom[:len(dateFrom)-10]
 	dateTo := filter.DateTo.String()
 	dateTo = dateTo[:len(dateTo)-10]
 	err := repo.
 		db.
-		Raw(`SELECT * FROM invoice_outputs WHERE
-			(nullif(?, 0) IS NULL OR project_id = ?) AND
-			(nullif(?, '') IS NULL OR delivery_code = ?) AND
-			(nullif(?, 0) IS NULL OR recipient_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR district_id = ?) AND
-			(nullif(?, 0) IS NULL OR object_id = ?) AND
-			(nullif(?, 0) IS NULL OR team_id = ?) AND
-			(nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= date_of_invoice) AND 
-			(nullif(?, '0001-01-01 00:00:00') IS NULL OR date_of_invoice <= ?) ORDER BY id DESC
+		Raw(`
+      SELECT 
+        invoice_outputs.id as id,
+        invoice_outputs.delivery_code as delivery_code,
+        warehouse_manager.name as warehouse_manager_name,
+        recipient_worker.name as recipient_name,
+        teams.number as team_number,
+        invoice_outputs.date_of_invoice as date_of_invoice
+      FROM invoice_outputs
+      INNER JOIN workers as warehouse_manager ON warehouse_manager.id = invoice_outputs.warehouse_manager_worker_id
+      INNER JOIN workers as recipient_worker ON recipient_worker.id = invoice_outputs.recipient_worker_id
+      INNER JOIN teams ON teams.id = invoice_outputs.team_id 
+      WHERE
+        (nullif(?, 0) IS NULL OR invoice_outputs.project_id = ?) AND
+        (nullif(?, '') IS NULL OR invoice_outputs.delivery_code = ?) AND
+        (nullif(?, 0) IS NULL OR invoice_outputs.recipient_worker_id = ?) AND
+        (nullif(?, 0) IS NULL OR invoice_outputs.warehouse_manager_worker_id = ?) AND
+        (nullif(?, 0) IS NULL OR invoice_outputs.team_id = ?) AND
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= invoice_outputs.date_of_invoice) AND 
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR invoice_outputs.date_of_invoice <= ?) ORDER BY invoice_outputs.id DESC
 		`,
 			projectID, projectID,
 			filter.Code, filter.Code,
 			filter.ReceivedID, filter.ReceivedID,
 			filter.WarehouseManagerID, filter.WarehouseManagerID,
-			filter.DistrictID, filter.DistrictID,
-			filter.ObjectID, filter.ObjectID,
 			filter.TeamID, filter.TeamID,
 			dateFrom, dateFrom,
 			dateTo, dateTo).
@@ -311,8 +350,6 @@ func (repo *invoiceOutputRepository) GetDataForExcel(id uint) (dto.InvoiceOutput
         projects.name as project_name,
         invoice_outputs.delivery_code as delivery_code,
         districts.name as district_name,
-        objects.type as object_type,
-        objects.name as object_name,
         team_leader.name as team_leader_name,
         warehouse_manager.name as warehouse_manager_name,
         released.name as released_name,
@@ -324,7 +361,6 @@ func (repo *invoiceOutputRepository) GetDataForExcel(id uint) (dto.InvoiceOutput
       INNER JOIN teams ON teams.id = invoice_outputs.team_id
       INNER JOIN team_leaders ON team_leaders.team_id = teams.id
       INNER JOIN workers AS team_leader ON team_leader.id = team_leaders.leader_worker_id
-      INNER JOIN objects ON objects.id = invoice_outputs.object_id
       INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_outputs.warehouse_manager_worker_id
       INNER JOIN workers AS released ON released.id = invoice_outputs.released_worker_id
       INNER JOIN workers AS recipient ON recipient.id = invoice_outputs.recipient_worker_id
@@ -333,4 +369,48 @@ func (repo *invoiceOutputRepository) GetDataForExcel(id uint) (dto.InvoiceOutput
       ORDER BY team_leaders.id DESC LIMIT 1;
     `, id).Scan(&data).Error
 	return data, err
+}
+
+func (repo *invoiceOutputRepository) GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error) {
+	result := []dto.InvoiceOutputMaterialsForEdit{}
+	err := repo.db.Raw(`
+    SELECT 
+      materials.id as material_id,
+      materials.name as material_name,
+      materials.unit as material_unit,
+      material_locations.amount as warehouse_amount,
+      invoice_materials.amount as amount,
+      invoice_materials.notes as notes,
+      materials.has_serial_number as has_serial_number
+    FROM invoice_materials
+    INNER JOIN material_costs ON material_costs.id = invoice_materials.material_cost_id
+    INNER JOIN materials ON materials.id = material_costs.material_id
+    INNER JOIN material_locations ON material_locations.material_cost_id = invoice_materials.material_cost_id
+    WHERE
+      material_locations.location_type = 'warehouse' AND
+      invoice_materials.invoice_type = 'output' AND
+      invoice_materials.invoice_id = ?
+    `, id).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *invoiceOutputRepository) GetMaterialDataForReport(invoiceID uint) ([]dto.InvoiceOutputMaterialDataForReport, error) {
+	result := []dto.InvoiceOutputMaterialDataForReport{}
+	err := repo.db.Raw(`
+    SELECT 
+      materials.name as material_name,
+      materials.unit as material_unit,
+      material_costs.cost_m19 as material_cost_m19,
+      invoice_materials.notes as notes,
+      invoice_materials.amount as amount
+    FROM invoice_materials
+    INNER JOIN material_costs ON material_costs.id = invoice_materials.material_cost_id
+    INNER JOIN materials ON materials.id = material_costs.material_id
+    WHERE 
+      invoice_materials.invoice_type = 'output' AND
+      invoice_materials.invoice_id = ?;
+    `, invoiceID).Scan(&result).Error
+
+	return result, err
 }

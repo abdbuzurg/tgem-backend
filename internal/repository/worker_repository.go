@@ -32,7 +32,7 @@ type IWorkerRepository interface {
 
 func (repo *workerRepository) GetAll() ([]model.Worker, error) {
 	data := []model.Worker{}
-	err := repo.db.Order("id DESC").Find(&data).Error
+	err := repo.db.Order("id DESC").Find(&data, "id <> 1").Error
 	return data, err
 }
 

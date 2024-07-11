@@ -15,7 +15,6 @@ type Object struct {
 	ObjectSupervisors []ObjectSupervisors `json:"-" gorm:"foreignKey:ObjectID"`
 
 	ObjectOperations []ObjectOperation `json:"-" gorm:"foreignKey:ObjectID"`
-	InvoiceOutputs   []InvoiceOutput   `json:"-" gorm:"foreignKey:ObjectID"`
 	InvoiceObject    []InvoiceObject   `json:"-" gorm:"foreignKey:ObjectID"`
 
 	TPNourashesObjects []TPNourashesObjects `json:"-" gorm:"foreignKey:TP_ObjectID"`
