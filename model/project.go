@@ -16,6 +16,7 @@ type Project struct {
 	SignedDateOfContract time.Time       `json:"signedDateOfContract"`
 	DateStart            time.Time       `json:"dateStart"`
 	DateEnd              time.Time       `json:"dateEnd"`
+	ProjectManager       string          `json:"projectManager"`
 
 	UserActions                []UserAction                `json:"-" gorm:"foreignKey:ProjectID"`
 	UserInProjects             []UserInProject             `json:"-" gorm:"foreignKey:ProjectID"`

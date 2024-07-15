@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/xuri/excelize/v2"
@@ -64,13 +63,12 @@ type IInvoiceOutputService interface {
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
 	Confirmation(id uint) error
-	UniqueCode(projectID uint) ([]string, error)
-	UniqueWarehouseManager(projectID uint) ([]string, error)
-	UniqueRecieved(projectID uint) ([]string, error)
-	UniqueDistrict(projectID uint) ([]string, error)
-	UniqueObject(projectID uint) ([]string, error)
-	UniqueTeam(projectID uint) ([]string, error)
-	Report(filter dto.InvoiceOutputReportFilterRequest, projectID uint) (string, error)
+	UniqueCode(projectID uint) ([]dto.DataForSelect[string], error)
+	UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueRecieved(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueDistrict(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error)
+	Report(filter dto.InvoiceOutputReportFilterRequest) (string, error)
 	GetTotalMaterialAmount(projectID, materialID uint) (float64, error)
 	GetSerialNumbersByMaterial(projectID, materialID uint) ([]string, error)
 	GetAvailableMaterialsInWarehouse(projectID uint) ([]dto.AvailableMaterialsInWarehouse, error)
@@ -649,163 +647,28 @@ func (service *invoiceOutputService) Confirmation(id uint) error {
 	return err
 }
 
-func (service *invoiceOutputService) UniqueCode(projectID uint) ([]string, error) {
+func (service *invoiceOutputService) UniqueCode(projectID uint) ([]dto.DataForSelect[string], error) {
 	return service.invoiceOutputRepo.UniqueCode(projectID)
 }
 
-func (service *invoiceOutputService) UniqueWarehouseManager(projectID uint) ([]string, error) {
-	ids, err := service.invoiceOutputRepo.UniqueWarehouseManager(projectID)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, id := range ids {
-		idconv, _ := strconv.ParseUint(id, 10, 32)
-		warehouseManager, err := service.workerRepo.GetByID(uint(idconv))
-		if err != nil {
-			return []string{}, err
-		}
-
-		result = append(result, warehouseManager.Name)
-	}
-
-	return result, nil
+func (service *invoiceOutputService) UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error) {
+  return service.invoiceOutputRepo.UniqueWarehouseManager(projectID)
 }
 
-func (service *invoiceOutputService) UniqueRecieved(projectID uint) ([]string, error) {
-	ids, err := service.invoiceOutputRepo.UniqueWarehouseManager(projectID)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, id := range ids {
-		idconv, _ := strconv.ParseUint(id, 10, 32)
-		recieved, err := service.workerRepo.GetByID(uint(idconv))
-		if err != nil {
-			return []string{}, err
-		}
-
-		result = append(result, recieved.Name)
-	}
-
-	return result, nil
+func (service *invoiceOutputService) UniqueRecieved(projectID uint) ([]dto.DataForSelect[uint], error) {
+  return service.invoiceOutputRepo.UniqueRecieved(projectID)
 }
 
-func (service *invoiceOutputService) UniqueDistrict(projectID uint) ([]string, error) {
-	ids, err := service.invoiceOutputRepo.UniqueWarehouseManager(projectID)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, id := range ids {
-		idconv, _ := strconv.ParseUint(id, 10, 32)
-		district, err := service.districtRepo.GetByID(uint(idconv))
-		if err != nil {
-			return []string{}, err
-		}
-
-		result = append(result, district.Name)
-	}
-
-	return result, nil
+func (service *invoiceOutputService) UniqueDistrict(projectID uint) ([]dto.DataForSelect[uint], error) {
+  return service.invoiceOutputRepo.UniqueDistrict(projectID)
 }
 
-func (service *invoiceOutputService) UniqueObject(projectID uint) ([]string, error) {
-	ids, err := service.invoiceOutputRepo.UniqueWarehouseManager(projectID)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, id := range ids {
-		idconv, _ := strconv.ParseUint(id, 10, 32)
-		object, err := service.objectRepo.GetByID(uint(idconv))
-		if err != nil {
-			return []string{}, err
-		}
-
-		result = append(result, object.Name)
-	}
-
-	return result, nil
+func (service *invoiceOutputService) UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error) {
+  return service.invoiceOutputRepo.UniqueTeam(projectID)
 }
 
-func (service *invoiceOutputService) UniqueTeam(projectID uint) ([]string, error) {
-	ids, err := service.invoiceOutputRepo.UniqueWarehouseManager(projectID)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, id := range ids {
-		idconv, _ := strconv.ParseUint(id, 10, 32)
-		team, err := service.teamRepo.GetByID(uint(idconv))
-		if err != nil {
-			return []string{}, err
-		}
-
-		result = append(result, team.Number)
-	}
-
-	return result, nil
-}
-
-func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilterRequest, projectID uint) (string, error) {
-	newFilter := dto.InvoiceOutputReportFilter{
-		Code:     filter.Code,
-		DateFrom: filter.DateFrom,
-		DateTo:   filter.DateTo,
-	}
-
-	var err error
-	if filter.WarehouseManager != "" {
-		warehouseManager, err := service.workerRepo.GetByName(filter.WarehouseManager)
-		if err != nil {
-			return "", err
-		}
-
-		newFilter.WarehouseManagerID = warehouseManager.ID
-	} else {
-		newFilter.WarehouseManagerID = 0
-	}
-
-	if filter.Received != "" {
-		released, err := service.workerRepo.GetByName(filter.Received)
-		if err != nil {
-			return "", err
-		}
-
-		newFilter.ReceivedID = released.ID
-	} else {
-		newFilter.ReceivedID = 0
-	}
-
-	if filter.District != "" {
-		district, err := service.districtRepo.GetByName(filter.Received)
-		if err != nil {
-			return "", err
-		}
-
-		newFilter.DistrictID = district.ID
-	} else {
-		newFilter.DistrictID = 0
-	}
-
-	if filter.Team != "" {
-		team, err := service.teamRepo.GetByNumber(filter.Team)
-		if err != nil {
-			return "", err
-		}
-
-		newFilter.TeamID = team.ID
-	} else {
-		newFilter.TeamID = 0
-	}
-
-	invoices, err := service.invoiceOutputRepo.ReportFilterData(newFilter, projectID)
+func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilterRequest) (string, error) {
+	invoices, err := service.invoiceOutputRepo.ReportFilterData(filter)
 	if err != nil {
 		return "", err
 	}
@@ -829,18 +692,19 @@ func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilter
 			f.SetCellStr(sheetName, "B"+fmt.Sprint(rowCount), invoice.WarehouseManagerName)
 			f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), invoice.RecipientName)
 			f.SetCellStr(sheetName, "D"+fmt.Sprint(rowCount), invoice.TeamNumber)
+			f.SetCellStr(sheetName, "E"+fmt.Sprint(rowCount), invoice.TeamLeaderName)
 
 			dateOfInvoice := invoice.DateOfInvoice.String()
 			dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
-			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), dateOfInvoice)
+			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), dateOfInvoice)
 
-			f.SetCellStr(sheetName, "F"+fmt.Sprint(rowCount), invoiceMaterial.MaterialName)
-			f.SetCellStr(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.MaterialUnit)
-			f.SetCellFloat(sheetName, "H"+fmt.Sprint(rowCount), invoiceMaterial.Amount, 2, 64)
+			f.SetCellStr(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.MaterialName)
+			f.SetCellStr(sheetName, "H"+fmt.Sprint(rowCount), invoiceMaterial.MaterialUnit)
+			f.SetCellFloat(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.Amount, 2, 64)
 
       materialCostFloat, _ := invoiceMaterial.MaterialCostM19.Float64()
-			f.SetCellFloat(sheetName, "I"+fmt.Sprint(rowCount), materialCostFloat, 2, 64)
-			f.SetCellValue(sheetName, "J"+fmt.Sprint(rowCount), invoiceMaterial.Notes)
+			f.SetCellFloat(sheetName, "J"+fmt.Sprint(rowCount), materialCostFloat, 2, 64)
+			f.SetCellValue(sheetName, "K"+fmt.Sprint(rowCount), invoiceMaterial.Notes)
 			rowCount++
 		}
 	}

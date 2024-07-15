@@ -34,4 +34,7 @@ type Worker struct {
 
 	//Invoice Output out of project
 	InvoiceOutputOutOfProjectReleased []InvoiceOutputOutOfProject `json:"-" gorm:"foreignKey:ReleasedWorkerID"`
+
+  //Invoice Object Operators
+  InvoiceObjectOperators []InvoiceObjectOperator `json:"-" gorm:"foreignKey:OperatorWorkerID"`
 }

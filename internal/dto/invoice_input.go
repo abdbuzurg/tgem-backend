@@ -42,20 +42,21 @@ type InvoiceInputConfirmationQueryData struct {
 }
 
 type InvoiceInputReportFilterRequest struct {
-	ProjectID        uint      `json:"projectID"`
-	Code             string    `json:"code"`
-	WarehouseManager string    `json:"warehouseManager"`
-	Released         string    `json:"released"`
-	DateFrom         time.Time `json:"dateFrom"`
-	DateTo           time.Time `json:"dateTo"`
+	ProjectID          uint      `json:"projectID"`
+	Code               string    `json:"code"`
+	WarehouseManagerID uint      `json:"warehouseManagerID"`
+	ReleasedID         uint      `json:"releasedID"`
+	DateFrom           time.Time `json:"dateFrom"`
+	DateTo             time.Time `json:"dateTo"`
 }
 
-type InvoiceInputReportFilter struct {
-	Code               string
-	WarehouseManagerID uint
-	ReleasedID         uint
-	DateFrom           time.Time
-	DateTo             time.Time
+type InvoiceInputReportData struct {
+	ID                   uint
+	WarehouseManagerName string
+	ReleasedName         string
+	DeliveryCode         string
+	Notes                string
+	DateOfInvoice        time.Time
 }
 
 type NewMaterialDataFromInvoiceInput struct {
@@ -72,13 +73,13 @@ type NewMaterialDataFromInvoiceInput struct {
 }
 
 type InvoiceInputMaterialForEdit struct {
-	MaterialID      uint            `json:"materialID"`
-	MaterialName    string          `json:"materialName"`
-	Unit            string          `json:"unit"`
-	Amount          float64         `json:"amount"`
-	MaterialCostID  uint            `json:"materialCostID"`
-	MaterialCost    float64 `json:"materialCost"`
-	Notes           string          `json:"notes"`
-	HasSerialNumber bool            `json:"hasSerialNumber"`
-	SerialNumbers   []string        `json:"serialNumbers"`
+	MaterialID      uint     `json:"materialID"`
+	MaterialName    string   `json:"materialName"`
+	Unit            string   `json:"unit"`
+	Amount          float64  `json:"amount"`
+	MaterialCostID  uint     `json:"materialCostID"`
+	MaterialCost    float64  `json:"materialCost"`
+	Notes           string   `json:"notes"`
+	HasSerialNumber bool     `json:"hasSerialNumber"`
+	SerialNumbers   []string `json:"serialNumbers"`
 }

@@ -52,15 +52,14 @@ type InvoiceOutputConfirmationQueryData struct {
 }
 
 type InvoiceOutputReportFilterRequest struct {
-	ProjectID        uint      `json:"projectID"`
-	Code             string    `json:"code"`
-	WarehouseManager string    `json:"warehouseManager"`
-	Received         string    `json:"recieved"`
-	Object           string    `json:"object"`
-	Team             string    `json:"team"`
-	District         string    `json:"district"`
-	DateFrom         time.Time `json:"dateFrom"`
-	DateTo           time.Time `json:"dateTo"`
+	ProjectID          uint      `json:"projectID"`
+	Code               string    `json:"code"`
+	WarehouseManagerID uint      `json:"warehouseManagerID"`
+	ReceivedID         uint      `json:"recievedID"`
+	TeamID             uint      `json:"teamID"`
+	DistrictID         uint      `json:"districtID"`
+	DateFrom           time.Time `json:"dateFrom"`
+	DateTo             time.Time `json:"dateTo"`
 }
 
 type InvoiceOutputReportFilter struct {
@@ -125,13 +124,14 @@ type InvoiceOutputDataForReport struct {
 	WarehouseManagerName string    `json:"warehouseManagerName"`
 	RecipientName        string    `json:"recipientName"`
 	TeamNumber           string    `json:"teamNumber"`
+	TeamLeaderName       string    `json:"teamLeaderName"`
 	DateOfInvoice        time.Time `json:"dateOfInvoice"`
 }
 
 type InvoiceOutputMaterialDataForReport struct {
-  MaterialName string
-  MaterialUnit string
-  MaterialCostM19 decimal.Decimal
-  Notes string
-  Amount float64
+	MaterialName    string
+	MaterialUnit    string
+	MaterialCostM19 decimal.Decimal
+	Notes           string
+	Amount          float64
 }

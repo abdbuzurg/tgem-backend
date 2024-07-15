@@ -17,7 +17,7 @@ type InvoiceMaterialsWithoutSerialNumberView struct {
 	ID           uint            `json:"id"`
 	MaterialName string          `json:"materialName"`
 	MaterialUnit string          `json:"materialUnit"`
-	IsDefected  bool            `json:"isDefected"`
+	IsDefected   bool            `json:"isDefected"`
 	CostM19      decimal.Decimal `json:"costM19"`
 	Amount       float64         `json:"amount"`
 	Notes        string          `json:"notes"`
@@ -27,7 +27,7 @@ type InvoiceMaterialsWithSerialNumberQuery struct {
 	ID           uint            `json:"id"`
 	MaterialName string          `json:"materialName"`
 	MaterialUnit string          `json:"materialUnit"`
-	IsDefected  bool            `json:"isDefected"`
+	IsDefected   bool            `json:"isDefected"`
 	SerialNumber string          `json:"serialNumber"`
 	CostM19      decimal.Decimal `json:"costM19"`
 	Amount       float64         `json:"amount"`
@@ -39,8 +39,20 @@ type InvoiceMaterialsWithSerialNumberView struct {
 	MaterialName  string          `json:"materialName"`
 	MaterialUnit  string          `json:"materialUnit"`
 	SerialNumbers []string        `json:"serialNumbers"`
-	IsDefected   bool            `json:"isDefected"`
+	IsDefected    bool            `json:"isDefected"`
 	CostM19       decimal.Decimal `json:"costM19"`
 	Amount        float64         `json:"amount"`
 	Notes         string          `json:"notes"`
+}
+
+type InvoiceMaterialsDataForReport struct {
+	InvoiceMaterialID        uint
+	MaterialName             string
+	MaterialUnit             string
+	MaterialCategory         string
+	MaterialCostPrime        decimal.Decimal
+	MaterialCostM19          decimal.Decimal
+	MaterialCostWithCustomer decimal.Decimal
+	InvoiceMaterialAmount    float64
+	InvoiceMaterialNotes     string
 }

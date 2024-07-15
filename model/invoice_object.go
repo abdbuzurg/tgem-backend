@@ -12,4 +12,6 @@ type InvoiceObject struct {
 	DateOfInvoice       time.Time `json:"dateOfInvoice"`
 	ConfirmedByOperator bool      `json:"confirmedByOperator"`
 	DateOfCorrection    time.Time `json:"dateOfCorrection"`
+
+  InvoiceObjectOperators []InvoiceObjectOperator `json:"-" gorm:"foreignKey:InvoiceObjectID"`
 }

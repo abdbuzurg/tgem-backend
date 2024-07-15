@@ -5,6 +5,8 @@ import (
 	"backend-v2/internal/service"
 	"backend-v2/pkg/response"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +30,9 @@ type IInvoiceCorrectionController interface {
 	GetInvoiceMaterialsByInvoiceObjectID(c *gin.Context)
 	GetSerialNumbersOfMaterial(c *gin.Context)
 	Create(c *gin.Context)
+	UniqueObject(c *gin.Context)
+	UniqueTeam(c *gin.Context)
+	Report(c *gin.Context)
 }
 
 func (controller *invoiceCorrectionController) GetAll(c *gin.Context) {
@@ -117,11 +122,55 @@ func (controller *invoiceCorrectionController) Create(c *gin.Context) {
 		return
 	}
 
+  createData.Details.OperatorWorkerID = c.GetUint("workerID")
+
 	data, err := controller.invoiceCorrectionService.Create(createData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-  response.ResponseSuccess(c, data)
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceCorrectionController) UniqueObject(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+	data, err := controller.invoiceCorrectionService.UniqueObject(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceCorrectionController) UniqueTeam(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+	data, err := controller.invoiceCorrectionService.UniqueTeam(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceCorrectionController) Report(c *gin.Context) {
+	var filter dto.InvoiceCorrectionReportFilter
+	if err := c.ShouldBindJSON(&filter); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	filter.ProjectID = c.GetUint("projectID")
+
+	reportFileName, err := controller.invoiceCorrectionService.Report(filter)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+	}
+
+	reportFilePath := filepath.Join("./pkg/excels/temp/", reportFileName)
+	c.FileAttachment(reportFilePath, reportFileName)
+	os.Remove(reportFilePath)
 }

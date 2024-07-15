@@ -73,6 +73,7 @@ func AutoMigrate(db *gorm.DB) {
 		model.InvoiceOutput{},
 		model.InvoiceReturn{},
 		model.InvoiceObject{},
+    model.InvoiceObjectOperator{},
 		model.InvoiceWriteOff{},
 		model.OperatorErrorFound{},
 		model.KL04KV_Object{},

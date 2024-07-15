@@ -27,10 +27,10 @@ type IInovoiceInputRepository interface {
 	Update(data dto.InvoiceInputCreateQueryData) (model.InvoiceInput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
-	UniqueCode(projectID uint) ([]string, error)
-	UniqueWarehouseManager(projectID uint) ([]string, error)
-	UniqueReleased(projectID uint) ([]string, error)
-	ReportFilterData(filter dto.InvoiceInputReportFilter, projectID uint) ([]model.InvoiceInput, error)
+	UniqueCode(projectID uint) ([]dto.DataForSelect[string], error)
+	UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueReleased(projectID uint) ([]dto.DataForSelect[uint], error)
+	ReportFilterData(filter dto.InvoiceInputReportFilterRequest) ([]dto.InvoiceInputReportData, error)
 	Confirmation(data dto.InvoiceInputConfirmationQueryData) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
 	GetSerialNumbersForEdit(invoiceID uint, materialCostID uint) ([]string, error)
@@ -183,40 +183,80 @@ func (repo *invoiceInputRespository) Count(projectID uint) (int64, error) {
 	return count, err
 }
 
-func (repo *invoiceInputRespository) UniqueCode(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT delivery_code FROM invoice_inputs WHERE project_id = ?", projectID).Scan(&data).Error
+func (repo *invoiceInputRespository) UniqueCode(projectID uint) ([]dto.DataForSelect[string], error) {
+	data := []dto.DataForSelect[string]{}
+	err := repo.db.Raw(`
+      SELECT 
+        delivery_code as "label",
+        delivery_code as "value"
+      FROM invoice_inputs
+      WHERE project_id = ?
+      ORDER BY id DESC;
+    `, projectID).Scan(&data).Error
 	return data, err
 }
 
-func (repo *invoiceInputRespository) UniqueWarehouseManager(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT warehouse_manager_worker_id FROM invoice_inputs WHERE project_id = ?", projectID).Scan(&data).Error
+func (repo *invoiceInputRespository) UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error) {
+	data := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+      SELECT 
+        workers.id as "value",
+        workers.name as "label"
+      FROM workers
+      WHERE workers.id IN (
+        SELECT DISTINCT(invoice_inputs.warehouse_manager_worker_id)
+        FROM invoice_inputs
+        WHERE invoice_inputs.project_id = ?
+      )
+    `, projectID).Scan(&data).Error
+
 	return data, err
 }
 
-func (repo *invoiceInputRespository) UniqueReleased(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT released_worker_id FROM invoice_inputs WHERE project_id = ?", projectID).Scan(&data).Error
+func (repo *invoiceInputRespository) UniqueReleased(projectID uint) ([]dto.DataForSelect[uint], error) {
+	data := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+      SELECT 
+        workers.id as "value",
+        workers.name as "label"
+      FROM workers
+      WHERE workers.id IN (
+        SELECT DISTINCT(invoice_inputs.released_worker_id)
+        FROM invoice_inputs
+        WHERE invoice_inputs.project_id = ?
+      )
+    `, projectID).Scan(&data).Error
 	return data, err
 }
 
-func (repo *invoiceInputRespository) ReportFilterData(filter dto.InvoiceInputReportFilter, projectID uint) ([]model.InvoiceInput, error) {
-	data := []model.InvoiceInput{}
+func (repo *invoiceInputRespository) ReportFilterData(filter dto.InvoiceInputReportFilterRequest) ([]dto.InvoiceInputReportData, error) {
+	data := []dto.InvoiceInputReportData{}
 	dateFrom := filter.DateFrom.String()
 	dateFrom = dateFrom[:len(dateFrom)-10]
 	dateTo := filter.DateTo.String()
 	dateTo = dateTo[:len(dateTo)-10]
 	err := repo.
 		db.
-		Raw(`SELECT * FROM invoice_inputs WHERE project_id = ? AND
-			(nullif(?, '') IS NULL OR delivery_code = ?) AND
-			(nullif(?, 0) IS NULL OR released_worker_id = ?) AND
-			(nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
-			(nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= date_of_invoice) AND 
-			(nullif(?, '0001-01-01 00:00:00') IS NULL OR date_of_invoice <= ?) ORDER BY id DESC
-		`,
-			projectID,
+		Raw(`
+      SELECT 
+        invoice_inputs.id as id,
+        warehouse_manager.name as warehouse_manager_name,
+        released.name as released_name,
+        invoice_inputs.delivery_code as delivery_code,
+        invoice_inputs.notes as notes,
+        invoice_inputs.date_of_invoice as date_of_invoice
+      FROM invoice_inputs 
+      INNER JOIN workers as warehouse_manager ON warehouse_manager.id = invoice_inputs.warehouse_manager_worker_id
+      INNER JOIN workers as released ON released.id = invoice_inputs.released_worker_id
+      WHERE 
+        invoice_inputs.project_id = ? AND
+        invoice_inputs.confirmed = true AND
+        (nullif(?, '') IS NULL OR invoice_inputs.delivery_code = ?) AND
+        (nullif(?, 0) IS NULL OR invoice_inputs.released_worker_id = ?) AND
+        (nullif(?, 0) IS NULL OR invoice_inputs.warehouse_manager_worker_id = ?) AND
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= invoice_inputs.date_of_invoice) AND 
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR invoice_inputs.date_of_invoice <= ?) ORDER BY invoice_inputs.id DESC		`,
+			filter.ProjectID,
 			filter.Code, filter.Code,
 			filter.ReleasedID, filter.ReleasedID,
 			filter.WarehouseManagerID, filter.WarehouseManagerID,

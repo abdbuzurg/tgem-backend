@@ -287,8 +287,8 @@ func (controller *invoiceOutputController) Report(c *gin.Context) {
 		return
 	}
 
-	projectID := c.GetUint("projectID")
-	filename, err := controller.invoiceOutputService.Report(filter, projectID)
+	filter.ProjectID = c.GetUint("projectID")
+	filename, err := controller.invoiceOutputService.Report(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
 		return

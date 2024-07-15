@@ -30,6 +30,7 @@ type IInvoiceMaterialsRepository interface {
 	Count() (int64, error)
 	GetByInvoice(projectID, invoiceID uint, invoceType string) ([]model.InvoiceMaterials, error)
 	GetByMaterialCostID(materialCostID uint, invoiceType string, invoiceID uint) (model.InvoiceMaterials, error)
+  GetDataForReport(invoiceID uint, invoiceType string) ([]dto.InvoiceMaterialsDataForReport, error)
 }
 
 func (repo *invoiceMaterialsRepository) GetAll() ([]model.InvoiceMaterials, error) {
@@ -160,4 +161,28 @@ func (repo *invoiceMaterialsRepository) GetInvoiceMaterialsWithSerialNumbers(id 
     `, invoiceType, id).Scan(&data).Error
 
 	return data, err
+}
+
+func (repo *invoiceMaterialsRepository) GetDataForReport(invoiceID uint, invoiceType string) ([]dto.InvoiceMaterialsDataForReport, error) {
+  result := []dto.InvoiceMaterialsDataForReport{}
+  err := repo.db.Raw(`
+      SELECT 
+        invoice_materials.id as invoice_material_id,
+        materials.name as material_name,
+        materials.unit as material_unit,
+        materials.category as material_category,
+        material_costs.cost_prime as material_cost_prime,
+        material_costs.cost_m19 as material_cost_m19,
+        material_costs.cost_with_customer as material_cost_with_customer,
+        invoice_materials.amount as invoice_material_amount,
+        invoice_materials.notes as invoice_material_notes
+      FROM invoice_materials
+      INNER JOIN material_costs ON material_costs.id = invoice_materials.material_cost_id
+      INNER JOIN materials ON materials.id = material_costs.material_id
+      WHERE
+        invoice_type = ? AND
+        invoice_id = ?;
+    `, invoiceType, invoiceID).Scan(&result).Error
+  
+  return result, err
 }

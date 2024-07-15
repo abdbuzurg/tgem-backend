@@ -22,6 +22,9 @@ type IInvoiceCorrectionRepository interface {
 	GetInvoiceMaterialsDataByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionMaterialsData, error)
 	GetSerialNumberOfMaterialInTeam(projectID uint, materialID uint, teamID uint) ([]string, error)
 	Create(data dto.InvoiceCorrectionCreateQuery) (model.InvoiceObject, error)
+	UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueObject(projectID uint) ([]dto.ObjectDataForSelect, error)
+	ReportFilterData(filter dto.InvoiceCorrectionReportFilter) ([]dto.InvoiceCorrectionReportData, error)
 }
 
 func (repo *invoiceCorrectionRepository) GetInvoiceMaterialsDataByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionMaterialsData, error) {
@@ -72,6 +75,10 @@ func (repo *invoiceCorrectionRepository) Create(data dto.InvoiceCorrectionCreate
 			return err
 		}
 
+		if err := tx.Create(&data.OperatorDetails).Error; err != nil {
+			return err
+		}
+
 		for index := range data.Items {
 			data.Items[index].InvoiceID = result.ID
 		}
@@ -98,4 +105,86 @@ func (repo *invoiceCorrectionRepository) Create(data dto.InvoiceCorrectionCreate
 	})
 
 	return result, err
+}
+
+func (repo *invoiceCorrectionRepository) UniqueObject(projectID uint) ([]dto.ObjectDataForSelect, error) {
+	result := []dto.ObjectDataForSelect{}
+	err := repo.db.Raw(`
+    SELECT 
+      objects.id as id,
+      objects.name as object_name,
+      objects.type as object_type
+    FROM objects
+    WHERE objects.id IN (
+      SELECT DISTINCT(invoice_objects.object_id)
+      FROM invoice_objects
+      WHERE invoice_objects.project_id = ?
+    )
+  `, projectID).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *invoiceCorrectionRepository) UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error) {
+	result := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+      SELECT 
+        teams.id as "value",
+        CONCAT(teams.number, ' (', workers.name, ')') as "label"
+      FROM teams
+      INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+      INNER JOIN workers ON workers.id = team_leaders.leader_worker_id
+      WHERE teams.id IN (
+        SELECT DISTINCT(invoice_objects.team_id)
+        FROM invoice_objects
+        WHERE invoice_objects.project_id = ?
+      )
+    `, projectID).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *invoiceCorrectionRepository) ReportFilterData(filter dto.InvoiceCorrectionReportFilter) ([]dto.InvoiceCorrectionReportData, error) {
+	data := []dto.InvoiceCorrectionReportData{}
+	dateFrom := filter.DateFrom.String()
+	dateFrom = dateFrom[:len(dateFrom)-10]
+	dateTo := filter.DateTo.String()
+	dateTo = dateTo[:len(dateTo)-10]
+	err := repo.
+		db.
+		Raw(`
+      SELECT 
+        invoice_objects.id as id,
+        invoice_objects.delivery_code as delivery_code,
+        objects.name as object_name,
+        objects.type as object_type,
+        teams.number as team_number,
+        team_leader.name as team_leader_name,
+        invoice_objects.date_of_invoice as date_of_invoice,
+        operator.name as operator_name,
+        invoice_objects.date_of_correction as date_of_correction
+      FROM invoice_objects
+      INNER JOIN objects ON objects.id = invoice_objects.object_id
+      INNER JOIN teams ON teams.id = invoice_objects.team_id
+      INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+      INNER JOIN workers AS team_leader ON team_leader.id = team_leaders.leader_worker_id
+      INNER JOIN invoice_object_operators ON invoice_object_operators.invoice_object_id = invoice_objects.id
+      INNER JOIN workers AS operator ON operator.id = invoice_object_operators.operator_worker_id 
+      WHERE 
+        invoice_objects.project_id = ? AND
+        invoice_objects.confirmed_by_operator = true AND
+        (nullif(?, 0) IS NULL OR invoice_objects.object_id = ?) AND
+        (nullif(?, 0) IS NULL OR invoice_objects.team_id = ?) AND
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= invoice_objects.date_of_invoice) AND 
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR invoice_objects.date_of_invoice <= ?) ORDER BY invoice_objects.id DESC
+    `,
+			filter.ProjectID,
+			filter.ObjectID, filter.ObjectID,
+			filter.TeamID, filter.TeamID,
+			dateFrom, dateFrom,
+			dateTo, dateTo,
+		).
+		Scan(&data).Error
+
+	return data, err
 }

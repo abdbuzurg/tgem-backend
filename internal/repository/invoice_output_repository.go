@@ -30,13 +30,12 @@ type IInvoiceOutputRepository interface {
 	Update(data dto.InvoiceOutputCreateQueryData) (model.InvoiceOutput, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
-	UniqueCode(projectID uint) ([]string, error)
-	UniqueWarehouseManager(projectID uint) ([]string, error)
-	UniqueRecieved(projectID uint) ([]string, error)
-	UniqueDistrict(projectID uint) ([]string, error)
-	UniqueObject(projectID uint) ([]string, error)
-	UniqueTeam(projectID uint) ([]string, error)
-	ReportFilterData(filter dto.InvoiceOutputReportFilter, projectID uint) ([]dto.InvoiceOutputDataForReport, error)
+	UniqueCode(projectID uint) ([]dto.DataForSelect[string], error)
+	UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueRecieved(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueDistrict(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error)
+	ReportFilterData(filter dto.InvoiceOutputReportFilterRequest) ([]dto.InvoiceOutputDataForReport, error)
 	Confirmation(data dto.InvoiceOutputConfirmationQueryData) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
 	GetMaterialDataForReport(invoiceID uint) ([]dto.InvoiceOutputMaterialDataForReport, error)
@@ -189,43 +188,87 @@ func (repo *invoiceOutputRepository) GetUnconfirmedByObjectInvoices() ([]model.I
 	return data, err
 }
 
-func (repo *invoiceOutputRepository) UniqueCode(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT delivery_code FROM invoice_outputs WHERE project_id = ?", projectID).Scan(&data).Error
+func (repo *invoiceOutputRepository) UniqueCode(projectID uint) ([]dto.DataForSelect[string], error) {
+	data := []dto.DataForSelect[string]{}
+	err := repo.db.Raw(`
+      SELECT 
+        delivery_code as "label",
+        delivery_code as "value"
+      FROM invoice_outputs
+      WHERE project_id = ?
+      ORDER BY id DESC;
+    `, projectID).Scan(&data).Error
+
 	return data, err
 }
 
-func (repo *invoiceOutputRepository) UniqueWarehouseManager(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT warehouse_manager_worker_id FROM invoice_outputs WHERE project_id = ?", projectID).Scan(&data).Error
+func (repo *invoiceOutputRepository) UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error) {
+	data := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+      SELECT 
+        workers.id as "value",
+        workers.name as "label"
+      FROM workers
+      WHERE workers.id IN (
+        SELECT DISTINCT(invoice_outputs.warehouse_manager_worker_id)
+        FROM invoice_outputs
+        WHERE invoice_outputs.project_id = ?
+      )
+    `, projectID).Scan(&data).Error
 	return data, err
 }
 
-func (repo *invoiceOutputRepository) UniqueRecieved(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT recieved_worker_id FROM invoice_outputs WHERE project_id = ?", projectID).Scan(&data).Error
+func (repo *invoiceOutputRepository) UniqueRecieved(projectID uint) ([]dto.DataForSelect[uint], error) {
+	data := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+      SELECT 
+        workers.id as "value",
+        workers.name as "label"
+      FROM workers
+      WHERE workers.id IN (
+        SELECT DISTINCT(invoice_outputs.recipient_worker_id)
+        FROM invoice_outputs
+        WHERE invoice_outputs.project_id = ?
+      )
+    `, projectID).Scan(&data).Error
 	return data, err
 }
 
-func (repo *invoiceOutputRepository) UniqueDistrict(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT district_id FROM invoice_outputs WHERE project_id = ?", projectID).Scan(&data).Error
+func (repo *invoiceOutputRepository) UniqueDistrict(projectID uint) ([]dto.DataForSelect[uint], error) {
+	data := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+      SELECT 
+        districts.id as "value",
+        districts.name as "label"
+      FROM districts
+      WHERE districts.id IN (
+        SELECT DISTINCT(invoice_outputs.district_id)
+        FROM invoice_outputs
+        WHERE invoice_outputs.project_id = ?
+      )
+    `, projectID).Scan(&data).Error
 	return data, err
 }
 
-func (repo *invoiceOutputRepository) UniqueObject(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT object_id FROM invoice_outputs WHERE project_id = ?", projectID).Scan(&data).Error
+func (repo *invoiceOutputRepository) UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error) {
+	data := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+      SELECT 
+        teams.id as "value",
+        CONCAT(teams.number, ' (', workers.name, ')') as "label"
+      FROM teams
+      INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+      INNER JOIN workers ON workers.id = team_leaders.leader_worker_id
+      WHERE teams.id IN (
+        SELECT DISTINCT(invoice_outputs.team_id)
+        FROM invoice_outputs
+        WHERE invoice_outputs.project_id = ?
+      )
+    `, projectID).Scan(&data).Error
 	return data, err
 }
 
-func (repo *invoiceOutputRepository) UniqueTeam(projectID uint) ([]string, error) {
-	data := []string{}
-	err := repo.db.Raw("SELECT DISTINCT team_id FROM invoice_outputs WHERE project_id = ?", projectID).Scan(&data).Error
-	return data, err
-}
-
-func (repo *invoiceOutputRepository) ReportFilterData(filter dto.InvoiceOutputReportFilter, projectID uint) ([]dto.InvoiceOutputDataForReport, error) {
+func (repo *invoiceOutputRepository) ReportFilterData(filter dto.InvoiceOutputReportFilterRequest) ([]dto.InvoiceOutputDataForReport, error) {
 	data := []dto.InvoiceOutputDataForReport{}
 	dateFrom := filter.DateFrom.String()
 	dateFrom = dateFrom[:len(dateFrom)-10]
@@ -240,13 +283,17 @@ func (repo *invoiceOutputRepository) ReportFilterData(filter dto.InvoiceOutputRe
         warehouse_manager.name as warehouse_manager_name,
         recipient_worker.name as recipient_name,
         teams.number as team_number,
+        leader_worker.name as team_leader_name,
         invoice_outputs.date_of_invoice as date_of_invoice
       FROM invoice_outputs
       INNER JOIN workers as warehouse_manager ON warehouse_manager.id = invoice_outputs.warehouse_manager_worker_id
       INNER JOIN workers as recipient_worker ON recipient_worker.id = invoice_outputs.recipient_worker_id
       INNER JOIN teams ON teams.id = invoice_outputs.team_id 
+      INNER JOIN team_leaders ON teams.id = team_leaders.team_id
+      INNER JOIN workers as leader_worker ON leader_worker.id = team_leaders.leader_worker_id
       WHERE
-        (nullif(?, 0) IS NULL OR invoice_outputs.project_id = ?) AND
+        invoice_outputs.project_id = ? AND
+        invoice_outputs.confirmation = true AND
         (nullif(?, '') IS NULL OR invoice_outputs.delivery_code = ?) AND
         (nullif(?, 0) IS NULL OR invoice_outputs.recipient_worker_id = ?) AND
         (nullif(?, 0) IS NULL OR invoice_outputs.warehouse_manager_worker_id = ?) AND
@@ -254,7 +301,7 @@ func (repo *invoiceOutputRepository) ReportFilterData(filter dto.InvoiceOutputRe
         (nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= invoice_outputs.date_of_invoice) AND 
         (nullif(?, '0001-01-01 00:00:00') IS NULL OR invoice_outputs.date_of_invoice <= ?) ORDER BY invoice_outputs.id DESC
 		`,
-			projectID, projectID,
+			filter.ProjectID,
 			filter.Code, filter.Code,
 			filter.ReceivedID, filter.ReceivedID,
 			filter.WarehouseManagerID, filter.WarehouseManagerID,

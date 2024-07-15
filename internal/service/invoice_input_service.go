@@ -7,7 +7,6 @@ import (
 	"backend-v2/pkg/utils"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/xuri/excelize/v2"
@@ -57,10 +56,10 @@ type IInvoiceInputService interface {
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
 	Confirmation(id, projectID uint) error
-	UniqueCode(projectID uint) ([]string, error)
-	UniqueWarehouseManager(projectID uint) ([]string, error)
-	UniqueReleased(projectID uint) ([]string, error)
-	Report(filter dto.InvoiceInputReportFilterRequest, projectID uint) (string, error)
+	UniqueCode(projectID uint) ([]dto.DataForSelect[string], error)
+	UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error)
+	UniqueReleased(projectID uint) ([]dto.DataForSelect[uint], error)
+	Report(filter dto.InvoiceInputReportFilterRequest) (string, error)
 	NewMaterialCost(data model.MaterialCost) error
 	NewMaterialAndItsCost(data dto.NewMaterialDataFromInvoiceInput) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
@@ -315,81 +314,20 @@ func (service *invoiceInputService) Confirmation(id, projectID uint) error {
 	return err
 }
 
-func (service *invoiceInputService) UniqueCode(projectID uint) ([]string, error) {
+func (service *invoiceInputService) UniqueCode(projectID uint) ([]dto.DataForSelect[string], error) {
 	return service.invoiceInputRepo.UniqueCode(projectID)
 }
 
-func (service *invoiceInputService) UniqueWarehouseManager(projectID uint) ([]string, error) {
-	ids, err := service.invoiceInputRepo.UniqueWarehouseManager(projectID)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, id := range ids {
-		idconv, _ := strconv.ParseUint(id, 10, 32)
-		warehouseManager, err := service.workerRepo.GetByID(uint(idconv))
-		if err != nil {
-			return []string{}, err
-		}
-
-		result = append(result, warehouseManager.Name)
-	}
-
-	return result, nil
+func (service *invoiceInputService) UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error) {
+	return service.invoiceInputRepo.UniqueWarehouseManager(projectID)
 }
 
-func (service *invoiceInputService) UniqueReleased(projectID uint) ([]string, error) {
-	ids, err := service.invoiceInputRepo.UniqueReleased(projectID)
-	if err != nil {
-		return []string{}, err
-	}
-
-	result := []string{}
-	for _, id := range ids {
-		idconv, _ := strconv.ParseUint(id, 10, 32)
-		released, err := service.workerRepo.GetByID(uint(idconv))
-		if err != nil {
-			return []string{}, err
-		}
-
-		result = append(result, released.Name)
-	}
-
-	return result, nil
+func (service *invoiceInputService) UniqueReleased(projectID uint) ([]dto.DataForSelect[uint], error) {
+	return service.invoiceInputRepo.UniqueReleased(projectID)
 }
 
-func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRequest, projectID uint) (string, error) {
-	newFilter := dto.InvoiceInputReportFilter{
-		Code:     filter.Code,
-		DateFrom: filter.DateFrom,
-		DateTo:   filter.DateTo,
-	}
-
-	var err error
-	if filter.WarehouseManager != "" {
-		warehouseManager, err := service.workerRepo.GetByName(filter.WarehouseManager)
-		if err != nil {
-			return "", err
-		}
-
-		newFilter.WarehouseManagerID = warehouseManager.ID
-	} else {
-		newFilter.WarehouseManagerID = 0
-	}
-
-	if filter.Released != "" {
-		released, err := service.workerRepo.GetByName(filter.Released)
-		if err != nil {
-			return "", err
-		}
-
-		newFilter.ReleasedID = released.ID
-	} else {
-		newFilter.ReleasedID = 0
-	}
-
-	invoices, err := service.invoiceInputRepo.ReportFilterData(newFilter, projectID)
+func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRequest) (string, error) {
+	invoices, err := service.invoiceInputRepo.ReportFilterData(filter)
 	if err != nil {
 		return "", err
 	}
@@ -403,47 +341,27 @@ func (service *invoiceInputService) Report(filter dto.InvoiceInputReportFilterRe
 
 	rowCount := 2
 	for _, invoice := range invoices {
-		invoiceMaterials, err := service.invoiceMaterialRepo.GetByInvoice(filter.ProjectID, invoice.ID, "input")
+		invoiceMaterials, err := service.invoiceMaterialRepo.GetDataForReport(invoice.ID, "input")
 		if err != nil {
 			return "", err
 		}
 
 		for _, invoiceMaterial := range invoiceMaterials {
-			materialCost, err := service.materialCostRepo.GetByID(invoiceMaterial.MaterialCostID)
-			if err != nil {
-				return "", nil
-			}
+			f.SetCellStr(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
+			f.SetCellStr(sheetName, "B"+fmt.Sprint(rowCount), invoice.WarehouseManagerName)
+			f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), invoice.ReleasedName)
 
-			material, err := service.materialRepo.GetByID(materialCost.MaterialID)
-			if err != nil {
-				return "", nil
-			}
-
-			f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
-
-			warehouseManager, err := service.workerRepo.GetByID(invoice.WarehouseManagerWorkerID)
-			if err != nil {
-				return "", err
-			}
-			f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), warehouseManager.Name)
-
-			released, err := service.workerRepo.GetByID(invoice.ReleasedWorkerID)
-			if err != nil {
-				return "", err
-			}
-
-			f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), released.Name)
 			dateOfInvoice := invoice.DateOfInvoice.String()
 			dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
-			f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
+			f.SetCellStr(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
 
-			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), material.Name)
-			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), material.Unit)
-			f.SetCellFloat(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.Amount, 2, 64)
+			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), invoiceMaterial.MaterialName)
+			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), invoiceMaterial.MaterialUnit)
+			f.SetCellFloat(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.InvoiceMaterialAmount, 2, 64)
 
-			costM19, _ := materialCost.CostM19.Float64()
+			costM19, _ := invoiceMaterial.MaterialCostM19.Float64()
 			f.SetCellFloat(sheetName, "H"+fmt.Sprint(rowCount), costM19, 2, 64)
-			f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.Notes)
+			f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.InvoiceMaterialNotes)
 			rowCount++
 		}
 	}

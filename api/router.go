@@ -276,6 +276,9 @@ func InitInvoiceCorrectionRoutes(router *gin.RouterGroup, controller controller.
 	invoiceCorrectionRoutes.GET("/materials/:id", controller.GetInvoiceMaterialsByInvoiceObjectID)
 	invoiceCorrectionRoutes.GET("/total-amount/:materialID/team/:teamNumber", controller.GetTotalMaterialInTeamByTeamNumber)
 	invoiceCorrectionRoutes.GET("/serial-number/material/:materialID/teams/:teamNumber", controller.GetSerialNumbersOfMaterial)
+	invoiceCorrectionRoutes.GET("unique/team", controller.UniqueTeam)
+	invoiceCorrectionRoutes.GET("unique/object", controller.UniqueObject)
+  invoiceCorrectionRoutes.POST("/report", controller.Report)
   invoiceCorrectionRoutes.POST("/", controller.Create)
 }
 

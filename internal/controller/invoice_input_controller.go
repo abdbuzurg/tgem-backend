@@ -316,7 +316,7 @@ func (controller *invoiceInputController) Report(c *gin.Context) {
 	}
 
 	filter.ProjectID = projectID
-	filename, err := controller.invoiceInputService.Report(filter, projectID)
+	filename, err := controller.invoiceInputService.Report(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
