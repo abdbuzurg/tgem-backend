@@ -272,6 +272,7 @@ func InitInvoiceCorrectionRoutes(router *gin.RouterGroup, controller controller.
 		middleware.Authentication(),
 	)
 
+  invoiceCorrectionRoutes.GET("/paginated", controller.GetPaginated)
 	invoiceCorrectionRoutes.GET("/", controller.GetAll)
 	invoiceCorrectionRoutes.GET("/materials/:id", controller.GetInvoiceMaterialsByInvoiceObjectID)
 	invoiceCorrectionRoutes.GET("/total-amount/:materialID/team/:teamNumber", controller.GetTotalMaterialInTeamByTeamNumber)

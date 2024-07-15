@@ -33,6 +33,39 @@ type IInvoiceCorrectionController interface {
 	UniqueObject(c *gin.Context)
 	UniqueTeam(c *gin.Context)
 	Report(c *gin.Context)
+	GetPaginated(c *gin.Context)
+}
+
+func (controller *invoiceCorrectionController) GetPaginated(c *gin.Context) {
+	pageStr := c.DefaultQuery("page", "1")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for page: %v", err))
+		return
+	}
+
+	limitStr := c.DefaultQuery("limit", "10")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
+
+  projectID := c.GetUint("projectID")
+
+	data, err := controller.invoiceCorrectionService.GetPaginated(page, limit, projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	dataCount, err := controller.invoiceCorrectionService.Count(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponsePaginatedData(c, data, dataCount)
 }
 
 func (controller *invoiceCorrectionController) GetAll(c *gin.Context) {
@@ -122,7 +155,7 @@ func (controller *invoiceCorrectionController) Create(c *gin.Context) {
 		return
 	}
 
-  createData.Details.OperatorWorkerID = c.GetUint("workerID")
+	createData.Details.OperatorWorkerID = c.GetUint("workerID")
 
 	data, err := controller.invoiceCorrectionService.Create(createData)
 	if err != nil {
