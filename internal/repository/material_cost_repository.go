@@ -68,8 +68,8 @@ func (repo *materialCostRepository) GetPaginatedFiltered(page, limit int, filter
       INNER JOIN materials ON materials.id = material_costs.material_id
       WHERE 
         materials.project_id = ? AND
-        (nullif(?, '') IS NULL OR materials.name = ?) AND
-      ORDER BY id DESC LIMIT ? OFFSET ?`,
+        (nullif(?, '') IS NULL OR materials.name = ?) 
+      ORDER BY material_costs.id DESC LIMIT ? OFFSET ?`,
 			filter.ProjectID,
 			filter.MaterialName, filter.MaterialName,
 			limit, (page-1)*limit,
