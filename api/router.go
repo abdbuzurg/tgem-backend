@@ -21,7 +21,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	mainRouter.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin, Content-Type, Authorization"},
+		AllowHeaders:     []string{"Content-Type", "Content-Length", "Accept-Encoding", "Authorization", "Cache-Control"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		AllowFiles:       true,
@@ -126,6 +126,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectSupervisorsRepo,
 		objectTeamsRepo,
     tpNourashesObjectsRepo,
+    teamRepo,
+    tpObjectRepo,
+    objectRepo,
 	)
 	materialCostService := service.InitMaterialCostService(
     materialCostRepo,
@@ -149,6 +152,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectSupervisorsRepo,
 		objectTeamsRepo,
     tpNourashesObjectsRepo,
+    teamRepo,
+    tpObjectRepo,
+    objectRepo,
 	)
 	// objectOperationService := service.InitObjectOperationService(objectOperationRepo)
 	objectService := service.InitObjectService(
@@ -479,16 +485,16 @@ func InitTPObjectRoutes(router *gin.RouterGroup, controller controller.ITPObject
 }
 
 func InitSubstationObjectRoutes(router *gin.RouterGroup, controller controller.ISubstationObjectController) {
-	tpObjectRoutes := router.Group("/object/substation")
-	tpObjectRoutes.Use(
+	substationObjectRoutes := router.Group("/object/substation")
+	substationObjectRoutes.Use(
 		middleware.Authentication(),
 	)
-	tpObjectRoutes.GET("/paginated", controller.GetPaginated)
-	tpObjectRoutes.GET("/document/template", controller.GetTemplateFile)
-	tpObjectRoutes.POST("/", controller.Create)
-	tpObjectRoutes.POST("/document/import", controller.Import)
-	tpObjectRoutes.PATCH("/", controller.Update)
-	tpObjectRoutes.DELETE("/:id", controller.Delete)
+	substationObjectRoutes.GET("/paginated", controller.GetPaginated)
+	substationObjectRoutes.GET("/document/template", controller.GetTemplateFile)
+	substationObjectRoutes.POST("/", controller.Create)
+	substationObjectRoutes.POST("/document/import", controller.Import)
+	substationObjectRoutes.PATCH("/", controller.Update)
+	substationObjectRoutes.DELETE("/:id", controller.Delete)
 }
 
 func InitSTVTObjectRoutes(router *gin.RouterGroup, controller controller.ISTVTObjectController) {
@@ -535,8 +541,10 @@ func InitKL04KVObjectRoutes(router *gin.RouterGroup, controller controller.IKL04
 	kl04kvObjectRoutes.Use(
 		middleware.Authentication(),
 	)
-	kl04kvObjectRoutes.GET("/paginated", controller.GetPaginated)
+	kl04kvObjectRoutes.GET("/paginated", controller.GetPaginated) 
+  kl04kvObjectRoutes.GET("/document/export", controller.Export)
 	kl04kvObjectRoutes.GET("/document/template", controller.GetTemplateFile)
+  kl04kvObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
 	kl04kvObjectRoutes.POST("/", controller.Create)
 	kl04kvObjectRoutes.POST("/document/import", controller.Import)
 	kl04kvObjectRoutes.PATCH("/", controller.Update)

@@ -215,7 +215,7 @@ func (service *materialService) Export(projectID uint) (string, error) {
 		materialCount -= int64(limit)
 	}
 
-	exportFileName := "Эспорт Материалов.xlsx"
+	exportFileName := "Экспорт Материалов.xlsx"
 	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
 	if err := f.SaveAs(exportFilePath); err != nil {
 		return "", err

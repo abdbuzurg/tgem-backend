@@ -41,7 +41,7 @@ type ITPObjectService interface {
 	Create(data dto.TPObjectCreate) (model.TP_Object, error)
 	Update(data dto.TPObjectCreate) (model.TP_Object, error)
 	Delete(id, projectID uint) error
-	TemplateFile(filepath string) error
+	TemplateFile(filepath string, projectID uint) error
 	Import(projectID uint, filepath string) error
 }
 
@@ -100,7 +100,7 @@ func (service *tpObjectService) Delete(id, projectID uint) error {
 	return service.tpObjectRepo.Delete(id, projectID)
 }
 
-func (service *tpObjectService) TemplateFile(filepath string) error {
+func (service *tpObjectService) TemplateFile(filepath string, projectID uint) error {
 
 	f, err := excelize.OpenFile(filepath)
 	if err != nil {
@@ -109,7 +109,7 @@ func (service *tpObjectService) TemplateFile(filepath string) error {
 	}
 
 	sheetName := "Супервайзеры"
-	allSupervisors, err := service.workerRepo.GetByJobTitleInProject("Супервайзер")
+	allSupervisors, err := service.workerRepo.GetByJobTitleInProject("Супервайзер", projectID)
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("Данные супервайзеров недоступны: %v", err)

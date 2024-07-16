@@ -38,7 +38,7 @@ type ISIPObjectService interface {
 	Create(data dto.SIPObjectCreate) (model.SIP_Object, error)
 	Update(data dto.SIPObjectCreate) (model.SIP_Object, error)
 	Delete(id, projectID uint) error
-	TemplateFile(filepath string) error
+	TemplateFile(filepath string, projectID uint) error
 	Import(projectID uint, filepath string) error
 }
 
@@ -92,7 +92,7 @@ func (service *sipObjectService) Delete(id, projectID uint) error {
 	return service.sipObjectRepo.Delete(id, projectID)
 }
 
-func (service *sipObjectService) TemplateFile(filepath string) error {
+func (service *sipObjectService) TemplateFile(filepath string, projectID uint) error {
 	f, err := excelize.OpenFile(filepath)
 	if err != nil {
 		f.Close()
@@ -100,7 +100,7 @@ func (service *sipObjectService) TemplateFile(filepath string) error {
 	}
 
 	sheetName := "Супервайзеры"
-	allSupervisors, err := service.workerRepo.GetByJobTitleInProject("Супервайзер")
+	allSupervisors, err := service.workerRepo.GetByJobTitleInProject("Супервайзер", projectID)
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("Данные супервайзеров недоступны: %v", err)

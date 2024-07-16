@@ -40,7 +40,7 @@ func (controller *tpObjectController) GetAll(c *gin.Context) {
 		return
 	}
 
-  response.ResponseSuccess(c, data)
+	response.ResponseSuccess(c, data)
 }
 
 func (controller *tpObjectController) GetPaginated(c *gin.Context) {
@@ -136,7 +136,7 @@ func (controller *tpObjectController) Delete(c *gin.Context) {
 func (controller *tpObjectController) GetTemplateFile(c *gin.Context) {
 	filepath := "./pkg/excels/templates/Шаблон для импорта ТП.xlsx"
 
-	if err := controller.tpObjectService.TemplateFile(filepath); err != nil {
+	if err := controller.tpObjectService.TemplateFile(filepath, c.GetUint("projectID")); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}

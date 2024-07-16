@@ -38,7 +38,7 @@ type ISubstationObjectService interface{
 	Create(data dto.SubstationObjectCreate) (model.Substation_Object, error)
 	Update(data dto.SubstationObjectCreate) (model.Substation_Object, error)
 	Delete(id, projectID uint) error
-	TemplateFile(filepath string) error
+	TemplateFile(filepath string, projectID uint) error
 	Import(projectID uint, filepath string) error
 }
 
@@ -92,7 +92,7 @@ func (service *substationObjectService) Delete(id, projectID uint) error {
 	return service.substationObjectRepo.Delete(id, projectID)
 }
 
-func (service *substationObjectService) TemplateFile(filepath string) error {
+func (service *substationObjectService) TemplateFile(filepath string, projectID uint) error {
 
 	f, err := excelize.OpenFile(filepath)
 	if err != nil {
@@ -101,7 +101,7 @@ func (service *substationObjectService) TemplateFile(filepath string) error {
 	}
 
 	sheetName := "Супервайзеры"
-	allSupervisors, err := service.workerRepo.GetByJobTitleInProject("Супервайзер")
+	allSupervisors, err := service.workerRepo.GetByJobTitleInProject("Супервайзер", projectID)
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("Данные супервайзеров недоступны: %v", err)

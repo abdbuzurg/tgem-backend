@@ -20,7 +20,7 @@ type IWorkerRepository interface {
 	GetAll() ([]model.Worker, error)
 	GetPaginated(page, limit int) ([]model.Worker, error)
 	GetPaginatedFiltered(page, limit int, filter model.Worker) ([]model.Worker, error)
-	GetByJobTitleInProject(jobTitleInProject string) ([]model.Worker, error)
+	GetByJobTitleInProject(jobTitleInProject string, projectID uint) ([]model.Worker, error)
   GetByName(name string) (model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
 	Create(data model.Worker) (model.Worker, error)
@@ -63,9 +63,9 @@ func(repo *workerRepository) GetByName(name string) (model.Worker, error) {
   return data, err
 }
 
-func (repo *workerRepository) GetByJobTitleInProject(jobTitleInProject string) ([]model.Worker, error) {
+func (repo *workerRepository) GetByJobTitleInProject(jobTitleInProject string, projectID uint) ([]model.Worker, error) {
 	data := []model.Worker{}
-	err := repo.db.Order("id DESC").Find(&data, "job_title_in_project = ?", jobTitleInProject).Error
+	err := repo.db.Order("id DESC").Find(&data, "job_title_in_project = ? AND project_id = ?", jobTitleInProject, projectID).Error
 	return data, err
 }
 

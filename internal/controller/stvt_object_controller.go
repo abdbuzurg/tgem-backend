@@ -126,7 +126,7 @@ func (controller *stvtObjectController) Delete(c *gin.Context) {
 func (controller *stvtObjectController) GetTemplateFile(c *gin.Context) {
 	filepath := "./pkg/excels/templates/Шаблон для импорта СТВТ.xlsx"
 
-	if err := controller.stvtObjectService.TemplateFile(filepath); err != nil {
+	if err := controller.stvtObjectService.TemplateFile(filepath, c.GetUint("projectID")); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}

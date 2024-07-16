@@ -34,3 +34,11 @@ type MJDObjectCreate struct {
 	Teams                 []uint           `json:"teams"`
 	NourashedByTPObjectID []uint           `json:"nourashedByTP"`
 }
+
+type MJDObjectImportData struct {
+	Object            model.Object
+	MJD               model.MJD_Object
+	ObjectSupervisors model.ObjectSupervisors
+	ObjectTeam        model.ObjectTeams
+	NourashedByTP     model.TPNourashesObjects
+}

@@ -19,13 +19,15 @@ func InitKL04KVObjectRepository(db *gorm.DB) IKL04KVObjectRepository {
 
 type IKL04KVObjectRepository interface {
 	GetAll() ([]model.KL04KV_Object, error)
-	GetPaginated(page, limit int, projectID uint) ([]dto.KL04KVObjectPaginatedQuery, error)
+	GetPaginated(page, limit int, filter dto.KL04KVObjectSearchParameters) ([]dto.KL04KVObjectPaginatedQuery, error)
 	GetByID(id uint) (model.KL04KV_Object, error)
 	Create(data dto.KL04KVObjectCreate) (model.KL04KV_Object, error)
 	CreateInBatches(objects []model.Object, kl04kvs []model.KL04KV_Object, supervisors []uint) ([]model.KL04KV_Object, error)
 	Delete(projectID, id uint) error
-	Count(projectID uint) (int64, error)
+	Count(filter dto.KL04KVObjectSearchParameters) (int64, error)
 	Update(data dto.KL04KVObjectCreate) (model.KL04KV_Object, error)
+	Import(data []dto.KL04KVObjectImportData) error
+  GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error)
 }
 
 func (repo *kl04kvObjectRepository) GetAll() ([]model.KL04KV_Object, error) {
@@ -34,7 +36,7 @@ func (repo *kl04kvObjectRepository) GetAll() ([]model.KL04KV_Object, error) {
 	return data, err
 }
 
-func (repo *kl04kvObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.KL04KVObjectPaginatedQuery, error) {
+func (repo *kl04kvObjectRepository) GetPaginated(page, limit int, filter dto.KL04KVObjectSearchParameters) ([]dto.KL04KVObjectPaginatedQuery, error) {
 	data := []dto.KL04KVObjectPaginatedQuery{}
 	err := repo.db.Raw(`
     SELECT 
@@ -45,15 +47,27 @@ func (repo *kl04kvObjectRepository) GetPaginated(page, limit int, projectID uint
       kl04_kv_objects.length as length,
       kl04_kv_objects.nourashes as nourashes
     FROM objects
-      INNER JOIN kl04_kv_objects ON objects.object_detailed_id = kl04_kv_objects.id
+    INNER JOIN kl04_kv_objects ON kl04_kv_objects.id = objects.object_detailed_id
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
     WHERE
       objects.type = 'kl04kv_objects' AND
-      objects.project_id = ?
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?) AND
+      (nullif(?, 0) IS NULL OR tp_nourashes_objects.tp_object_id = ?)
     ORDER BY kl04_kv_objects.id DESC 
     LIMIT ? 
     OFFSET ?;
 
-    `, projectID, limit, (page-1)*limit).Scan(&data).Error
+    `, filter.ProjectID,
+    filter.ObjectName, filter.ObjectName,
+    filter.TeamID, filter.TeamID,
+    filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+    filter.TPObjectID, filter.TPObjectID,
+    limit, (page-1)*limit).Scan(&data).Error
 	return data, err
 }
 
@@ -161,6 +175,22 @@ func (repo *kl04kvObjectRepository) Delete(projectID, id uint) error {
 			return err
 		}
 
+		err = tx.Exec(`
+        DELETE FROM tp_nourashes_objects
+        WHERE tp_nourashes_objects.target_id = (
+        SELECT DISTINCT(objects.id)
+        FROM objects
+          INNER JOIN kl04_kv_objects ON kl04_kv_objects.id = objects.object_detailed_id
+        WHERE
+          objects.project_id = ? AND
+          kl04_kv_objects.id = ? AND
+          objects.type = 'kl04kv_objects'
+        );
+      `, projectID, id).Error
+    if err != nil {
+      return err
+    }
+
 		if err := tx.Table("kl04_kv_objects").Delete(&model.KL04KV_Object{}, "id = ?", id).Error; err != nil {
 			return err
 		}
@@ -175,15 +205,29 @@ func (repo *kl04kvObjectRepository) Delete(projectID, id uint) error {
 	return err
 }
 
-func (repo *kl04kvObjectRepository) Count(projectID uint) (int64, error) {
+func (repo *kl04kvObjectRepository) Count(filter dto.KL04KVObjectSearchParameters) (int64, error) {
 	var count int64
 	err := repo.db.Raw(`
     SELECT COUNT(*)
     FROM objects
+    INNER JOIN kl04_kv_objects ON kl04_kv_objects.id = objects.object_detailed_id
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
     WHERE
       objects.type = 'kl04kv_objects' AND
-      objects.project_id = ?
-    `, projectID).Scan(&count).Error
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?) AND
+      (nullif(?, 0) IS NULL OR tp_nourashes_objects.tp_object_id = ?)
+    `,
+    filter.ProjectID,
+    filter.ObjectName, filter.ObjectName,
+    filter.TeamID, filter.TeamID,
+    filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+    filter.TPObjectID, filter.TPObjectID,
+    ).Scan(&count).Error
 	return count, err
 }
 
@@ -253,7 +297,7 @@ func (repo *kl04kvObjectRepository) Update(data dto.KL04KVObjectCreate) (model.K
 			return err
 		}
 
-    if len(data.NourashedByTPObjectID) != 0 {
+		if len(data.NourashedByTPObjectID) != 0 {
 			tpNourashesObjects := []model.TPNourashesObjects{}
 			for _, tpObjectID := range data.NourashedByTPObjectID {
 				tpNourashesObjects = append(tpNourashesObjects, model.TPNourashesObjects{
@@ -267,7 +311,7 @@ func (repo *kl04kvObjectRepository) Update(data dto.KL04KVObjectCreate) (model.K
 				}
 			}
 
-    }
+		}
 
 		return nil
 	})
@@ -293,4 +337,63 @@ func (repo *kl04kvObjectRepository) CreateInBatches(objects []model.Object, kl04
 	})
 
 	return kl04kvs, err
+}
+
+func (repo *kl04kvObjectRepository) Import(data []dto.KL04KVObjectImportData) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+
+		for index, row := range data {
+			kl04kv := row.Kl04KV
+			if err := tx.Create(&kl04kv).Error; err != nil {
+				return err
+			}
+
+			object := row.Object
+			object.ObjectDetailedID = kl04kv.ID
+			data[index].Object.ObjectDetailedID = kl04kv.ID
+			if err := tx.Create(&object).Error; err != nil {
+				return err
+			}
+
+			if row.ObjectSupervisors.SupervisorWorkerID != 0 {
+				data[index].ObjectSupervisors.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectSupervisors).Error; err != nil {
+					return err
+				}
+			}
+
+			if row.ObjectTeam.TeamID != 0 {
+				data[index].ObjectTeam.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectTeam).Error; err != nil {
+					return err
+				}
+			}
+
+			if row.NourashedByTP.TP_ObjectID != 0 {
+				data[index].NourashedByTP.TargetID = object.ID
+				if err := tx.Create(&data[index].NourashedByTP).Error; err != nil {
+					return err
+				}
+			}
+
+		}
+
+		return nil
+	})
+}
+
+func (repo *kl04kvObjectRepository) GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error) {
+  data := []dto.DataForSelect[string]{}
+  err := repo.db.Raw(`
+    SELECT 
+      objects.name as "label",
+      objects.name as "value"
+    FROM objects
+    INNER JOIN kl04_kv_objects ON kl04_kv_objects.id = objects.object_detailed_id
+    WHERE
+      objects.project_id = ? AND
+      objects.type = 'kl04kv_objects'
+    `, projectID).Scan(&data).Error
+
+  return data, err
 }

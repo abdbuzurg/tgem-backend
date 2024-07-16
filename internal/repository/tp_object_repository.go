@@ -18,12 +18,35 @@ func InitTPObjectRepository(db *gorm.DB) ITPObjectRepository {
 }
 
 type ITPObjectRepository interface {
+  GetAll(projectID uint) ([]dto.TPObjectPaginatedQuery, error)
 	GetPaginated(page, limit int, projectID uint) ([]dto.TPObjectPaginatedQuery, error)
 	Count(projectID uint) (int64, error)
 	Create(data dto.TPObjectCreate) (model.TP_Object, error)
 	Update(data dto.TPObjectCreate) (model.TP_Object, error)
 	Delete(id, projectID uint) error
 	CreateInBatches(objects []model.Object, tps []model.TP_Object, supervisors []uint) ([]model.TP_Object, error)
+}
+
+func (repo *tpObjectRepository) GetAll(projectID uint) ([]dto.TPObjectPaginatedQuery, error) {
+  data := []dto.TPObjectPaginatedQuery{}
+  err := repo.db.Raw(`
+      SELECT 
+        objects.id as object_id,
+        objects.object_detailed_id as object_detailed_id,
+        objects.name as name,
+        objects.status as status,
+        tp_objects.model as model,
+        tp_objects.voltage_class as voltage_class,
+        tp_objects.nourashes as nourashes
+      FROM objects
+        INNER JOIN tp_objects ON objects.object_detailed_id = tp_objects.id
+      WHERE
+        objects.type = 'tp_objects' AND
+        objects.project_id = ?
+      ORDER BY tp_objects.id DESC
+    `, projectID).Scan(&data).Error
+
+  return data, err
 }
 
 func (repo *tpObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.TPObjectPaginatedQuery, error) {

@@ -125,7 +125,7 @@ func (controller *substationObjectController) Delete(c *gin.Context) {
 func (controller *substationObjectController) GetTemplateFile(c *gin.Context) {
 	filepath := "./pkg/excels/templates/Шаблон для импорта Подстанции.xlsx"
 
-	if err := controller.substationObjectService.TemplateFile(filepath); err != nil {
+	if err := controller.substationObjectService.TemplateFile(filepath, c.GetUint("projectID")); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}

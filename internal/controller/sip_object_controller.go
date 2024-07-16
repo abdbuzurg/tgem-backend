@@ -126,7 +126,7 @@ func (controller *sipObjectController) Delete(c *gin.Context) {
 func (controller *sipObjectController) GetTemplateFile(c *gin.Context) {
 	filepath := "./pkg/excels/templates/Шаблон для импорта СИП.xlsx"
 
-	if err := controller.sipObjectService.TemplateFile(filepath); err != nil {
+	if err := controller.sipObjectService.TemplateFile(filepath, c.GetUint("projectID")); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}

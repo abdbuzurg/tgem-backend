@@ -24,6 +24,7 @@ type IMJDObjectRepository interface {
 	Update(data dto.MJDObjectCreate) (model.MJD_Object, error)
 	Delete(id, projectID uint) error
 	CreateInBatches(objects []model.Object, mjds []model.MJD_Object, supervisors []uint) ([]model.MJD_Object, error)
+	Import(data []dto.MJDObjectImportData) error
 }
 
 func (repo *mjdObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.MJDObjectPaginatedQuery, error) {
@@ -268,6 +269,23 @@ func (repo *mjdObjectRepository) Delete(id, projectID uint) error {
 			return err
 		}
 
+		err = tx.Exec(`
+      DELETE FROM tp_nourashes_objects
+      WHERE tp_nourashes_objects.target_id = (
+        SELECT DISTINCT(objects.id)
+        FROM objects
+          INNER JOIN mjd_objects ON mjd_objects.id = objects.object_detailed_id
+        WHERE
+          objects.project_id = ? AND
+          mjd_objects.id = ? AND
+          objects.type = 'mjd_objects'
+      );
+    `, projectID, id).Error
+
+		if err != nil {
+			return err
+		}
+
 		if err := tx.Table("mjd_objects").Delete(&model.MJD_Object{}, "id = ?", id).Error; err != nil {
 			return err
 		}
@@ -298,4 +316,46 @@ func (repo *mjdObjectRepository) CreateInBatches(objects []model.Object, mjds []
 	})
 
 	return mjds, err
+}
+
+func (repo *mjdObjectRepository) Import(data []dto.MJDObjectImportData) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		for index, row := range data {
+			mjd := row.MJD
+			if err := tx.Create(&mjd).Error; err != nil {
+				return err
+			}
+
+			object := row.Object
+			object.ObjectDetailedID = mjd.ID
+			data[index].Object.ObjectDetailedID = mjd.ID
+			if err := tx.Create(&object).Error; err != nil {
+				return err
+			}
+
+			if row.ObjectSupervisors.SupervisorWorkerID != 0 {
+				data[index].ObjectSupervisors.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectSupervisors).Error; err != nil {
+					return err
+				}
+			}
+
+			if row.ObjectTeam.TeamID != 0 {
+				data[index].ObjectTeam.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectTeam).Error; err != nil {
+					return err
+				}
+			}
+
+			if row.NourashedByTP.TP_ObjectID != 0 {
+				data[index].NourashedByTP.TargetID = object.ID
+				if err := tx.Create(&data[index].NourashedByTP).Error; err != nil {
+					return err
+				}
+			}
+
+		}
+
+		return nil
+	})
 }

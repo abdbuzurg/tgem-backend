@@ -30,3 +30,19 @@ type KL04KVObjectCreate struct {
 	Teams                 []uint              `json:"teams"`
 	NourashedByTPObjectID []uint              `json:"nourashedByTP"`
 }
+
+type KL04KVObjectImportData struct {
+	Object            model.Object
+	Kl04KV            model.KL04KV_Object
+	ObjectSupervisors model.ObjectSupervisors
+	ObjectTeam        model.ObjectTeams
+	NourashedByTP     model.TPNourashesObjects
+}
+
+type KL04KVObjectSearchParameters struct {
+  ProjectID uint
+  ObjectName string
+  TeamID uint
+  SupervisorWorkerID uint
+  TPObjectID uint
+}

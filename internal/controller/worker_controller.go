@@ -97,7 +97,7 @@ func (controller *workerController) GetByID(c *gin.Context) {
 func (controller *workerController) GetByJobTitleInProject(c *gin.Context) {
 	jobTitleInProject := c.Param("jobTitleInProject")
 
-	data, err := controller.workerService.GetByJobTitleInProject(jobTitleInProject)
+	data, err := controller.workerService.GetByJobTitleInProject(jobTitleInProject, c.GetUint("projectID"))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Cannot get workers by the job title: %v", err))
 		return

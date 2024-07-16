@@ -163,6 +163,7 @@ func (repo *teamRepository) GetByNumber(number string) (model.Team, error) {
 	data := model.Team{}
 	err := repo.db.
 		Raw(`SELECT * FROM teams WHERE number = ?`, number).
+    Scan(&data).
 		Error
 	return data, err
 }

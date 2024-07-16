@@ -5,6 +5,7 @@ import (
 	"backend-v2/internal/service"
 	"backend-v2/pkg/response"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -121,14 +122,14 @@ func (controller *mjdObjectController) Delete(c *gin.Context) {
 }
 
 func (controller *mjdObjectController) GetTemplateFile(c *gin.Context) {
-	filepath := "./pkg/excels/templates/Шаблон для импорта МЖД.xlsx"
+  templateFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта МЖД.xlsx")
 
-	if err := controller.mjdObjectService.TemplateFile(filepath); err != nil {
+	if err := controller.mjdObjectService.TemplateFile(templateFilePath, c.GetUint("projectID")); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	c.FileAttachment(filepath, "Шаблон для импорта МЖД.xlsx")
+	c.FileAttachment(templateFilePath, "Шаблон для импорта МЖД.xlsx")
 }
 
 func (controller *mjdObjectController) Import(c *gin.Context) {
@@ -139,15 +140,15 @@ func (controller *mjdObjectController) Import(c *gin.Context) {
 	}
 
 	date := time.Now()
-	filePath := "./pkg/excels/temp/" + date.Format("2006-01-02 15-04-05") + file.Filename
-	err = c.SaveUploadedFile(file, filePath)
+  importFilePath := filepath.Join("./pkg/excels/temp/",date.Format("2006-01-02 15-04-05") + file.Filename)
+	err = c.SaveUploadedFile(file, importFilePath)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
 		return
 	}
 
 	projectID := c.GetUint("projectID")
-	err = controller.mjdObjectService.Import(projectID, filePath)
+	err = controller.mjdObjectService.Import(projectID, importFilePath)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
