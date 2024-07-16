@@ -127,7 +127,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectTeamsRepo,
     tpNourashesObjectsRepo,
 	)
-	materialCostService := service.InitMaterialCostService(materialCostRepo)
+	materialCostService := service.InitMaterialCostService(
+    materialCostRepo,
+    materialRepo,
+  )
 	// materialForProjectService := service.InitMaterialForProjectService(materialForProjectRepo)
 	materialLocationService := service.InitMaterialLocationService(
 		materialLocationRepo,
@@ -394,6 +397,9 @@ func InitMaterialCostRoutes(router *gin.RouterGroup, controller controller.IMate
 	materialCostRoutes.Use(middleware.Authentication())
 	materialCostRoutes.GET("/paginated", controller.GetPaginated)
 	materialCostRoutes.GET("/material-id/:materialID", controller.GetAllMaterialCostByMaterialID)
+  materialCostRoutes.GET("/document/template", controller.ImportTemplate)
+  materialCostRoutes.GET("/document/export", controller.Export)
+  materialCostRoutes.POST("/document/import", controller.Import)
 	materialCostRoutes.POST("/", controller.Create)
 	materialCostRoutes.PATCH("/", controller.Update)
 	materialCostRoutes.DELETE("/:id", controller.Delete)
@@ -409,6 +415,7 @@ func InitMaterialRoutes(router *gin.RouterGroup, controller controller.IMaterial
 	materialRoutes.GET("/paginated", controller.GetPaginated)
 	materialRoutes.GET("/:id", controller.GetAll)
 	materialRoutes.GET("/document/template", controller.GetTemplateFile)
+  materialRoutes.GET("/document/export", controller.Export)
 	materialRoutes.POST("/", controller.Create)
 	materialRoutes.POST("/document/import", controller.Import)
 	materialRoutes.PATCH("/", controller.Update)

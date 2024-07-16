@@ -18,14 +18,15 @@ func InitMaterialRepository(db *gorm.DB) IMaterialRepository {
 
 type IMaterialRepository interface {
 	GetAll(projectID uint) ([]model.Material, error)
-	GetPaginated(page, limit int) ([]model.Material, error)
+	GetPaginated(page, limit int, projectID uint) ([]model.Material, error)
 	GetPaginatedFiltered(page, limit int, filter model.Material) ([]model.Material, error)
 	GetByID(id uint) (model.Material, error)
 	Create(data model.Material) (model.Material, error)
-  CreateInBatches(data []model.Material) ([]model.Material, error)
+	CreateInBatches(data []model.Material) ([]model.Material, error)
 	Update(data model.Material) (model.Material, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(filter model.Material) (int64, error)
+  GetByName(name string) (model.Material, error)
 }
 
 func (repo *materialRepository) GetAll(projectID uint) ([]model.Material, error) {
@@ -34,9 +35,9 @@ func (repo *materialRepository) GetAll(projectID uint) ([]model.Material, error)
 	return data, err
 }
 
-func (repo *materialRepository) GetPaginated(page, limit int) ([]model.Material, error) {
+func (repo *materialRepository) GetPaginated(page, limit int, projectID uint) ([]model.Material, error) {
 	data := []model.Material{}
-	err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data).Error
+	err := repo.db.Order("id desc").Offset((page-1)*limit).Limit(limit).Find(&data, "project_id = ?", projectID).Error
 	return data, err
 }
 
@@ -53,12 +54,12 @@ func (repo *materialRepository) GetPaginatedFiltered(page, limit int, filter mod
 			(nullif(?, '') IS NULL OR name = ?) AND
 			(nullif(?, '') IS NULL OR unit = ?) 
     ORDER BY id DESC LIMIT ? OFFSET ?`,
-    filter.ProjectID,
-		filter.Category, filter.Category, 
-    filter.Code, filter.Code, 
-    filter.Name, filter.Name, 
-    filter.Unit, filter.Unit, 
-    limit, (page-1)*limit,
+			filter.ProjectID,
+			filter.Category, filter.Category,
+			filter.Code, filter.Code,
+			filter.Name, filter.Name,
+			filter.Unit, filter.Unit,
+			limit, (page-1)*limit,
 		).Scan(&data).Error
 
 	return data, err
@@ -75,9 +76,9 @@ func (repo *materialRepository) Create(data model.Material) (model.Material, err
 	return data, err
 }
 
-func(repo *materialRepository) CreateInBatches(data []model.Material) ([]model.Material, error) {
-  err := repo.db.CreateInBatches(&data, 20).Error
-  return data, err
+func (repo *materialRepository) CreateInBatches(data []model.Material) ([]model.Material, error) {
+	err := repo.db.CreateInBatches(&data, 20).Error
+	return data, err
 }
 
 func (repo *materialRepository) Update(data model.Material) (model.Material, error) {
@@ -89,8 +90,30 @@ func (repo *materialRepository) Delete(id uint) error {
 	return repo.db.Delete(&model.Material{}, "id = ?", id).Error
 }
 
-func (repo *materialRepository) Count() (int64, error) {
+func (repo *materialRepository) Count(filter model.Material) (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.Material{}).Count(&count).Error
+	count = 0
+	err := repo.db.Raw(`
+    SELECT COUNT(*)
+    FROM materials
+    WHERE
+      project_id = ? AND
+			(nullif(?, '') IS NULL OR category = ?) AND
+			(nullif(?, '') IS NULL OR code = ?) AND
+			(nullif(?, '') IS NULL OR name = ?) AND
+			(nullif(?, '') IS NULL OR unit = ?)
+    `,
+		filter.ProjectID,
+		filter.Category, filter.Category,
+		filter.Code, filter.Code,
+		filter.Name, filter.Name,
+		filter.Unit, filter.Unit,
+	).Scan(&count).Error
 	return count, err
+}
+
+func (repo *materialRepository) GetByName(name string) (model.Material, error) {
+  result := model.Material{}
+  err := repo.db.First(&result, "name = ?", name).Error
+  return result, err
 }

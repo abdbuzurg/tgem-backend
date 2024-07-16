@@ -9,3 +9,8 @@ type MaterialCostView struct {
 	CostWithCustomer decimal.Decimal `json:"costWithCustomer"`
 	MaterialName     string          `json:"materialName"`
 }
+
+type MaterialCostSearchFilter struct {
+	ProjectID    uint   `json:"projectID"`
+	MaterialName string `json:"materialName"`
+}

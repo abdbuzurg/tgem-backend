@@ -5,6 +5,7 @@ import (
 	"backend-v2/model"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
@@ -27,8 +28,9 @@ type IMaterialService interface {
 	Create(data model.Material) (model.Material, error)
 	Update(data model.Material) (model.Material, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(filter model.Material) (int64, error)
 	Import(projectID uint, filepath string) error
+	Export(projectID uint) (string, error)
 }
 
 func (service *materialService) GetAll(projectID uint) ([]model.Material, error) {
@@ -37,7 +39,7 @@ func (service *materialService) GetAll(projectID uint) ([]model.Material, error)
 
 func (service *materialService) GetPaginated(page, limit int, data model.Material) ([]model.Material, error) {
 	// if !(utils.IsEmptyFields(data)) {
-		return service.materialRepo.GetPaginatedFiltered(page, limit, data)
+	return service.materialRepo.GetPaginatedFiltered(page, limit, data)
 	// }
 
 	// return service.materialRepo.GetPaginated(page, limit)
@@ -59,8 +61,8 @@ func (service *materialService) Delete(id uint) error {
 	return service.materialRepo.Delete(id)
 }
 
-func (service *materialService) Count() (int64, error) {
-	return service.materialRepo.Count()
+func (service *materialService) Count(filter model.Material) (int64, error) {
+	return service.materialRepo.Count(filter)
 }
 
 func (service *materialService) Import(projectID uint, filepath string) error {
@@ -71,7 +73,7 @@ func (service *materialService) Import(projectID uint, filepath string) error {
 		return fmt.Errorf("Не смог открыть файл: %v", err)
 	}
 
-	sheetName := "Импорт"
+	sheetName := "Материалы"
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
 		f.Close()
@@ -88,9 +90,9 @@ func (service *materialService) Import(projectID uint, filepath string) error {
 	materials := []model.Material{}
 	index := 1
 	for len(rows) > index {
-    material := model.Material{
-      ProjectID: projectID,
-    }
+		material := model.Material{
+			ProjectID: projectID,
+		}
 
 		material.Name, err = f.GetCellValue(sheetName, "A"+fmt.Sprint(index+1))
 		if err != nil {
@@ -127,14 +129,14 @@ func (service *materialService) Import(projectID uint, filepath string) error {
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке E%d: %v", index+1, err)
 		}
 
-    serialNumberStatus, err := f.GetCellValue(sheetName, "F"+fmt.Sprint(index+1))
+		serialNumberStatus, err := f.GetCellValue(sheetName, "F"+fmt.Sprint(index+1))
 		if err != nil {
 			f.Close()
 			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке F%d: %v", index+1, err)
 		}
 
-    serialNumberStatus = strings.ToLower(serialNumberStatus)
+		serialNumberStatus = strings.ToLower(serialNumberStatus)
 		if serialNumberStatus == "да" {
 			material.HasSerialNumber = true
 		} else {
@@ -148,8 +150,8 @@ func (service *materialService) Import(projectID uint, filepath string) error {
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке G%d: %v", index+1, err)
 		}
 
-    materials = append(materials, material)
-    index++
+		materials = append(materials, material)
+		index++
 	}
 
 	if err := f.Close(); err != nil {
@@ -166,4 +168,58 @@ func (service *materialService) Import(projectID uint, filepath string) error {
 	}
 
 	return nil
+}
+
+func (service *materialService) Export(projectID uint) (string, error) {
+
+	materialTempalteFilePath := filepath.Join("./pkg/excels/templates", "Шаблон для импорта материалов.xlsx")
+	f, err := excelize.OpenFile(materialTempalteFilePath)
+	if err != nil {
+		f.Close()
+		return "", fmt.Errorf("Не смог открыть файл: %v", err)
+	}
+	sheetName := "Материалы"
+	startingRow := 2
+
+  materialCount, err := service.materialRepo.Count(model.Material{ProjectID: projectID})
+	if err != nil {
+		return "", err
+	}
+
+	limit := 100
+	page := 1
+	for materialCount > 0 {
+		materials, err := service.materialRepo.GetPaginated(page, limit, projectID)
+		if err != nil {
+			return "", err
+		}
+
+		for index, material := range materials {
+			f.SetCellStr(sheetName, "A"+fmt.Sprint(startingRow+index), material.Name)
+			f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), material.Code)
+			f.SetCellStr(sheetName, "C"+fmt.Sprint(startingRow+index), material.Category)
+			f.SetCellStr(sheetName, "D"+fmt.Sprint(startingRow+index), material.Unit)
+			f.SetCellStr(sheetName, "E"+fmt.Sprint(startingRow+index), material.Article)
+
+			serialNumberStatus := "Нет"
+			if material.HasSerialNumber {
+				serialNumberStatus = "Да"
+			}
+
+			f.SetCellStr(sheetName, "F"+fmt.Sprint(startingRow+index), serialNumberStatus)
+			f.SetCellStr(sheetName, "G"+fmt.Sprint(startingRow+index), material.Notes)
+		}
+
+    startingRow = page * limit + 2 
+		page++
+		materialCount -= int64(limit)
+	}
+
+	exportFileName := "Эспорт Материалов.xlsx"
+	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
+	if err := f.SaveAs(exportFilePath); err != nil {
+		return "", err
+	}
+
+	return exportFileName, nil
 }
