@@ -526,7 +526,7 @@ func InitSIPObjectRoutes(router *gin.RouterGroup, controller controller.ISIPObje
 }
 
 func InitMJDObjectRoutes(router *gin.RouterGroup, controller controller.IMJDObjectController) {
-	mjdObjectRoutes := router.Group("/object/mjd")
+	mjdObjectRoutes := router.Group("/mjd")
 	mjdObjectRoutes.Use(
 		middleware.Authentication(),
 	)
