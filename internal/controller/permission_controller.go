@@ -143,7 +143,7 @@ func(controller *permissionController) GetByResourceURL(c *gin.Context) {
 
   resourceURL := c.Param("resourceURL")
 
-  err := controller.permissionService.GetByResourceURL(resourceURL, roleID)
+  err := controller.permissionService.GetByResourceURL("/" + resourceURL, roleID)
   if err != nil {
     response.ResponseSuccess(c, false) 
     return

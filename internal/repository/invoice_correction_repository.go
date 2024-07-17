@@ -49,7 +49,7 @@ func (repo *invoiceCorrectionRepository) GetPaginated(page, limit int, projectID
     WHERE
       invoice_objects.project_id = ? AND
       invoice_objects.confirmed_by_operator = false
-    ORDER BY invoice_inputs.id DESC LIMIT ? OFFSET ?;
+    ORDER BY invoice_objects.id DESC LIMIT ? OFFSET ?;
     `, projectID, limit, (page-1)*limit).Scan(&data).Error
 
 	return data, err

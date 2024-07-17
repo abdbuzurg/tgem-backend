@@ -88,8 +88,13 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 			return model.InvoiceObject{}, err
 		}
 
+    fmt.Println(materialInfoSorted)
+
 		index := 0
 		for invoiceMaterial.MaterialAmount > 0 {
+      if len(materialInfoSorted) == index {
+        return model.InvoiceObject{}, fmt.Errorf("Ошибка корректировки: количество материала внутри корректировки превышает количество материала у бригадира")
+      }
 			invoiceMaterialCreate := model.InvoiceMaterials{
 				ProjectID:      invoiceObject.ProjectID,
 				ID:             0,

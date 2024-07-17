@@ -62,7 +62,6 @@ func (repo *permissionRepository) CreateBatch(data []model.Permission) error {
 
 func (repo *permissionRepository) GetByResourceURL(resourceURL string, roleID uint) (model.Permission, error) {
 	var data model.Permission
-	resourceURL = "%" + resourceURL + "%"
 	err := repo.db.
 		Raw(`
       SELECT * 
@@ -71,7 +70,7 @@ func (repo *permissionRepository) GetByResourceURL(resourceURL string, roleID ui
         INNER JOIN resources ON resources.id = permissions.resource_id
       WHERE 
         permissions.role_id = ? 
-        AND resources.url LIKE ?`,
+        AND resources.url = ?`,
 			roleID, resourceURL).
 		Scan(&data).
 		Error
