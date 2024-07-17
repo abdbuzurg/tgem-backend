@@ -28,8 +28,8 @@ type IMaterialLocationRepository interface {
 	Delete(id uint) error
 	Count() (int64, error)
 	GetUniqueMaterialCostsByLocation(locationType string, locationID uint) ([]uint, error)
-	UniqueObjects() ([]dto.ObjectDataForSelect, error)
-	UniqueTeams() ([]dto.TeamDataForSelect, error)
+	UniqueObjects(projectID uint) ([]dto.ObjectDataForSelect, error)
+	UniqueTeams(projectID uint) ([]dto.TeamDataForSelect, error)
 	GetByLocationTypeAndID(locationType string, locationID uint) ([]model.MaterialLocation, error)
 	GetTotalAmountInWarehouse(projectID, materialID uint) (float64, error)
 	GetUniqueMaterialsFromLocation(projectID, locationID uint, locationType string) ([]model.Material, error)
@@ -125,7 +125,7 @@ func (repo *materialLocationRepository) GetUniqueMaterialCostsByLocation(
 	return data, err
 }
 
-func (repo *materialLocationRepository) UniqueObjects() ([]dto.ObjectDataForSelect, error) {
+func (repo *materialLocationRepository) UniqueObjects(projectID uint) ([]dto.ObjectDataForSelect, error) {
   data := []dto.ObjectDataForSelect{}
 	err := repo.db.Raw(`
     SELECT 
@@ -136,13 +136,17 @@ func (repo *materialLocationRepository) UniqueObjects() ([]dto.ObjectDataForSele
     WHERE objects.id IN (
       SELECT DISTINCT(location_id)
       FROM material_locations
-      WHERE location_type='object' AND amount > 0
+      WHERE 
+      location_type='object' AND 
+      amount > 0 AND
+      material_locations.project_id = ?
     )
-    `).Scan(&data).Error
+    `, projectID).Scan(&data).Error
+
 	return data, err
 }
 
-func (repo *materialLocationRepository) UniqueTeams() ([]dto.TeamDataForSelect, error) {
+func (repo *materialLocationRepository) UniqueTeams(projectID uint) ([]dto.TeamDataForSelect, error) {
   data := []dto.TeamDataForSelect{}
 	err := repo.db.Raw(`
       SELECT 
@@ -155,9 +159,13 @@ func (repo *materialLocationRepository) UniqueTeams() ([]dto.TeamDataForSelect, 
       WHERE teams.id IN (
         SELECT DISTINCT(location_id)
         FROM material_locations
-        WHERE location_type='team' AND amount > 0
+        WHERE 
+          location_type='team' AND 
+          amount > 0 AND
+          material_locations.project_id = ?
       )
-    `).Scan(&data).Error
+    `, projectID).Scan(&data).Error
+
 	return data, err
 }
 

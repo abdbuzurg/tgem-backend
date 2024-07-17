@@ -52,8 +52,8 @@ type IMaterialLocationService interface {
 	Delete(id uint) error
 	Count() (int64, error)
 	GetMaterialsInLocation(locationType string, locationID uint) ([]model.Material, error)
-	UniqueObjects() ([]dto.ObjectDataForSelect, error)
-	UniqueTeams() ([]dto.TeamDataForSelect, error)
+	UniqueObjects(projectID uint) ([]dto.ObjectDataForSelect, error)
+	UniqueTeams(projectID uint) ([]dto.TeamDataForSelect, error)
 	BalanceReport(projectID uint, data dto.ReportBalanceFilterRequest) (string, error)
 }
 
@@ -126,12 +126,12 @@ func (service *materialLocationService) GetMaterialsInLocation(
 	return result, nil
 }
 
-func (service *materialLocationService) UniqueTeams() ([]dto.TeamDataForSelect, error) {
-	return service.materialLocationRepo.UniqueTeams()
+func (service *materialLocationService) UniqueTeams(projectID uint) ([]dto.TeamDataForSelect, error) {
+	return service.materialLocationRepo.UniqueTeams(projectID)
 }
 
-func (service *materialLocationService) UniqueObjects() ([]dto.ObjectDataForSelect, error) {
-	return service.materialLocationRepo.UniqueObjects()
+func (service *materialLocationService) UniqueObjects(projectID uint) ([]dto.ObjectDataForSelect, error) {
+	return service.materialLocationRepo.UniqueObjects(projectID)
 }
 
 func (service *materialLocationService) BalanceReport(projectID uint, data dto.ReportBalanceFilterRequest) (string, error) {

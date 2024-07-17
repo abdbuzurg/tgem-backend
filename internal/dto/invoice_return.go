@@ -19,6 +19,8 @@ type InvoiceReturnPaginated struct {
 type InvoiceReturnTeamPaginatedQueryData struct {
 	ID             uint   `json:"id"`
 	DeliveryCode   string `json:"deliveryCode"`
+	DistrictName   string `json:"districtName"`
+	AcceptorName   string `json:"acceptorName"`
 	TeamNumber     string `json:"teamNumber"`
 	TeamLeaderName string `json:"teamLeaderName"`
 	DateOfInvoice  string `json:"dateOfInvoice"`
@@ -28,6 +30,8 @@ type InvoiceReturnTeamPaginatedQueryData struct {
 type InvoiceReturnTeamPaginated struct {
 	ID              uint     `json:"id"`
 	DeliveryCode    string   `json:"deliveryCode"`
+	DistrictName    string   `json:"districtName"`
+	AcceptorName    string   `json:"acceptorName"`
 	TeamNumber      string   `json:"teamNumber"`
 	TeamLeaderNames []string `json:"teamLeaderNames"`
 	DateOfInvoice   string   `json:"dateOfInvoice"`
@@ -37,8 +41,13 @@ type InvoiceReturnTeamPaginated struct {
 type InvoiceReturnObjectPaginatedQueryData struct {
 	ID                   uint   `json:"id"`
 	DeliveryCode         string `json:"deliveryCode"`
+	AcceptorName         string `json:"acceptorName"`
+	DistrictName         string `json:"districtName"`
 	ObjectName           string `json:"objectName"`
 	ObjectSupervisorName string `json:"objectSupervisorName"`
+	ObjectType           string `json:"objectType"`
+	TeamNumber           string `json:"teamNumber"`
+	TeamLeaderName       string `json:"teamLeaderName"`
 	DateOfInvoice        string `json:"dateOfInvoice"`
 	Confirmation         bool
 }
@@ -46,8 +55,13 @@ type InvoiceReturnObjectPaginatedQueryData struct {
 type InvoiceReturnObjectPaginated struct {
 	ID                    uint     `json:"id"`
 	DeliveryCode          string   `json:"deliveryCode"`
+	AcceptorName          string   `json:"acceptorName"`
+	DistrictName          string   `json:"districtName"`
 	ObjectName            string   `json:"objectName"`
 	ObjectSupervisorNames []string `json:"objectSupervisorNames"`
+	ObjectType            string   `json:"objectType"`
+	TeamNumber            string   `json:"teamNumber"`
+	TeamLeaderName        string   `json:"teamLeaderName"`
 	DateOfInvoice         string   `json:"dateOfInvoice"`
 	Confirmation          bool     `json:"confirmation"`
 }
@@ -118,10 +132,24 @@ type InvoiceReturnObjectDataForExcel struct {
 }
 
 type InvoiceReturnConfirmDataQuery struct {
-	Invoice                                model.InvoiceReturn
-	MaterialsInReturnerLocation            []model.MaterialLocation
-	MaterialsInAcceptorLocation  []model.MaterialLocation
+	Invoice                                     model.InvoiceReturn
+	MaterialsInReturnerLocation                 []model.MaterialLocation
+	MaterialsInAcceptorLocation                 []model.MaterialLocation
 	NewMaterialsInAcceptorLocationWithNewDefect []model.MaterialLocation
-	MaterialsDefected           []model.MaterialDefect
-  NewMaterialsDefected []model.MaterialDefect
+	MaterialsDefected                           []model.MaterialDefect
+	NewMaterialsDefected                        []model.MaterialDefect
+}
+
+type InvoiceReturnMaterialForEdit struct {
+	MaterialID      uint     `json:"materialID"`
+	MaterialCostID  uint     `json:"materialCostID"`
+	MaterialName    string   `json:"materialName"`
+	Unit            string   `json:"uint"`
+	HolderAmount    float64  `json:"holderAmount"`
+	Amount          float64  `json:"amount"`
+	MaterialCost    string   `json:"materialCost"`
+	HasSerialNumber bool     `json:"hasSerialNumber"`
+	SerialNumbers   []string `json:"serialNumbers"`
+	IsDefective     bool     `json:"isDefective"`
+	Notes           string   `json:"notes"`
 }

@@ -24,7 +24,7 @@ type IInvoiceReturnRepository interface {
 	GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginatedQueryData, error)
 	GetPaginatedObject(page, limit int, projectID uint) ([]dto.InvoiceReturnObjectPaginatedQueryData, error)
 	Create(data dto.InvoiceReturnCreateQueryData) (model.InvoiceReturn, error)
-	Update(data model.InvoiceReturn) (model.InvoiceReturn, error)
+	Update(data dto.InvoiceReturnCreateQueryData) (model.InvoiceReturn, error)
 	Delete(id uint) error
 	CountBasedOnType(projectID uint, invoiceType string) (int64, error)
 	Count(projectID uint) (int64, error)
@@ -36,6 +36,7 @@ type IInvoiceReturnRepository interface {
 	GetInvoiceReturnTeamDataForExcel(id uint) (dto.InvoiceReturnTeamDataForExcel, error)
 	GetInvoiceReturnObjectDataForExcel(id uint) (dto.InvoiceReturnObjectDataForExcel, error)
 	Confirmation(data dto.InvoiceReturnConfirmDataQuery) error
+	GetMaterialsForEdit(id uint) ([]dto.InvoiceReturnMaterialForEdit, error)
 }
 
 func (repo *invoiceReturnRepository) GetAll() ([]model.InvoiceReturn, error) {
@@ -50,14 +51,18 @@ func (repo *invoiceReturnRepository) GetPaginatedTeam(page, limit int, projectID
     SELECT 
       invoice_returns.id as id,
       invoice_returns.delivery_code,
+      districts.name as district_name,
       teams.number as team_number,
       workers.name as team_leader_name,
+      acceptor_worker.name as acceptor_name,
       invoice_returns.date_of_invoice as date_of_invoice,
       invoice_returns.confirmation as confirmation
     FROM invoice_returns
+    INNER JOIN districts ON districts.id = invoice_returns.district_id
     INNER JOIN teams ON teams.id = invoice_returns.returner_id
     INNER JOIN team_leaders ON team_leaders.team_id = teams.id
     INNER JOIN workers ON workers.id = team_leaders.leader_worker_id
+    INNER JOIN workers AS acceptor_worker ON acceptor_worker.id = invoice_returns.accepted_by_worker_id
     WHERE
       invoice_returns.project_id = ? AND
       invoice_returns.returner_type = 'team'
@@ -74,14 +79,24 @@ func (repo *invoiceReturnRepository) GetPaginatedObject(page, limit int, project
     SELECT 
       invoice_returns.id as id,
       invoice_returns.delivery_code,
+      districts.name as district_name,
       objects.name as object_name,
+      objects.type as object_type,
       workers.name as object_supervisor_name,
+      teams.number as team_number,
+      leader.name as team_leader_name,
+      acceptor_worker.name as acceptor_name,
       invoice_returns.date_of_invoice as date_of_invoice,
       invoice_returns.confirmation as confirmation
     FROM invoice_returns
+    INNER JOIN districts ON districts.id = invoice_returns.district_id
     INNER JOIN objects ON objects.id = invoice_returns.returner_id
-    INNER JOIN supervisor_objects ON objects.id = supervisor_objects.object_id
-    INNER JOIN workers ON workers.id = supervisor_objects.supervisor_worker_id
+    INNER JOIN object_supervisors ON objects.id = object_supervisors.object_id
+    INNER JOIN workers ON workers.id = object_supervisors.supervisor_worker_id
+    INNER JOIN teams ON teams.id = invoice_returns.acceptor_id 
+    INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+    INNER JOIN workers AS leader ON leader.id = team_leaders.leader_worker_id
+    INNER JOIN workers AS acceptor_worker ON acceptor_worker.id = invoice_returns.accepted_by_worker_id
     WHERE
       invoice_returns.project_id = ? AND
       invoice_returns.returner_type = 'object'
@@ -127,9 +142,41 @@ func (repo *invoiceReturnRepository) Create(data dto.InvoiceReturnCreateQueryDat
 	return result, err
 }
 
-func (repo *invoiceReturnRepository) Update(data model.InvoiceReturn) (model.InvoiceReturn, error) {
-	err := repo.db.Model(&model.InvoiceReturn{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
-	return data, err
+func (repo *invoiceReturnRepository) Update(data dto.InvoiceReturnCreateQueryData) (model.InvoiceReturn, error) {
+	result := data.Invoice
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.InvoiceReturn{}).Select("*").Where("id = ?", result.ID).Updates(&result).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(model.InvoiceMaterials{}, "invoice_id = ? AND invoice_type='return'", result.ID).Error; err != nil {
+			return nil
+		}
+
+		for index := range data.InvoiceMaterials {
+			data.InvoiceMaterials[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(model.SerialNumberMovement{}, "invoice_id = ? AND invoice_type='output'", result.ID).Error; err != nil {
+			return err
+		}
+
+		for index := range data.SerialNumberMovements {
+			data.SerialNumberMovements[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.SerialNumberMovements, 15).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return result, err
 }
 
 func (repo *invoiceReturnRepository) Delete(id uint) error {
@@ -256,8 +303,8 @@ func (repo *invoiceReturnRepository) GetInvoiceReturnObjectDataForExcel(id uint)
     INNER JOIN projects ON projects.id = invoice_returns.project_id
     INNER JOIN districts ON districts.id = invoice_returns.district_id
     INNER JOIN objects ON objects.id = invoice_returns.returner_id
-    INNER JOIN supervisor_objects ON supervisor_objects.object_id = objects.id
-    INNER JOIN workers AS supervisor_worker ON supervisor_worker.id = supervisor_objects.supervisor_worker_id
+    INNER JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    INNER JOIN workers AS supervisor_worker ON supervisor_worker.id = object_supervisors.supervisor_worker_id
     INNER JOIN workers AS team_leader_worker ON team_leader_worker.id = invoice_returns.accepted_by_worker_id
     WHERE 
       invoice_returns.id = ?
@@ -287,24 +334,26 @@ func (repo *invoiceReturnRepository) Confirmation(data dto.InvoiceReturnConfirmD
 			return err
 		}
 
-    if err := tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "id"}},
-			DoUpdates: clause.AssignmentColumns([]string{"amount", "material_location_id"}),
-		}).Create(&data.MaterialsDefected).Error; err != nil {
+		if len(data.MaterialsDefected) != 0 {
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"amount", "material_location_id"}),
+			}).Create(&data.MaterialsDefected).Error; err != nil {
+				return err
+			}
+		}
+
+		if err := tx.CreateInBatches(&data.NewMaterialsInAcceptorLocationWithNewDefect, 15).Error; err != nil {
 			return err
 		}
 
-    if err := tx.CreateInBatches(&data.NewMaterialsInAcceptorLocationWithNewDefect, 15).Error; err != nil {
-      return err
-    }
+		for index := range data.NewMaterialsDefected {
+			data.NewMaterialsDefected[index].MaterialLocationID = data.NewMaterialsInAcceptorLocationWithNewDefect[index].ID
+		}
 
-    for index := range data.NewMaterialsDefected {
-      data.NewMaterialsDefected[index].MaterialLocationID = data.NewMaterialsInAcceptorLocationWithNewDefect[index].ID
-    }
-
-    if err := tx.CreateInBatches(&data.NewMaterialsDefected, 15).Error; err != nil {
-      return err
-    }
+		if err := tx.CreateInBatches(&data.NewMaterialsDefected, 15).Error; err != nil {
+			return err
+		}
 
 		if err := tx.Exec(`
         UPDATE serial_number_movements
@@ -332,6 +381,30 @@ func (repo *invoiceReturnRepository) Confirmation(data dto.InvoiceReturnConfirmD
 			return err
 		}
 
-    return nil
+		return nil
 	})
+}
+
+func (repo *invoiceReturnRepository) GetMaterialsForEdit(id uint) ([]dto.InvoiceReturnMaterialForEdit, error) {
+	result := []dto.InvoiceReturnMaterialForEdit{}
+	err := repo.db.Raw(`
+    SELECT 
+      materials.id as material_id,
+      materials.name as material_name,
+      materials.unit as unit,
+      invoice_materials.amount as amount,
+      material_costs.id  as material_cost_id,
+      material_costs.cost_m19 as material_cost,
+      invoice_materials.notes as  notes,
+      materials.has_serial_number as has_serial_number,
+      invoice_materials.is_defected as is_defective 
+    FROM invoice_materials
+    INNER JOIN material_costs ON invoice_materials.material_cost_id = material_costs.id
+    INNER JOIN materials ON material_costs.material_id = materials.id
+    WHERE
+      invoice_materials.invoice_type='return' AND
+      invoice_materials.invoice_id = ?;
+    `, id).Scan(&result).Error
+
+	return result, err
 }

@@ -6,6 +6,7 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -54,9 +55,10 @@ func InitInvoiceReturnService(
 type IInvoiceReturnService interface {
 	GetAll() ([]model.InvoiceReturn, error)
 	GetByID(id uint) (model.InvoiceReturn, error)
-	GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginated, error)
+	GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginatedQueryData, error)
 	GetPaginatedObject(page, limit int, projectID uint) ([]dto.InvoiceReturnObjectPaginated, error)
 	Create(data dto.InvoiceReturn) (model.InvoiceReturn, error)
+	Update(data dto.InvoiceReturn) (model.InvoiceReturn, error)
 	Delete(id uint) error
 	CountBasedOnType(projectID uint, invoiceType string) (int64, error)
 	Confirmation(id uint) error
@@ -70,6 +72,7 @@ type IInvoiceReturnService interface {
 	GetSerialNumberCodesInLocation(projectID, materialID uint, locationType string, locationID uint) ([]string, error)
 	GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error)
 	GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error)
+	GetMaterialsForEdit(id uint) ([]dto.InvoiceReturnMaterialForEdit, error)
 }
 
 func (service *invoiceReturnService) GetAll() ([]model.InvoiceReturn, error) {
@@ -80,46 +83,8 @@ func (service *invoiceReturnService) GetByID(id uint) (model.InvoiceReturn, erro
 	return service.invoiceReturnRepo.GetByID(id)
 }
 
-func (service *invoiceReturnService) GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginated, error) {
-	invoiceReturnQueryData, err := service.invoiceReturnRepo.GetPaginatedTeam(page, limit, projectID)
-	if err != nil {
-		return []dto.InvoiceReturnTeamPaginated{}, err
-	}
-
-	result := []dto.InvoiceReturnTeamPaginated{}
-	currentInvoice := dto.InvoiceReturnTeamPaginated{}
-	for index, entry := range invoiceReturnQueryData {
-		if index == 0 {
-			currentInvoice = dto.InvoiceReturnTeamPaginated{
-				ID:              entry.ID,
-				DeliveryCode:    entry.DeliveryCode,
-				DateOfInvoice:   entry.DateOfInvoice,
-				TeamNumber:      entry.TeamNumber,
-				TeamLeaderNames: []string{},
-				Confirmation:    entry.Confirmation,
-			}
-		}
-
-		if currentInvoice.ID == entry.ID {
-			currentInvoice.TeamLeaderNames = append(currentInvoice.TeamLeaderNames, entry.TeamLeaderName)
-		} else {
-			result = append(result, currentInvoice)
-			currentInvoice = dto.InvoiceReturnTeamPaginated{
-				ID:              entry.ID,
-				DeliveryCode:    entry.DeliveryCode,
-				DateOfInvoice:   entry.DateOfInvoice,
-				TeamNumber:      entry.TeamNumber,
-				TeamLeaderNames: []string{entry.TeamLeaderName},
-				Confirmation:    entry.Confirmation,
-			}
-		}
-	}
-
-	if len(invoiceReturnQueryData) != 0 {
-		result = append(result, currentInvoice)
-	}
-
-	return result, nil
+func (service *invoiceReturnService) GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginatedQueryData, error) {
+	return service.invoiceReturnRepo.GetPaginatedTeam(page, limit, projectID)
 }
 
 func (service *invoiceReturnService) GetPaginatedObject(page, limit int, projectID uint) ([]dto.InvoiceReturnObjectPaginated, error) {
@@ -137,6 +102,11 @@ func (service *invoiceReturnService) GetPaginatedObject(page, limit int, project
 				DeliveryCode:          entry.DeliveryCode,
 				DateOfInvoice:         entry.DateOfInvoice,
 				ObjectName:            entry.ObjectName,
+				ObjectType:            entry.ObjectType,
+				AcceptorName:          entry.AcceptorName,
+				DistrictName:          entry.DistrictName,
+				TeamNumber:            entry.TeamNumber,
+				TeamLeaderName:        entry.TeamLeaderName,
 				ObjectSupervisorNames: []string{},
 				Confirmation:          entry.Confirmation,
 			}
@@ -150,8 +120,13 @@ func (service *invoiceReturnService) GetPaginatedObject(page, limit int, project
 				ID:                    entry.ID,
 				DeliveryCode:          entry.DeliveryCode,
 				DateOfInvoice:         entry.DateOfInvoice,
+				AcceptorName:          entry.AcceptorName,
+				DistrictName:          entry.DistrictName,
 				ObjectName:            entry.ObjectName,
 				ObjectSupervisorNames: []string{entry.ObjectSupervisorName},
+				ObjectType:            entry.ObjectType,
+				TeamNumber:            entry.TeamNumber,
+				TeamLeaderName:        entry.TeamLeaderName,
 				Confirmation:          entry.Confirmation,
 			}
 		}
@@ -214,7 +189,8 @@ func (service *invoiceReturnService) Create(data dto.InvoiceReturn) (model.Invoi
 		return model.InvoiceReturn{}, err
 	}
 
-	f, err := excelize.OpenFile("./pkg/excels/templates/return.xlsx")
+	templateFilePath := filepath.Join("./pkg/excels/templates/return.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
 	if err != nil {
 		return model.InvoiceReturn{}, err
 	}
@@ -334,12 +310,192 @@ func (service *invoiceReturnService) Create(data dto.InvoiceReturn) (model.Invoi
 		f.SetCellValue(sheetName, "J"+fmt.Sprint(startingRow+index), oneEntry.MaterialNotes)
 	}
 
-	f.SaveAs("./pkg/excels/return/" + data.Details.DeliveryCode + ".xlsx")
+	savePath := filepath.Join("./pkg/excels/return/", data.Details.DeliveryCode+".xlsx")
+	f.SaveAs(savePath)
 	if err := f.Close(); err != nil {
 		fmt.Println(err)
 	}
 
 	return invoiceReturn, nil
+}
+
+func (service *invoiceReturnService) Update(data dto.InvoiceReturn) (model.InvoiceReturn, error) {
+
+	invoiceMaterialsForCreate := []model.InvoiceMaterials{}
+	serialNumberMovements := []model.SerialNumberMovement{}
+	for _, invoiceMaterial := range data.Items {
+		invoiceMaterialsForCreate = append(invoiceMaterialsForCreate, model.InvoiceMaterials{
+			ProjectID:      data.Details.ProjectID,
+			MaterialCostID: invoiceMaterial.MaterialCostID,
+			InvoiceID:      0,
+			InvoiceType:    "return",
+			Amount:         invoiceMaterial.Amount,
+			IsDefected:     invoiceMaterial.IsDefected,
+			Notes:          invoiceMaterial.Notes,
+		})
+
+		if len(invoiceMaterial.SerialNumbers) != 0 {
+			serialNumbers, err := service.serialNumberRepo.GetSerialNumberIDsBySerialNumberCodes(invoiceMaterial.SerialNumbers)
+			if err != nil {
+				return model.InvoiceReturn{}, err
+			}
+
+			for _, serialNumber := range serialNumbers {
+				serialNumberMovements = append(serialNumberMovements, model.SerialNumberMovement{
+					ID:             0,
+					SerialNumberID: serialNumber.ID,
+					ProjectID:      data.Details.ProjectID,
+					InvoiceID:      0,
+					InvoiceType:    "return",
+					IsDefected:     invoiceMaterial.IsDefected,
+				})
+			}
+		}
+	}
+
+	invoiceReturn, err := service.invoiceReturnRepo.Update(dto.InvoiceReturnCreateQueryData{
+		Invoice:               data.Details,
+		InvoiceMaterials:      invoiceMaterialsForCreate,
+		SerialNumberMovements: serialNumberMovements,
+	})
+	if err != nil {
+		return model.InvoiceReturn{}, err
+	}
+
+	excelFilePath := filepath.Join("./pkg/excels/return/", invoiceReturn.DeliveryCode+".xlsx")
+	err = os.Remove(excelFilePath)
+	if err != nil {
+		return model.InvoiceReturn{}, err
+	}
+
+	templateFilePath := filepath.Join("./pkg/excels/templates/return.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
+	if err != nil {
+		return model.InvoiceReturn{}, err
+	}
+	sheetName := "Возврат"
+	startingRow := 5
+
+	materialsForExcel, err := service.invoiceReturnRepo.GetInvoiceReturnMaterialsForExcel(invoiceReturn.ID)
+	if err != nil {
+		return model.InvoiceReturn{}, err
+	}
+
+	f.InsertRows(sheetName, startingRow, len(materialsForExcel))
+
+	defaultStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Size:      8,
+			VertAlign: "center",
+		},
+		Border: []excelize.Border{
+			{Type: "left", Color: "#000000", Style: 1},
+			{Type: "top", Color: "#000000", Style: 1},
+			{Type: "right", Color: "#000000", Style: 1},
+			{Type: "bottom", Color: "#000000", Style: 1},
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "center",
+			WrapText:   true,
+			Vertical:   "center",
+		},
+	})
+
+	namingStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Size:      8,
+			VertAlign: "center",
+		},
+		Border: []excelize.Border{
+			{Type: "left", Color: "#000000", Style: 1},
+			{Type: "top", Color: "#000000", Style: 1},
+			{Type: "bottom", Color: "#000000", Style: 1},
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "left",
+			Vertical:   "center",
+			WrapText:   true,
+		},
+	})
+
+	if invoiceReturn.AcceptorType == "warehouse" {
+		invoiceReturnTeamDataExcel, err := service.invoiceReturnRepo.GetInvoiceReturnTeamDataForExcel(invoiceReturn.ID)
+		if err != nil {
+			return model.InvoiceReturn{}, err
+		}
+
+		f.SetCellValue(sheetName, "E1", fmt.Sprintf(`
+НАКЛАДНАЯ № %s
+от %s года       
+на возврат материала 
+      `, invoiceReturnTeamDataExcel.DeliveryCode, utils.DateConverter(invoiceReturnTeamDataExcel.DateOfInvoice)))
+		f.SetCellValue(sheetName, "I1", fmt.Sprintf(`
+%s
+в г. Душанбе
+Регион: %s 
+      `, invoiceReturnTeamDataExcel.ProjectName, invoiceReturnTeamDataExcel.DistrictName))
+
+		f.SetCellValue(sheetName, "A2", "")
+		f.SetCellValue(sheetName, "A3", "")
+		f.SetCellValue(sheetName, "E2", "")
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(6+len(materialsForExcel)), fmt.Sprint(invoiceReturnTeamDataExcel.TeamLeaderName))
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(9+len(materialsForExcel)), fmt.Sprint(invoiceReturnTeamDataExcel.TeamLeaderName))
+		f.SetCellValue(sheetName, "D"+fmt.Sprint(9+len(materialsForExcel)), fmt.Sprint(invoiceReturnTeamDataExcel.AcceptorName))
+	}
+
+	if invoiceReturn.AcceptorType == "team" {
+		invoiceReturnObjectDataExcel, err := service.invoiceReturnRepo.GetInvoiceReturnObjectDataForExcel(invoiceReturn.ID)
+		if err != nil {
+			return model.InvoiceReturn{}, err
+		}
+
+		f.SetCellValue(sheetName, "E1", fmt.Sprintf(`
+НАКЛАДНАЯ № %s
+от %s года       
+на возврат материала 
+      `, invoiceReturnObjectDataExcel.DeliveryCode, utils.DateConverter(invoiceReturnObjectDataExcel.DateOfInvoice)))
+		f.SetCellValue(sheetName, "I1", fmt.Sprintf(`
+%s
+в г. Душанбе
+Регион: %s 
+      `, invoiceReturnObjectDataExcel.ProjectName, invoiceReturnObjectDataExcel.DistrictName))
+
+		f.SetCellValue(sheetName, "D2", invoiceReturnObjectDataExcel.ObjectType)
+		f.SetCellValue(sheetName, "D3", invoiceReturnObjectDataExcel.ObjectName)
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(6+len(materialsForExcel)), fmt.Sprint(invoiceReturnObjectDataExcel.TeamLeaderName))
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(9+len(materialsForExcel)), fmt.Sprint(invoiceReturnObjectDataExcel.SupervisorName))
+		f.SetCellValue(sheetName, "D"+fmt.Sprint(9+len(materialsForExcel)), fmt.Sprint(invoiceReturnObjectDataExcel.TeamLeaderName))
+	}
+
+	for index, oneEntry := range materialsForExcel {
+		f.MergeCell(sheetName, "D"+fmt.Sprint(startingRow+index), "F"+fmt.Sprint(startingRow+index))
+		f.MergeCell(sheetName, "I"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index))
+
+		f.SetCellStyle(sheetName, "A"+fmt.Sprint(startingRow+index), "K"+fmt.Sprint(startingRow+index), defaultStyle)
+		f.SetCellStyle(sheetName, "B"+fmt.Sprint(startingRow+index), "B"+fmt.Sprint(startingRow+index), namingStyle)
+
+		f.SetCellValue(sheetName, "A"+fmt.Sprint(startingRow+index), index+1)
+		f.SetCellValue(sheetName, "B"+fmt.Sprint(startingRow+index), oneEntry.MaterialCode)
+		f.SetCellValue(sheetName, "D"+fmt.Sprint(startingRow+index), oneEntry.MaterialName)
+		f.SetCellValue(sheetName, "G"+fmt.Sprint(startingRow+index), oneEntry.MaterialUnit)
+		f.SetCellValue(sheetName, "H"+fmt.Sprint(startingRow+index), oneEntry.MaterialAmount)
+		materialDefect := ""
+		if oneEntry.MaterialDefected {
+			materialDefect = "Да"
+		} else {
+			materialDefect = "Нет"
+		}
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(startingRow+index), materialDefect)
+		f.SetCellValue(sheetName, "J"+fmt.Sprint(startingRow+index), oneEntry.MaterialNotes)
+	}
+
+	savePath := filepath.Join("./pkg/excels/return/", data.Details.DeliveryCode+".xlsx")
+	f.SaveAs(savePath)
+	if err := f.Close(); err != nil {
+		fmt.Println(err)
+	}
+
+	return model.InvoiceReturn{}, nil
 }
 
 func (service *invoiceReturnService) Delete(id uint) error {
@@ -542,7 +698,7 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 		return "", err
 	}
 
-  templateFilePath := filepath.Join("./pkg/excels/report/", "Invoice Return Report.xlsx")
+	templateFilePath := filepath.Join("./pkg/excels/report/", "Invoice Return Report.xlsx")
 	f, err := excelize.OpenFile(templateFilePath)
 	if err != nil {
 		return "", err
@@ -579,9 +735,9 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 				}
 
 				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), team.Number)
-			} 
+			}
 
-      if invoice.ReturnerType == "object" {
+			if invoice.ReturnerType == "object" {
 				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
 
 				object, err := service.objectRepo.GetByID(invoice.ReturnerID)
@@ -606,7 +762,7 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 	}
 
 	currentTime := time.Now()
-  fileName := fmt.Sprintf(
+	fileName := fmt.Sprintf(
 		"Отсчет накладной возврат - %s.xlsx",
 		currentTime.Format("02-01-2006"),
 	)
@@ -693,4 +849,8 @@ func (service *invoiceReturnService) GetInvoiceMaterialsWithSerialNumbers(id uin
 	}
 
 	return result, nil
+}
+
+func (service *invoiceReturnService) GetMaterialsForEdit(id uint) ([]dto.InvoiceReturnMaterialForEdit, error) {
+	return service.invoiceReturnRepo.GetMaterialsForEdit(id)
 }

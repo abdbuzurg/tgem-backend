@@ -314,7 +314,7 @@ func InitInvoiceReturnRoutes(router *gin.RouterGroup, controller controller.IInv
 		middleware.Authentication(),
 		middleware.Permission(db),
 	)
-	invoiceReturnRoutes.GET("/returner-type/:type/paginated", controller.GetPaginated)
+  invoiceReturnRoutes.GET("/paginated", controller.GetPaginated)
 	invoiceReturnRoutes.GET("/unique/code", controller.UniqueCode)
 	invoiceReturnRoutes.GET("/unique/team", controller.UniqueTeam)
 	invoiceReturnRoutes.GET("/unique/object", controller.UniqueObject)
@@ -325,9 +325,11 @@ func InitInvoiceReturnRoutes(router *gin.RouterGroup, controller controller.IInv
 	invoiceReturnRoutes.GET("/serial-number/:locationType/:locationID/:materialID", controller.GetSerialNumberCodesInLocation)
 	invoiceReturnRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumbers)
 	invoiceReturnRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
+  invoiceReturnRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
 	invoiceReturnRoutes.POST("/confirm/:id", controller.Confirmation)
 	invoiceReturnRoutes.POST("/", controller.Create)
 	invoiceReturnRoutes.POST("/report", controller.Report)
+  invoiceReturnRoutes.PATCH("/", controller.Update)
 	invoiceReturnRoutes.DELETE("/:id", controller.Delete)
 }
 
@@ -471,7 +473,7 @@ func InitObjectRoutes(router *gin.RouterGroup, controller controller.IObjectCont
 }
 
 func InitTPObjectRoutes(router *gin.RouterGroup, controller controller.ITPObjectController) {
-	tpObjectRoutes := router.Group("/object/tp")
+	tpObjectRoutes := router.Group("/tp")
 	tpObjectRoutes.Use(
 		middleware.Authentication(),
 	)
@@ -485,7 +487,7 @@ func InitTPObjectRoutes(router *gin.RouterGroup, controller controller.ITPObject
 }
 
 func InitSubstationObjectRoutes(router *gin.RouterGroup, controller controller.ISubstationObjectController) {
-	substationObjectRoutes := router.Group("/object/substation")
+	substationObjectRoutes := router.Group("/substation")
 	substationObjectRoutes.Use(
 		middleware.Authentication(),
 	)
@@ -498,7 +500,7 @@ func InitSubstationObjectRoutes(router *gin.RouterGroup, controller controller.I
 }
 
 func InitSTVTObjectRoutes(router *gin.RouterGroup, controller controller.ISTVTObjectController) {
-	stvtObjectRoutes := router.Group("/object/stvt")
+	stvtObjectRoutes := router.Group("/stvt")
 	stvtObjectRoutes.Use(
 		middleware.Authentication(),
 	)
@@ -511,7 +513,7 @@ func InitSTVTObjectRoutes(router *gin.RouterGroup, controller controller.ISTVTOb
 }
 
 func InitSIPObjectRoutes(router *gin.RouterGroup, controller controller.ISIPObjectController) {
-	sipObjectRoutes := router.Group("/object/sip")
+	sipObjectRoutes := router.Group("/sip")
 	sipObjectRoutes.Use(
 		middleware.Authentication(),
 	)
@@ -537,7 +539,7 @@ func InitMJDObjectRoutes(router *gin.RouterGroup, controller controller.IMJDObje
 }
 
 func InitKL04KVObjectRoutes(router *gin.RouterGroup, controller controller.IKL04KVObjectController) {
-	kl04kvObjectRoutes := router.Group("/object/kl04kv")
+	kl04kvObjectRoutes := router.Group("/kl04kv")
 	kl04kvObjectRoutes.Use(
 		middleware.Authentication(),
 	)

@@ -9,46 +9,6 @@ WHERE NOT EXISTS (
   WHERE roles.name = values_tobe_inserted.name AND roles.description = values_tobe_inserted.description
 );
 
-INSERT INTO permissions(role_id, resource_id, r, w, u, d)
-SELECT *
-FROM (VALUES
-  (1, 1, true, true, true, true),
-  (1, 2, true, true, true, true),
-  (1, 3, true, true, true, true),
-  (1, 4, true, true, true, true),
-  (1, 5, true, true, true, true),
-  (1, 6, true, true, true, true),
-  (1, 7, true, true, true, true),
-  (1, 8, true, true, true, true),
-  (1, 9, true, true, true, true),
-  (1, 10, true, true, true, true),
-  (1, 11, true, true, true, true),
-  (1, 12, true, true, true, true),
-  (1, 13, true, true, true, true),
-  (1, 14, true, true, true, true),
-  (1, 15, true, true, true, true),
-  (1, 16, true, true, true, true),
-  (1, 17, true, true, true, true),
-  (1, 18, true, true, true, true),
-  (1, 19, true, true, true, true),
-  (1, 20, true, true, true, true),
-  (1, 21, true, true, true, true),
-  (1, 22, true, true, true, true),
-  (1, 23, true, true, true, true),
-  (1, 24, true, true, true, true)
-) AS values_tobe_inserted(role_id, resource_id, r, w, u, d)
-WHERE NOT EXISTS (
-  SELECT *
-  FROM permissions
-  WHERE  
-    permissions.role_id = values_tobe_inserted.role_id
-    AND permissions.resource_id = values_tobe_inserted.resource_id
-    AND permissions.r = values_tobe_inserted.r
-    AND permissions.w = values_tobe_inserted.w
-    AND permissions.u = values_tobe_inserted.u
-    AND permissions.u = values_tobe_inserted.d
-);
-
 INSERT INTO workers(name, job_title, mobile_number)
 SELECT * 
 FROM (VALUES

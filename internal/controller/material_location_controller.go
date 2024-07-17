@@ -212,7 +212,7 @@ func (controller *materialLocationController) GetMaterialInLocation(c *gin.Conte
 
 func (controller *materialLocationController) UniqueTeams(c *gin.Context) {
 
-	data, err := controller.materialLocationService.UniqueTeams()
+	data, err := controller.materialLocationService.UniqueTeams(c.GetUint("projectID"))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return
@@ -223,8 +223,7 @@ func (controller *materialLocationController) UniqueTeams(c *gin.Context) {
 }
 
 func (controller *materialLocationController) UniqueObjects(c *gin.Context) {
-
-	data, err := controller.materialLocationService.UniqueObjects()
+	data, err := controller.materialLocationService.UniqueObjects(c.GetUint("projectID"))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return

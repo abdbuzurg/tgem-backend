@@ -27,7 +27,7 @@ type IInvoiceReturnController interface {
 	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	Create(c *gin.Context)
-	// Update(c *gin.Context)
+	Update(c *gin.Context)
 	Delete(c *gin.Context)
 	GetDocument(c *gin.Context)
 	Confirmation(c *gin.Context)
@@ -41,6 +41,7 @@ type IInvoiceReturnController interface {
 	GetSerialNumberCodesInLocation(c *gin.Context)
 	GetInvoiceMaterialsWithSerialNumbers(c *gin.Context)
 	GetInvoiceMaterialsWithoutSerialNumbers(c *gin.Context)
+	GetMaterialsForEdit(c *gin.Context)
 }
 
 func (controller *invoiceReturnController) GetAll(c *gin.Context) {
@@ -68,12 +69,16 @@ func (controller *invoiceReturnController) GetPaginated(c *gin.Context) {
 		return
 	}
 
+	returnType := c.DefaultQuery("type", "")
+	if returnType == "" {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
+
 	projectID := c.GetUint("projectID")
 
-	invoiceReturnType := c.Param("type")
-
 	var data interface{}
-	if invoiceReturnType == "team" {
+	if returnType == "team" {
 		data, err = controller.invoiceReturnService.GetPaginatedTeam(page, limit, projectID)
 		if err != nil {
 			response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of Invoice: %v", err))
@@ -81,7 +86,7 @@ func (controller *invoiceReturnController) GetPaginated(c *gin.Context) {
 		}
 	}
 
-	if invoiceReturnType == "object" {
+	if returnType == "object" {
 		data, err = controller.invoiceReturnService.GetPaginatedObject(page, limit, projectID)
 		if err != nil {
 			response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of Invoice: %v", err))
@@ -89,7 +94,7 @@ func (controller *invoiceReturnController) GetPaginated(c *gin.Context) {
 		}
 	}
 
-	dataCount, err := controller.invoiceReturnService.CountBasedOnType(projectID, invoiceReturnType)
+	dataCount, err := controller.invoiceReturnService.CountBasedOnType(projectID, returnType)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the total amount of Invoice: %v", err))
 		return
@@ -108,6 +113,24 @@ func (controller *invoiceReturnController) Create(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	createData.Details.ProjectID = projectID
 	data, err := controller.invoiceReturnService.Create(createData)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Invoice: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceReturnController) Update(c *gin.Context) {
+	var updateData dto.InvoiceReturn
+	if err := c.ShouldBindJSON(&updateData); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
+
+	projectID := c.GetUint("projectID")
+	updateData.Details.ProjectID = projectID
+	data, err := controller.invoiceReturnService.Update(updateData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Invoice: %v", err))
 		return
@@ -163,6 +186,9 @@ func (controller *invoiceReturnController) Confirmation(c *gin.Context) {
 		return
 	}
 
+  excelFilePath := filepath.Join("./pkg/excels/output/", invoiceReturn.DeliveryCode + ".xlsx") 
+  os.Remove(excelFilePath)
+
 	err = controller.invoiceReturnService.Confirmation(uint(id))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("cannot confirm invoice input with id %v: %v", id, err))
@@ -175,19 +201,18 @@ func (controller *invoiceReturnController) Confirmation(c *gin.Context) {
 func (controller *invoiceReturnController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
 
-  filePath := filepath.Join("./pkg/excels/return/", deliveryCode)
+	filePath := filepath.Join("./pkg/excels/return/", deliveryCode)
 	fileGlob, err := filepath.Glob(filePath + ".*")
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-  filePath = fileGlob[0]
-  pathSeparated := strings.Split(filePath, ".")
-  deliveryCodeExtension := pathSeparated[len(pathSeparated) - 1]
+	filePath = fileGlob[0]
+	pathSeparated := strings.Split(filePath, ".")
+	deliveryCodeExtension := pathSeparated[len(pathSeparated)-1]
 
-	c.FileAttachment(filePath, deliveryCode + "." + deliveryCodeExtension)
-	c.FileAttachment("./pkg/excels/return/"+deliveryCode+".xlsx", deliveryCode+".xlsx")
+	c.FileAttachment(filePath, deliveryCode+"."+deliveryCodeExtension)
 }
 
 func (controller *invoiceReturnController) UniqueCode(c *gin.Context) {
@@ -239,7 +264,8 @@ func (controller *invoiceReturnController) Report(c *gin.Context) {
 
 	filePath := filepath.Join("./pkg/excels/temp/", filename)
 	c.FileAttachment(filePath, filename)
-  os.Remove(filePath)}
+	os.Remove(filePath)
+}
 
 func (controller *invoiceReturnController) GetUniqueMaterialCostsFromLocation(c *gin.Context) {
 
@@ -383,4 +409,17 @@ func (controller *invoiceReturnController) GetInvoiceMaterialsWithSerialNumbers(
 	}
 
 	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceReturnController) GetMaterialsForEdit(c *gin.Context) {
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+
+	result, err := controller.invoiceReturnService.GetMaterialsForEdit(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, result)
 }

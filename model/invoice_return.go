@@ -9,7 +9,7 @@ type InvoiceReturn struct {
 	ReturnerType       string    `json:"returnerType"`
 	ReturnerID         uint      `json:"returnerID"`
 	AcceptorType       string    `json:"acceptorType"`
-	AcceptorID         uint    `json:"acceptorID"`
+	AcceptorID         uint      `json:"acceptorID"`
 	AcceptedByWorkerID uint      `json:"acceptedByWorkerID"`
 	DateOfInvoice      time.Time `json:"dateOfInvoice"`
 	Notes              string    `json:"notes"`

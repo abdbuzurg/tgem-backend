@@ -73,7 +73,7 @@ func (controller *invoiceOutputController) GetPaginated(c *gin.Context) {
 
 	projectID := c.GetUint("projectID")
 	filter := model.InvoiceOutput{
-		ProjectID:                projectID,
+		ProjectID: projectID,
 	}
 
 	data, err := controller.invoiceOutputService.GetPaginated(page, limit, filter)
@@ -196,8 +196,8 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 		return
 	}
 
-  excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode + ".xlsx") 
-  os.Remove(excelFilePath)
+	excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode+".xlsx")
+	os.Remove(excelFilePath)
 
 	err = controller.invoiceOutputService.Confirmation(uint(id))
 	if err != nil {
@@ -371,7 +371,7 @@ func (controller *invoiceOutputController) GetMaterialsForEdit(c *gin.Context) {
 }
 
 func (controller *invoiceOutputController) Update(c *gin.Context) {
-  var updateData dto.InvoiceOutput
+	var updateData dto.InvoiceOutput
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
