@@ -18,49 +18,75 @@ func InitMJDObjectRepository(db *gorm.DB) IMJDObjectRepository {
 }
 
 type IMJDObjectRepository interface {
-	GetPaginated(page, limit int, projectID uint) ([]dto.MJDObjectPaginatedQuery, error)
-	Count(projectID uint) (int64, error)
+	GetPaginated(page, limit int, filter dto.MJDObjectSearchParameters) ([]dto.MJDObjectPaginatedQuery, error)
+	Count(filter dto.MJDObjectSearchParameters) (int64, error)
 	Create(data dto.MJDObjectCreate) (model.MJD_Object, error)
 	Update(data dto.MJDObjectCreate) (model.MJD_Object, error)
 	Delete(id, projectID uint) error
 	CreateInBatches(objects []model.Object, mjds []model.MJD_Object, supervisors []uint) ([]model.MJD_Object, error)
 	Import(data []dto.MJDObjectImportData) error
+  GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error)
 }
 
-func (repo *mjdObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.MJDObjectPaginatedQuery, error) {
+func (repo *mjdObjectRepository) GetPaginated(page, limit int, filter dto.MJDObjectSearchParameters) ([]dto.MJDObjectPaginatedQuery, error) {
 	data := []dto.MJDObjectPaginatedQuery{}
 	err := repo.db.Raw(`
-      SELECT 
-        objects.id as object_id,
-        objects.object_detailed_id as object_detailed_id,
-        objects.name as name,
-        objects.status as status,
-        mjd_objects.model as model,
-        mjd_objects.amount_stores as amount_stores,
-        mjd_objects.amount_entrances as amount_entrances,
-        mjd_objects.has_basement as has_basement
-      FROM objects
-        INNER JOIN mjd_objects ON objects.object_detailed_id = mjd_objects.id
-      WHERE
-        objects.type = 'mjd_objects' AND
-        objects.project_id = ?
-      ORDER BY mjd_objects.id DESC 
-      LIMIT ? 
-      OFFSET ?;
-    `, projectID, limit, (page-1)*limit).Scan(&data).Error
+    SELECT 
+      objects.id as object_id,
+      mjd_objects.id as object_detailed_id,
+      objects.name as name,
+      objects.status as status,
+      mjd_objects.model as model,
+      mjd_objects.amount_stores as amount_stores,
+      mjd_objects.amount_entrances as amount_entrances
+    FROM objects
+    INNER JOIN mjd_objects ON mjd_objects.id = objects.object_detailed_id
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
+    WHERE
+      objects.type = 'mjd_objects' AND
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?) AND
+      (nullif(?, 0) IS NULL OR tp_nourashes_objects.tp_object_id = ?)
+    ORDER BY mjd_objects.id DESC 
+    LIMIT ? 
+    OFFSET ?;
+
+    `, filter.ProjectID,
+    filter.ObjectName, filter.ObjectName,
+    filter.TeamID, filter.TeamID,
+    filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+    filter.TPObjectID, filter.TPObjectID,
+    limit, (page-1)*limit).Scan(&data).Error
 
 	return data, err
 }
 
-func (repo *mjdObjectRepository) Count(projectID uint) (int64, error) {
+func (repo *mjdObjectRepository) Count(filter dto.MJDObjectSearchParameters) (int64, error) {
 	var count int64
 	err := repo.db.Raw(`
     SELECT COUNT(*)
     FROM objects
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
     WHERE
-      objects.type = 'mjd_objects' AND
-      objects.project_id = ?
-    `, projectID).Scan(&count).Error
+      objects.type = 'kl04kv_objects' AND
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?) AND
+      (nullif(?, 0) IS NULL OR tp_nourashes_objects.tp_object_id = ?)
+    `,
+    filter.ProjectID,
+    filter.ObjectName, filter.ObjectName,
+    filter.TeamID, filter.TeamID,
+    filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+    filter.TPObjectID, filter.TPObjectID,
+    ).Scan(&count).Error
 	return count, err
 }
 
@@ -358,4 +384,20 @@ func (repo *mjdObjectRepository) Import(data []dto.MJDObjectImportData) error {
 
 		return nil
 	})
+}
+
+func (repo *mjdObjectRepository) GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error) {
+  data := []dto.DataForSelect[string]{}
+  err := repo.db.Raw(`
+    SELECT 
+      objects.name as "label",
+      objects.name as "value"
+    FROM objects
+    INNER JOIN mjd_objects ON mjd_objects.id = objects.object_detailed_id
+    WHERE
+      objects.project_id = ? AND
+      objects.type = 'mjd_objects'
+    `, projectID).Scan(&data).Error
+
+  return data, err
 }

@@ -42,3 +42,11 @@ type MJDObjectImportData struct {
 	ObjectTeam        model.ObjectTeams
 	NourashedByTP     model.TPNourashesObjects
 }
+
+type MJDObjectSearchParameters struct {
+  ProjectID uint
+  ObjectName string 
+  SupervisorWorkerID uint
+  TeamID uint
+  TPObjectID uint
+}

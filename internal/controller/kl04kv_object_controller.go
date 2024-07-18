@@ -153,12 +153,14 @@ func (controller *kl04kvObjectController) Update(c *gin.Context) {
 func (controller *kl04kvObjectController) GetTemplateFile(c *gin.Context) {
 	templateFilePath := filepath.Join("./pkg/excels/templates/Шаблон для импорта КЛ 04 КВ.xlsx")
 
-	if err := controller.kl04kvObjectService.TemplateFile(templateFilePath, c.GetUint("projectID")); err != nil {
+	tmpFilePath, err := controller.kl04kvObjectService.TemplateFile(templateFilePath, c.GetUint("projectID"))
+	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	c.FileAttachment(templateFilePath, "Шаблон для импорта КЛ 04 КВ.xlsx")
+	c.FileAttachment(tmpFilePath, "Шаблон для импорта КЛ 04 КВ.xlsx")
+  os.Remove(tmpFilePath)
 }
 
 func (controller *kl04kvObjectController) Import(c *gin.Context) {
@@ -207,5 +209,5 @@ func (controller *kl04kvObjectController) GetObjectNamesForSearch(c *gin.Context
 		return
 	}
 
-  response.ResponseSuccess(c, data)
+	response.ResponseSuccess(c, data)
 }

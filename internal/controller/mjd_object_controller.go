@@ -5,6 +5,7 @@ import (
 	"backend-v2/internal/service"
 	"backend-v2/pkg/response"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -29,6 +30,8 @@ type IMJDObjectController interface {
 	Delete(c *gin.Context)
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
+	Export(c *gin.Context)
+	GetObjectNamesForSearch(c *gin.Context)
 }
 
 func (controller *mjdObjectController) GetPaginated(c *gin.Context) {
@@ -47,15 +50,42 @@ func (controller *mjdObjectController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	projectID := c.GetUint("projectID")
+	teamIDStr := c.DefaultQuery("teamID", "0")
+	teamID, err := strconv.Atoi(teamIDStr)
+	if err != nil || teamID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса teamID: %v", err))
+		return
+	}
 
-	data, err := controller.mjdObjectService.GetPaginated(page, limit, projectID)
+	supervisorWorkerIDStr := c.DefaultQuery("supervisorWorkerID", "0")
+	supervisorWorkerID, err := strconv.Atoi(supervisorWorkerIDStr)
+	if err != nil || supervisorWorkerID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса supervisorWorkerID: %v", err))
+		return
+	}
+
+	tpObjectIDStr := c.DefaultQuery("tpObjectID", "0")
+	tpObjectID, err := strconv.Atoi(tpObjectIDStr)
+	if err != nil || tpObjectID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса tpObjectID: %v", err))
+		return
+	}
+
+	filter := dto.MJDObjectSearchParameters{
+		ProjectID:          c.GetUint("projectID"),
+		TeamID:             uint(teamID),
+		SupervisorWorkerID: uint(supervisorWorkerID),
+		TPObjectID:         uint(tpObjectID),
+		ObjectName:         c.DefaultQuery("objectName", ""),
+	}
+
+	data, err := controller.mjdObjectService.GetPaginated(page, limit, filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	dataCount, err := controller.mjdObjectService.Count(projectID)
+	dataCount, err := controller.mjdObjectService.Count(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -122,14 +152,16 @@ func (controller *mjdObjectController) Delete(c *gin.Context) {
 }
 
 func (controller *mjdObjectController) GetTemplateFile(c *gin.Context) {
-  templateFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта МЖД.xlsx")
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта МЖД.xlsx")
 
-	if err := controller.mjdObjectService.TemplateFile(templateFilePath, c.GetUint("projectID")); err != nil {
+	tmpFilePath, err := controller.mjdObjectService.TemplateFile(templateFilePath, c.GetUint("projectID"))
+	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	c.FileAttachment(templateFilePath, "Шаблон для импорта МЖД.xlsx")
+	c.FileAttachment(tmpFilePath, "Шаблон для импорта МЖД.xlsx")
+	os.Remove(tmpFilePath)
 }
 
 func (controller *mjdObjectController) Import(c *gin.Context) {
@@ -140,7 +172,7 @@ func (controller *mjdObjectController) Import(c *gin.Context) {
 	}
 
 	date := time.Now()
-  importFilePath := filepath.Join("./pkg/excels/temp/",date.Format("2006-01-02 15-04-05") + file.Filename)
+	importFilePath := filepath.Join("./pkg/excels/temp/", date.Format("2006-01-02 15-04-05")+file.Filename)
 	err = c.SaveUploadedFile(file, importFilePath)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
@@ -155,4 +187,28 @@ func (controller *mjdObjectController) Import(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, true)
+}
+
+func (controller *mjdObjectController) Export(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+
+	exportFileName, err := controller.mjdObjectService.Export(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
+	c.FileAttachment(exportFilePath, exportFileName)
+	os.Remove(exportFileName)
+}
+
+func (controller *mjdObjectController) GetObjectNamesForSearch(c *gin.Context) {
+	data, err := controller.mjdObjectService.GetObjectNamesForSearch(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

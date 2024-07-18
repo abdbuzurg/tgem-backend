@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -51,7 +52,7 @@ type IKL04KVObjectService interface {
 	Create(data dto.KL04KVObjectCreate) (model.KL04KV_Object, error)
 	Delete(projectID, id uint) error
 	Update(data dto.KL04KVObjectCreate) (model.KL04KV_Object, error)
-	TemplateFile(filepath string, projectID uint) error
+	TemplateFile(filepath string, projectID uint) (string, error)
 	Import(projectID uint, filepath string) error
 	Export(projectID uint) (string, error)
 	GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error)
@@ -113,18 +114,18 @@ func (service *kl04kvObjectService) Update(data dto.KL04KVObjectCreate) (model.K
 	return service.kl04kvObjectRepo.Update(data)
 }
 
-func (service *kl04kvObjectService) TemplateFile(filepath string, projectID uint) error {
-	f, err := excelize.OpenFile(filepath)
+func (service *kl04kvObjectService) TemplateFile(filePath string, projectID uint) (string, error) {
+	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("Не смог открыть шаблонный файл: %v", err)
+		return "", fmt.Errorf("Не смог открыть шаблонный файл: %v", err)
 	}
 
 	supervisorSheetName := "Супервайзеры"
 	allSupervisors, err := service.workerRepo.GetByJobTitleInProject("Супервайзер", projectID)
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("Данные супервайзеров недоступны: %v", err)
+		return "", fmt.Errorf("Данные супервайзеров недоступны: %v", err)
 	}
 
 	for index, supervisor := range allSupervisors {
@@ -134,7 +135,7 @@ func (service *kl04kvObjectService) TemplateFile(filepath string, projectID uint
 	allTeams, err := service.teamRepo.GetAll(projectID)
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("Данны бригад не доступны: %v", err)
+		return "", fmt.Errorf("Данны бригад не доступны: %v", err)
 	}
 
 	teamSheetName := "Бригады"
@@ -145,7 +146,7 @@ func (service *kl04kvObjectService) TemplateFile(filepath string, projectID uint
 	allTPObjects, err := service.tpObjectRepo.GetAll(projectID)
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("Данны бригад не доступны: %v", err)
+		return "", fmt.Errorf("Данны бригад не доступны: %v", err)
 	}
 
 	tpObjectSheetName := "ТП"
@@ -153,13 +154,15 @@ func (service *kl04kvObjectService) TemplateFile(filepath string, projectID uint
 		f.SetCellStr(tpObjectSheetName, "A"+fmt.Sprint(index+2), tp.Name)
 	}
 
-	if err := f.Save(); err != nil {
-		return fmt.Errorf("Не удалось обновить шаблон с новыми данными: %v", err)
+  date := time.Now()
+  temporaryFilePath := filepath.Join("./pkg/excels/temp/", date.String() + " Шаблон для импорта КЛ 04 КВ.xlsx")
+	if err := f.SaveAs(temporaryFilePath); err != nil {
+		return "", fmt.Errorf("Не удалось обновить шаблон с новыми данными: %v", err)
 	}
 
 	f.Close()
 
-	return nil
+	return temporaryFilePath, nil
 }
 
 func (service *kl04kvObjectService) Import(projectID uint, filepath string) error {
