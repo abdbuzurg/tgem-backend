@@ -34,6 +34,7 @@ type IInovoiceInputRepository interface {
 	Confirmation(data dto.InvoiceInputConfirmationQueryData) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
 	GetSerialNumbersForEdit(invoiceID uint, materialCostID uint) ([]string, error)
+  Import(data []dto.InvoiceInputImportData) error
 }
 
 func (repo *invoiceInputRespository) GetAll() ([]model.InvoiceInput, error) {
@@ -174,7 +175,18 @@ func (repo *invoiceInputRespository) Update(data dto.InvoiceInputCreateQueryData
 }
 
 func (repo *invoiceInputRespository) Delete(id uint) error {
-	return repo.db.Delete(&model.InvoiceInput{}, "id = ?", id).Error
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+
+		if err := tx.Delete(&model.InvoiceInput{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&model.InvoiceMaterials{}, "invoice_type = 'input' AND invoice_id = ?", id).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (repo *invoiceInputRespository) Count(projectID uint) (int64, error) {
@@ -344,4 +356,36 @@ func (repo *invoiceInputRespository) GetSerialNumbersForEdit(invoiceID uint, mat
     `, invoiceID, materialCostID).Scan(&result).Error
 
 	return result, err
+}
+
+func(repo *invoiceInputRespository) Import(data []dto.InvoiceInputImportData) error {
+  return repo.db.Transaction(func(tx *gorm.DB) error {
+    for index, invoice := range data {
+      invoiceInput := invoice.Details
+      if err := tx.Create(&invoiceInput).Error; err != nil {
+        return err
+      }
+
+      for subIndex := range invoice.Items {
+        data[index].Items[subIndex].InvoiceID = invoiceInput.ID
+      }
+
+      if err := tx.CreateInBatches(&data[index].Items, 15).Error; err != nil {
+        return err
+      }
+    }
+
+    err := tx.Exec(`
+      UPDATE invoice_counts
+      SET count = count + ?
+      WHERE
+        invoice_type = 'input' AND
+        project_id = ?
+      `, len(data), data[0].Details.ProjectID).Error
+		if err != nil {
+			return err
+		}
+
+    return nil
+  })
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/xuri/excelize/v2"
@@ -24,6 +25,7 @@ type invoiceOutputService struct {
 	materialRepo         repository.IMaterialRepository
 	districtRepo         repository.IDistrictRepository
 	serialNumberRepo     repository.ISerialNumberRepository
+	invoiceCountRepo     repository.IInvoiceCountRepository
 }
 
 func InitInvoiceOutputService(
@@ -37,6 +39,7 @@ func InitInvoiceOutputService(
 	materialRepo repository.IMaterialRepository,
 	districtRepo repository.IDistrictRepository,
 	serialNumberRepo repository.ISerialNumberRepository,
+	invoiceCountRepo repository.IInvoiceCountRepository,
 ) IInvoiceOutputService {
 	return &invoiceOutputService{
 		invoiceOutputRepo:    invoiceOutputRepo,
@@ -49,6 +52,7 @@ func InitInvoiceOutputService(
 		materialRepo:         materialRepo,
 		districtRepo:         districtRepo,
 		serialNumberRepo:     serialNumberRepo,
+		invoiceCountRepo:     invoiceCountRepo,
 	}
 }
 
@@ -73,6 +77,7 @@ type IInvoiceOutputService interface {
 	GetSerialNumbersByMaterial(projectID, materialID uint) ([]string, error)
 	GetAvailableMaterialsInWarehouse(projectID uint) ([]dto.AvailableMaterialsInWarehouse, error)
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
+	Import(filePath string, projectID uint, workerID uint) error
 }
 
 func (service *invoiceOutputService) GetAll() ([]model.InvoiceOutput, error) {
@@ -462,11 +467,11 @@ func (service *invoiceOutputService) Update(data dto.InvoiceOutput) (model.Invoi
 		return model.InvoiceOutput{}, err
 	}
 
-	excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode +".xlsx")
-  err = os.Remove(excelFilePath)
-  if err != nil {
-    return model.InvoiceOutput{}, err
-  }
+	excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode+".xlsx")
+	err = os.Remove(excelFilePath)
+	if err != nil {
+		return model.InvoiceOutput{}, err
+	}
 
 	templateFilePath := filepath.Join("./pkg/excels/templates/output.xlsx")
 	f, err := excelize.OpenFile(templateFilePath)
@@ -643,7 +648,6 @@ func (service *invoiceOutputService) Confirmation(id uint) error {
 		TeamMaterials:      materialsInTeam,
 	})
 
-
 	return err
 }
 
@@ -652,19 +656,19 @@ func (service *invoiceOutputService) UniqueCode(projectID uint) ([]dto.DataForSe
 }
 
 func (service *invoiceOutputService) UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error) {
-  return service.invoiceOutputRepo.UniqueWarehouseManager(projectID)
+	return service.invoiceOutputRepo.UniqueWarehouseManager(projectID)
 }
 
 func (service *invoiceOutputService) UniqueRecieved(projectID uint) ([]dto.DataForSelect[uint], error) {
-  return service.invoiceOutputRepo.UniqueRecieved(projectID)
+	return service.invoiceOutputRepo.UniqueRecieved(projectID)
 }
 
 func (service *invoiceOutputService) UniqueDistrict(projectID uint) ([]dto.DataForSelect[uint], error) {
-  return service.invoiceOutputRepo.UniqueDistrict(projectID)
+	return service.invoiceOutputRepo.UniqueDistrict(projectID)
 }
 
 func (service *invoiceOutputService) UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error) {
-  return service.invoiceOutputRepo.UniqueTeam(projectID)
+	return service.invoiceOutputRepo.UniqueTeam(projectID)
 }
 
 func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilterRequest) (string, error) {
@@ -702,7 +706,7 @@ func (service *invoiceOutputService) Report(filter dto.InvoiceOutputReportFilter
 			f.SetCellStr(sheetName, "H"+fmt.Sprint(rowCount), invoiceMaterial.MaterialUnit)
 			f.SetCellFloat(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.Amount, 2, 64)
 
-      materialCostFloat, _ := invoiceMaterial.MaterialCostM19.Float64()
+			materialCostFloat, _ := invoiceMaterial.MaterialCostM19.Float64()
 			f.SetCellFloat(sheetName, "J"+fmt.Sprint(rowCount), materialCostFloat, 2, 64)
 			f.SetCellValue(sheetName, "K"+fmt.Sprint(rowCount), invoiceMaterial.Notes)
 			rowCount++
@@ -763,4 +767,201 @@ func (service *invoiceOutputService) GetAvailableMaterialsInWarehouse(projectID 
 
 func (service *invoiceOutputService) GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error) {
 	return service.invoiceOutputRepo.GetMaterialsForEdit(id)
+}
+
+func (service *invoiceOutputService) Import(filePath string, projectID uint, workerID uint) error {
+	f, err := excelize.OpenFile(filePath)
+	if err != nil {
+		f.Close()
+		os.Remove(filePath)
+		return fmt.Errorf("Не смог открыть файл: %v", err)
+	}
+
+	sheetName := "Sheet1"
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		f.Close()
+		os.Remove(filePath)
+		return fmt.Errorf("Не смог найти таблицу 'Импорт': %v", err)
+	}
+
+	if len(rows) == 1 {
+		f.Close()
+		os.Remove(filePath)
+		return fmt.Errorf("Файл не имеет данных")
+	}
+
+	count, err := service.invoiceCountRepo.CountInvoice("output", projectID)
+	if err != nil {
+		f.Close()
+		os.Remove(filePath)
+		return fmt.Errorf("Файл не имеет данных")
+	}
+
+	index := 1
+	importData := []dto.InvoiceOutputImportData{}
+	currentInvoiceOutput := model.InvoiceOutput{}
+	currentInvoiceMaterials := []model.InvoiceMaterials{}
+	for len(rows) > index {
+		excelInvoiceOutput := model.InvoiceOutput{
+			ID:               0,
+			ProjectID:        projectID,
+			ReleasedWorkerID: workerID,
+			Confirmation:     false,
+			Notes:            "",
+		}
+
+		districtName, err := f.GetCellValue(sheetName, "L"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке L%v: %v", index+1, err)
+		}
+
+		district, err := service.districtRepo.GetByName(districtName)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Имя %v в ячейке L%v не найдено в базе: %v", districtName, index+1, err)
+		}
+
+		excelInvoiceOutput.DistrictID = district.ID
+
+		warehouseManagerName, err := f.GetCellValue(sheetName, "B"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке B%v: %v", index+1, err)
+		}
+
+		warehouseManager, err := service.workerRepo.GetByName(warehouseManagerName)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Имя %v в ячейке B%v не найдено в базе: %v", warehouseManagerName, index+1, err)
+		}
+
+		excelInvoiceOutput.WarehouseManagerWorkerID = warehouseManager.ID
+
+		recipientName, err := f.GetCellValue(sheetName, "C"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке C%v: %v", index+1, err)
+		}
+
+		recipient, err := service.workerRepo.GetByName(recipientName)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Имя %v в ячейке C%v не найдено в базе: %v", warehouseManagerName, index+1, err)
+		}
+
+		excelInvoiceOutput.RecipientWorkerID = recipient.ID
+
+		teamNumber, err := f.GetCellValue(sheetName, "D"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке D%v: %v", index+1, err)
+		}
+
+		team, err := service.teamRepo.GetByNumber(teamNumber)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Имя %v в ячейке D%v не найдено в базе: %v", warehouseManagerName, index+1, err)
+		}
+
+    excelInvoiceOutput.TeamID = team.ID
+
+		dateOfInvoiceInExcel, err := f.GetCellValue(sheetName, "F"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке F%v: %v", index+1, err)
+		}
+
+		dateLayout := "2006/01/02"
+		dateOfInvoice, err := time.Parse(dateLayout, dateOfInvoiceInExcel)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Неправильные данные в ячейке F%v: %v", index+1, err)
+		}
+
+		excelInvoiceOutput.DateOfInvoice = dateOfInvoice
+		if index == 1 {
+			currentInvoiceOutput = excelInvoiceOutput
+		}
+
+		excelInvoiceMaterial := model.InvoiceMaterials{
+			InvoiceType: "output",
+			IsDefected:  false,
+			ProjectID:   projectID,
+		}
+
+		materialName, err := f.GetCellValue(sheetName, "G"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке G%v: %v", index+1, err)
+		}
+
+		material, err := service.materialRepo.GetByName(materialName)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Материал %v в ячейке G%v не найдено в базе: %v", materialName, index+1, err)
+		}
+
+		materialCost, err := service.materialCostRepo.GetByMaterialID(material.ID)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Цена Материала %v в ячейке G%v не найдено в базе: %v", materialName, index+1, err)
+		}
+
+		excelInvoiceMaterial.MaterialCostID = materialCost[0].ID
+
+		amountExcel, err := f.GetCellValue(sheetName, "I"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке I%v: %v", index+1, err)
+		}
+
+		amount, err := strconv.ParseFloat(amountExcel, 64)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке I%v: %v", index+1, err)
+		}
+
+		excelInvoiceMaterial.Amount = amount
+
+		if currentInvoiceOutput.DateOfInvoice.Equal(excelInvoiceOutput.DateOfInvoice) {
+			currentInvoiceMaterials = append(currentInvoiceMaterials, excelInvoiceMaterial)
+		} else {
+			currentInvoiceOutput.DeliveryCode = utils.UniqueCodeGeneration("O", int64(count), projectID)
+			count++
+			importData = append(importData, dto.InvoiceOutputImportData{
+				Details: currentInvoiceOutput,
+				Items:   currentInvoiceMaterials,
+			})
+
+			currentInvoiceOutput = excelInvoiceOutput
+			currentInvoiceMaterials = []model.InvoiceMaterials{excelInvoiceMaterial}
+		}
+
+		index++
+	}
+
+	currentInvoiceOutput.DeliveryCode = utils.UniqueCodeGeneration("O", int64(count), projectID)
+	importData = append(importData, dto.InvoiceOutputImportData{
+		Details: currentInvoiceOutput,
+		Items:   currentInvoiceMaterials,
+	})
+
+	return service.invoiceOutputRepo.Import(importData)
 }

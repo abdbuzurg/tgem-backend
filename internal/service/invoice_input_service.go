@@ -6,7 +6,9 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/xuri/excelize/v2"
@@ -21,6 +23,7 @@ type invoiceInputService struct {
 	materialRepo             repository.IMaterialRepository
 	serialNumberRepo         repository.ISerialNumberRepository
 	serialNumberMovementRepo repository.ISerialNumberMovementRepository
+	invoiceCountRepo         repository.IInvoiceCountRepository
 }
 
 func InitInvoiceInputService(
@@ -32,6 +35,7 @@ func InitInvoiceInputService(
 	materialRepo repository.IMaterialRepository,
 	serialNumberRepo repository.ISerialNumberRepository,
 	serialNumberMovementRepo repository.ISerialNumberMovementRepository,
+	invoiceCountRepo repository.IInvoiceCountRepository,
 ) IInvoiceInputService {
 	return &invoiceInputService{
 		invoiceInputRepo:         invoiceInputRepo,
@@ -42,6 +46,7 @@ func InitInvoiceInputService(
 		materialRepo:             materialRepo,
 		serialNumberRepo:         serialNumberRepo,
 		serialNumberMovementRepo: serialNumberMovementRepo,
+		invoiceCountRepo:         invoiceCountRepo,
 	}
 }
 
@@ -63,6 +68,7 @@ type IInvoiceInputService interface {
 	NewMaterialCost(data model.MaterialCost) error
 	NewMaterialAndItsCost(data dto.NewMaterialDataFromInvoiceInput) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
+	Import(filePath string, projectID uint, workerID uint) error
 }
 
 func (service *invoiceInputService) GetAll() ([]model.InvoiceInput, error) {
@@ -414,4 +420,153 @@ func (service *invoiceInputService) NewMaterialAndItsCost(data dto.NewMaterialDa
 
 func (service *invoiceInputService) GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error) {
 	return service.invoiceInputRepo.GetMaterialsForEdit(id)
+}
+
+func (service *invoiceInputService) Import(filePath string, projectID uint, workerID uint) error {
+	f, err := excelize.OpenFile(filePath)
+	if err != nil {
+		f.Close()
+		os.Remove(filePath)
+		return fmt.Errorf("Не смог открыть файл: %v", err)
+	}
+
+	sheetName := "Sheet1"
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		f.Close()
+		os.Remove(filePath)
+		return fmt.Errorf("Не смог найти таблицу 'Импорт': %v", err)
+	}
+
+	if len(rows) == 1 {
+		f.Close()
+		os.Remove(filePath)
+		return fmt.Errorf("Файл не имеет данных")
+	}
+
+	count, err := service.invoiceCountRepo.CountInvoice("input", projectID)
+	if err != nil {
+		f.Close()
+		os.Remove(filePath)
+		return fmt.Errorf("Файл не имеет данных")
+	}
+
+	index := 1
+	importData := []dto.InvoiceInputImportData{}
+	currentInvoiceInput := model.InvoiceInput{}
+	currentInvoiceMaterials := []model.InvoiceMaterials{}
+	for len(rows) > index {
+		excelInvoiceInput := model.InvoiceInput{
+			ID:               0,
+			ProjectID:        projectID,
+			ReleasedWorkerID: workerID,
+			Confirmed:        false,
+			Notes:            "",
+		}
+
+		warehouseManagerName, err := f.GetCellValue(sheetName, "B"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке B%v: %v", index+1, err)
+		}
+
+		warehouseManager, err := service.workerRepo.GetByName(warehouseManagerName)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Имя %v в ячейке B%v не найдено в базе: %v", warehouseManagerName, index+1, err)
+		}
+
+		excelInvoiceInput.WarehouseManagerWorkerID = warehouseManager.ID
+
+		dateOfInvoiceInExcel, err := f.GetCellValue(sheetName, "D"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке D%v: %v", index+1, err)
+		}
+
+		dateLayout := "2006/01/02"
+		dateOfInvoice, err := time.Parse(dateLayout, dateOfInvoiceInExcel)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Неправильные данные в ячейке D%v: %v", index+1, err)
+		}
+
+		excelInvoiceInput.DateOfInvoice = dateOfInvoice
+		if index == 1 {
+			currentInvoiceInput = excelInvoiceInput
+		}
+
+		excelInvoiceMaterial := model.InvoiceMaterials{
+			InvoiceType: "input",
+			IsDefected:  false,
+			ProjectID:   projectID,
+		}
+
+		materialName, err := f.GetCellValue(sheetName, "E"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке E%v: %v", index+1, err)
+		}
+
+		material, err := service.materialRepo.GetByName(materialName)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Материал %v в ячейке E%v не найдено в базе: %v", warehouseManagerName, index+1, err)
+		}
+
+		materialCost, err := service.materialCostRepo.GetByMaterialID(material.ID)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Цена Материала %v в ячейке E%v не найдено в базе: %v", warehouseManagerName, index+1, err)
+		}
+
+		excelInvoiceMaterial.MaterialCostID = materialCost[0].ID
+
+		amountExcel, err := f.GetCellValue(sheetName, "G"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке G%v: %v", index+1, err)
+		}
+
+		amount, err := strconv.ParseFloat(amountExcel, 64)
+		if err != nil {
+			f.Close()
+			os.Remove(filePath)
+			return fmt.Errorf("Нету данных в ячейке G%v: %v", index+1, err)
+		}
+
+		excelInvoiceMaterial.Amount = amount
+
+		if currentInvoiceInput.DateOfInvoice.Equal(excelInvoiceInput.DateOfInvoice) {
+			currentInvoiceMaterials = append(currentInvoiceMaterials, excelInvoiceMaterial)
+		} else {
+			currentInvoiceInput.DeliveryCode = utils.UniqueCodeGeneration("П", int64(count), projectID)
+			count++
+			importData = append(importData, dto.InvoiceInputImportData{
+				Details: currentInvoiceInput,
+				Items:   currentInvoiceMaterials,
+			})
+
+			currentInvoiceInput = excelInvoiceInput
+			currentInvoiceMaterials = []model.InvoiceMaterials{excelInvoiceMaterial}
+		}
+
+		index++
+	}
+
+			currentInvoiceInput.DeliveryCode = utils.UniqueCodeGeneration("П", int64(count), projectID)
+	importData = append(importData, dto.InvoiceInputImportData{
+		Details: currentInvoiceInput,
+		Items:   currentInvoiceMaterials,
+	})
+
+	return service.invoiceInputRepo.Import(importData)
 }

@@ -275,9 +275,7 @@ func (service *kl04kvObjectService) Import(projectID uint, filepath string) erro
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке F%d: %v", index+1, err)
 		}
 		team := model.Team{}
-		fmt.Println(teamNumber, teamNumber != "")
 		if teamNumber != "" {
-			fmt.Println(teamNumber, teamNumber != "")
 			team, err = service.teamRepo.GetByNumber(teamNumber)
 			if err != nil {
 				f.Close()

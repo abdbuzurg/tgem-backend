@@ -83,3 +83,8 @@ type InvoiceInputMaterialForEdit struct {
 	HasSerialNumber bool     `json:"hasSerialNumber"`
 	SerialNumbers   []string `json:"serialNumbers"`
 }
+
+type InvoiceInputImportData struct {
+  Details model.InvoiceInput
+  Items []model.InvoiceMaterials
+}

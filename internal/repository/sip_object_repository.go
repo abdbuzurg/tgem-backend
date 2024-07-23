@@ -24,6 +24,7 @@ type ISIPObjectRepository interface {
 	Update(data dto.SIPObjectCreate) (model.SIP_Object, error)
 	Delete(id, projectID uint) error
 	CreateInBatches(objects []model.Object, sips []model.SIP_Object, supervisors []uint) ([]model.SIP_Object, error)
+	Import(data []dto.SIPObjectImportData) error
 }
 
 func (repo *sipObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.SIPObjectPaginatedQuery, error) {
@@ -253,4 +254,39 @@ func (repo *sipObjectRepository) CreateInBatches(objects []model.Object, sips []
 	})
 
 	return sips, err
+}
+
+func (repo *sipObjectRepository) Import(data []dto.SIPObjectImportData) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		for index, row := range data {
+			sip := row.SIP
+			if err := tx.Create(&sip).Error; err != nil {
+				return err
+			}
+
+			object := row.Object
+			object.ObjectDetailedID = sip.ID
+			data[index].Object.ObjectDetailedID = sip.ID
+			if err := tx.Create(&object).Error; err != nil {
+				return err
+			}
+
+			if row.ObjectSupervisors.SupervisorWorkerID != 0 {
+				data[index].ObjectSupervisors.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectSupervisors).Error; err != nil {
+					return err
+				}
+			}
+
+			if row.ObjectTeam.TeamID != 0 {
+				data[index].ObjectTeam.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectTeam).Error; err != nil {
+					return err
+				}
+			}
+
+		}
+
+		return nil
+	})
 }

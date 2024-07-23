@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,6 +45,7 @@ type IInvoiceOutputController interface {
 	GetCodesByMaterialID(c *gin.Context)
 	GetAvailableMaterialsInWarehouse(c *gin.Context)
 	GetMaterialsForEdit(c *gin.Context)
+	Import(c *gin.Context)
 }
 
 func (controller *invoiceOutputController) GetAll(c *gin.Context) {
@@ -390,4 +392,32 @@ func (controller *invoiceOutputController) Update(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceOutputController) Import(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сформирован, проверьте файл: %v", err))
+		return
+	}
+
+	date := time.Now()
+	importFileName := date.Format("2006-01-02 15-04-05") + file.Filename
+	importFilePath := filepath.Join("./pkg/excels/temp/", importFileName)
+	err = c.SaveUploadedFile(file, importFilePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
+		return
+	}
+
+	projectID := c.GetUint("projectID")
+	workerID := c.GetUint("workerID")
+	err = controller.invoiceOutputService.Import(importFilePath, projectID, workerID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, true)
+
 }

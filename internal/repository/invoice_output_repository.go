@@ -39,6 +39,7 @@ type IInvoiceOutputRepository interface {
 	Confirmation(data dto.InvoiceOutputConfirmationQueryData) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
 	GetMaterialDataForReport(invoiceID uint) ([]dto.InvoiceOutputMaterialDataForReport, error)
+	Import(data []dto.InvoiceOutputImportData) error
 }
 
 func (repo *invoiceOutputRepository) GetAll() ([]model.InvoiceOutput, error) {
@@ -61,9 +62,13 @@ func (repo *invoiceOutputRepository) GetPaginatedFiltered(page, limit int, filte
         invoice_outputs.id as id,
         invoice_outputs.delivery_code as delivery_code,
         districts.name as district_name,
+        districts.id as district_id,
         teams.number as team_name,
+        teams.id as team_id,
+        warehouse_manager.id as warehouse_manager_id,
         warehouse_manager.name as warehouse_manager_name,
         released.name as released_name,
+        recipient.id as recipient_id,
         recipient.name as recipient_name,
         invoice_outputs.date_of_invoice as date_of_invoice,
         invoice_outputs.confirmation as confirmation,
@@ -173,7 +178,17 @@ func (repo *invoiceOutputRepository) Update(data dto.InvoiceOutputCreateQueryDat
 }
 
 func (repo *invoiceOutputRepository) Delete(id uint) error {
-	return repo.db.Delete(&model.InvoiceOutput{}, "id = ?", id).Error
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&model.InvoiceOutput{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&model.InvoiceMaterials{}, "invoice_type = 'output' AND invoice_id = ?", id).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (repo *invoiceOutputRepository) Count(projectID uint) (int64, error) {
@@ -460,4 +475,37 @@ func (repo *invoiceOutputRepository) GetMaterialDataForReport(invoiceID uint) ([
     `, invoiceID).Scan(&result).Error
 
 	return result, err
+}
+
+func (repo *invoiceOutputRepository) Import(data []dto.InvoiceOutputImportData) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+
+		for index, invoice := range data {
+			invoiceOutput := invoice.Details
+			if err := tx.Create(&invoiceOutput).Error; err != nil {
+				return err
+			}
+
+			for subIndex := range invoice.Items {
+				data[index].Items[subIndex].InvoiceID = invoiceOutput.ID
+			}
+
+			if err := tx.CreateInBatches(&data[index].Items, 15).Error; err != nil {
+				return err
+			}
+		}
+
+		err := tx.Exec(`
+      UPDATE invoice_counts
+      SET count = count + ?
+      WHERE
+        invoice_type = 'output' AND
+        project_id = ?
+      `, len(data), data[0].Details.ProjectID).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

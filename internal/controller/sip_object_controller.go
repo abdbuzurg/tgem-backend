@@ -5,6 +5,8 @@ import (
 	"backend-v2/internal/service"
 	"backend-v2/pkg/response"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -124,14 +126,16 @@ func (controller *sipObjectController) Delete(c *gin.Context) {
 }
 
 func (controller *sipObjectController) GetTemplateFile(c *gin.Context) {
-	filepath := "./pkg/excels/templates/Шаблон для импорта СИП.xlsx"
+	templateFilePath := filepath.Join("./pkg/excels/templates/Шаблон для импорта СИП.xlsx")
 
-	if err := controller.sipObjectService.TemplateFile(filepath, c.GetUint("projectID")); err != nil {
+	tmpFilePath, err := controller.sipObjectService.TemplateFile(templateFilePath, c.GetUint("projectID"))
+	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	c.FileAttachment(filepath, "Шаблон для импорта СИП.xlsx")
+	c.FileAttachment(tmpFilePath, "Шаблон для импорта СИП.xlsx")
+	os.Remove(tmpFilePath)
 }
 
 func (controller *sipObjectController) Import(c *gin.Context) {

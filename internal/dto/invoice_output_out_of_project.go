@@ -7,27 +7,34 @@ import (
 
 type InvoiceOutputOutOfProjectPaginated struct {
 	ID                 uint      `json:"id" gorm:"primaryKey"`
-	ProjectID          uint      `json:"-"`
+	FromProjectID      uint      `json:"fromProjectID"`
+	ToProjectID        uint      `json:"toProjectID"`
+	ToProjectName      string    `json:"toProjectName"`
+	ToProjectManager   string    `json:"toProjectManager"`
 	DeliveryCode       string    `json:"deliveryCode"`
-	ReleasedWorkerName uint      `json:"releasedWorkerName"`
+	ReleasedWorkerName string    `json:"releasedWorkerName"`
 	DateOfInvoice      time.Time `json:"dateOfInvoice"`
-	Notes              string    `json:"notes"`
 	Confirmation       bool      `json:"confirmation"`
 }
 
 type InvoiceOutputOutOfProjectCreateQueryData struct {
-	Invoice                       model.InvoiceOutputOutOfProject
-	InvoiceMaterials              []model.InvoiceMaterials
-	SerialNumberMovements         []model.SerialNumberMovement
+	Invoice          model.InvoiceOutputOutOfProject
+	InvoiceMaterials []model.InvoiceMaterials
 }
 
 type InvoiceOutputOutOfProjectConfirmationQueryData struct {
-  InvoiceData model.InvoiceOutputOutOfProject
-  WarehouseMaterials []model.MaterialLocation
-  TeamMaterials []model.MaterialLocation
+	InvoiceData        model.InvoiceOutputOutOfProject
+	WarehouseMaterials []model.MaterialLocation
 }
 
 type InvoiceOutputOutOfProject struct {
 	Details model.InvoiceOutputOutOfProject `json:"details"`
-	Items   []InvoiceOutputItem `json:"items"`
+	Items   []InvoiceOutputItem             `json:"items"`
 }
+
+type InvoiceOutputOutOfProjectSearchParameters struct {
+	ToProjectID      uint
+	FromProjectID    uint
+	ReleasedWorkerID uint
+}
+

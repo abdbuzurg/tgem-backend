@@ -19,33 +19,43 @@ func InitInvoiceOutputOutOfProjectRepository(db *gorm.DB) IInvoiceOutputOutOfPro
 }
 
 type IInvoiceOutputOutOfProjectRepository interface {
-	GetPaginated(page, limit int, filter model.InvoiceOutputOutOfProject) ([]dto.InvoiceOutputOutOfProjectPaginated, error)
+	GetPaginated(page, limit int, filter dto.InvoiceOutputOutOfProjectSearchParameters) ([]dto.InvoiceOutputOutOfProjectPaginated, error)
+	GetByID(id uint) (model.InvoiceOutputOutOfProject, error)
 	Create(data dto.InvoiceOutputOutOfProjectCreateQueryData) (model.InvoiceOutputOutOfProject, error)
-	Count(projectID uint) (int64, error)
+	Count(filter dto.InvoiceOutputOutOfProjectSearchParameters) (int64, error)
 	Confirmation(data dto.InvoiceOutputOutOfProjectConfirmationQueryData) error
+	Delete(id uint) error
+	Update(data dto.InvoiceOutputOutOfProjectCreateQueryData) (model.InvoiceOutputOutOfProject, error)
+	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
 }
 
-func (repo *invoiceOutputOutOfProjectRepository) GetPaginated(page, limit int, filter model.InvoiceOutputOutOfProject) ([]dto.InvoiceOutputOutOfProjectPaginated, error) {
+func (repo *invoiceOutputOutOfProjectRepository) GetPaginated(page, limit int, filter dto.InvoiceOutputOutOfProjectSearchParameters) ([]dto.InvoiceOutputOutOfProjectPaginated, error) {
 	data := []dto.InvoiceOutputOutOfProjectPaginated{}
 	err := repo.db.Raw(`
     SELECT 
       invoice_output_out_of_projects.id as id,
+      invoice_output_out_of_projects.from_project_id as from_project_id,
+      invoice_output_out_of_projects.to_project_id as to_project_id,
+      projects.name as to_project_name,    
+      projects.project_manager as to_project_manager,
       invoice_output_out_of_projects.delivery_code as delivery_code,
-      released.name as released_name,
+      workers.name as released_worker_name,
       invoice_output_out_of_projects.date_of_invoice as date_of_invoice,
-      invoice_output_out_of_projects.confirmation as confirmation,
-      invoice_output_out_of_projects.notes as notes
-    FROM invoice_outputs
-      INNER JOIN workers AS released ON released.id = invoice_outputs.released_worker_id
-    WHERE
-      invoice_output_out_of_projects.project_id = ? AND
-      (nullif(?, 0) IS NULL OR invoice_outputs.released_worker_id = ?) AND
-      (nullif(?, '') IS NULL OR invoice_outputs.delivery_code = ?) 
-    ORDER BY invoice_output_out_of_projects.id DESC LIMIT ? OFFSET ?;
-  `,
-		filter.ProjectID,
+      invoice_output_out_of_projects.confirmation as confirmation
+    FROM invoice_output_out_of_projects 
+    INNER JOIN projects ON invoice_output_out_of_projects.to_project_id = projects.id
+    INNER JOIN workers ON invoice_output_out_of_projects.released_worker_id = workers.id
+    WHERE 
+      from_project_id = ? AND
+      (nullif(?, 0) IS NULL OR to_project_id = ?) AND
+			(nullif(?, 0) IS NULL OR released_worker_id = ?)
+    ORDER BY invoice_output_out_of_projects.id 
+    LIMIT ? 
+    OFFSET ?
+    `,
+		filter.FromProjectID,
+		filter.ToProjectID, filter.ToProjectID,
 		filter.ReleasedWorkerID, filter.ReleasedWorkerID,
-		filter.DeliveryCode, filter.DeliveryCode,
 		limit, (page-1)*limit,
 	).Scan(&data).Error
 
@@ -68,13 +78,24 @@ func (repo *invoiceOutputOutOfProjectRepository) Create(data dto.InvoiceOutputOu
 			return err
 		}
 
-		for index := range data.SerialNumberMovements {
-			data.SerialNumberMovements[index].InvoiceID = result.ID
-		}
-
-		if err := tx.CreateInBatches(&data.SerialNumberMovements, 15).Error; err != nil {
+		err := tx.Exec(`
+      UPDATE invoice_counts
+      SET count = count + 1
+      WHERE
+        invoice_type = 'output' AND
+        project_id = ?
+      `, result.FromProjectID).Error
+		if err != nil {
 			return err
 		}
+
+		// for index := range data.SerialNumberMovements {
+		// 	data.SerialNumberMovements[index].InvoiceID = result.ID
+		// }
+
+		// if err := tx.CreateInBatches(&data.SerialNumberMovements, 15).Error; err != nil {
+		// 	return err
+		// }
 
 		return nil
 
@@ -82,9 +103,20 @@ func (repo *invoiceOutputOutOfProjectRepository) Create(data dto.InvoiceOutputOu
 	return result, err
 }
 
-func (repo *invoiceOutputOutOfProjectRepository) Count(projectID uint) (int64, error) {
+func (repo *invoiceOutputOutOfProjectRepository) Count(filter dto.InvoiceOutputOutOfProjectSearchParameters) (int64, error) {
 	var count int64
-	err := repo.db.Raw("SELECT COUNT(*) FROM invoice_output_out_of_projects WHERE project_id = ?", projectID).Scan(&count).Error
+	err := repo.db.Raw(`
+    SELECT COUNT(*) 
+    FROM invoice_output_out_of_projects 
+    WHERE 
+      from_project_id = ? AND
+      (nullif(?, 0) IS NULL OR to_project_id = ?) AND
+			(nullif(?, 0) IS NULL OR released_worker_id = ?)
+    `,
+		filter.FromProjectID,
+		filter.ToProjectID, filter.ToProjectID,
+		filter.ReleasedWorkerID, filter.ReleasedWorkerID,
+	).Scan(&count).Error
 	return count, err
 }
 
@@ -101,16 +133,77 @@ func (repo *invoiceOutputOutOfProjectRepository) Confirmation(data dto.InvoiceOu
 			return err
 		}
 
-		if err := tx.Exec(`
-        UPDATE serial_number_movements
-        SET confirmation = true
-        WHERE 
-          serial_number_movements.invoice_type = 'output-out-of-project' AND
-          serial_number_movements.invoice_id = ?
-      `, data.InvoiceData.ID).Error; err != nil {
+		return nil
+	})
+}
+
+func (repo *invoiceOutputOutOfProjectRepository) Delete(id uint) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&model.InvoiceMaterials{}, "invoice_type = 'output-out-of-project' AND invoice_id = ?", id).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&model.InvoiceOutputOutOfProject{}, "id = ?", id).Error; err != nil {
 			return err
 		}
 
 		return nil
 	})
+}
+
+func (repo *invoiceOutputOutOfProjectRepository) Update(data dto.InvoiceOutputOutOfProjectCreateQueryData) (model.InvoiceOutputOutOfProject, error) {
+	result := data.Invoice
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&model.InvoiceOutput{}).Select("*").Where("id = ?", result.ID).Updates(&result).Error
+		if err != nil {
+			return err
+		}
+
+		if err = tx.Delete(model.InvoiceMaterials{}, "invoice_id = ? AND invoice_type='output-out-of-project'", result.ID).Error; err != nil {
+			return nil
+		}
+
+		for index := range data.InvoiceMaterials {
+			data.InvoiceMaterials[index].InvoiceID = result.ID
+		}
+
+		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
+			return err
+		}
+
+		return nil
+
+	})
+
+	return result, err
+}
+
+func (repo *invoiceOutputOutOfProjectRepository) GetByID(id uint) (model.InvoiceOutputOutOfProject, error) {
+	result := model.InvoiceOutputOutOfProject{}
+	err := repo.db.First(&result, "id = ?", id).Error
+	return result, err
+}
+
+func (repo *invoiceOutputOutOfProjectRepository) GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error) {
+	result := []dto.InvoiceOutputMaterialsForEdit{}
+	err := repo.db.Raw(`
+    SELECT 
+      materials.id as material_id,
+      materials.name as material_name,
+      materials.unit as material_unit,
+      material_locations.amount as warehouse_amount,
+      invoice_materials.amount as amount,
+      invoice_materials.notes as notes,
+      materials.has_serial_number as has_serial_number
+    FROM invoice_materials
+    INNER JOIN material_costs ON material_costs.id = invoice_materials.material_cost_id
+    INNER JOIN materials ON materials.id = material_costs.material_id
+    INNER JOIN material_locations ON material_locations.material_cost_id = invoice_materials.material_cost_id
+    WHERE
+      material_locations.location_type = 'warehouse' AND
+      invoice_materials.invoice_type = 'output-out-of-project' AND
+      invoice_materials.invoice_id = ?
+    `, id).Scan(&result).Error
+
+	return result, err
 }

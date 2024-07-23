@@ -28,3 +28,10 @@ type SIPObjectCreate struct {
 	Supervisors  []uint           `json:"supervisors"`
 	Teams        []uint           `json:"teams"`
 }
+
+type SIPObjectImportData struct {
+	Object            model.Object
+	SIP               model.SIP_Object
+	ObjectSupervisors model.ObjectSupervisors
+	ObjectTeam        model.ObjectTeams
+}

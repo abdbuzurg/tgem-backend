@@ -9,10 +9,14 @@ import (
 
 type InvoiceOutputPaginated struct {
 	ID                   uint      `json:"id"`
+	WarehouseManagerID   uint      `json:"warehouseManagerID"`
 	WarehouseManagerName string    `json:"warehouseManagerName"`
 	ReleasedName         string    `json:"releasedName"`
+	RecipientID          uint      `json:"recipientID"`
 	RecipientName        string    `json:"recipientName"`
+	TeamID               uint      `json:"teamID"`
 	TeamName             string    `json:"teamName"`
+	DistrictID           uint      `json:"districtID"`
 	DistrictName         string    `json:"districtName"`
 	DeliveryCode         string    `json:"deliveryCode"`
 	Notes                string    `json:"notes"`
@@ -134,4 +138,9 @@ type InvoiceOutputMaterialDataForReport struct {
 	MaterialCostM19 decimal.Decimal
 	Notes           string
 	Amount          float64
+}
+
+type InvoiceOutputImportData struct {
+	Details model.InvoiceOutput
+	Items   []model.InvoiceMaterials
 }

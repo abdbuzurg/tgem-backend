@@ -24,6 +24,7 @@ type IMaterialCostRepository interface {
 	GetByID(id uint) (model.MaterialCost, error)
 	GetByMaterialID(materialID uint) ([]model.MaterialCost, error)
 	GetByMaterialIDSorted(materialID uint) ([]model.MaterialCost, error)
+  GetByCostM19AndMaterialID(materialID uint, costM19 float64) (model.MaterialCost, error)
 	Create(data model.MaterialCost) (model.MaterialCost, error)
 	Update(data model.MaterialCost) (model.MaterialCost, error)
 	Delete(id uint) error
@@ -132,4 +133,10 @@ func (repo *materialCostRepository) Count(filter dto.MaterialCostSearchFilter) (
 func (repo *materialCostRepository) CreateInBatch(data []model.MaterialCost) ([]model.MaterialCost, error) {
 	err := repo.db.CreateInBatches(&data, 15).Error
 	return data, err
+}
+
+func (repo *materialCostRepository) GetByCostM19AndMaterialID(materialID uint, costM19 float64) (model.MaterialCost, error) {
+  result := model.MaterialCost{}
+  err := repo.db.First(&result, "material_id = ? AND cost_m19 = ?", materialID, costM19).Error
+  return result, err
 }
