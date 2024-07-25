@@ -943,8 +943,8 @@ func (service *invoiceOutputService) Import(filePath string, projectID uint, wor
 		if currentInvoiceOutput.DateOfInvoice.Equal(excelInvoiceOutput.DateOfInvoice) {
 			currentInvoiceMaterials = append(currentInvoiceMaterials, excelInvoiceMaterial)
 		} else {
-			currentInvoiceOutput.DeliveryCode = utils.UniqueCodeGeneration("O", int64(count), projectID)
 			count++
+			currentInvoiceOutput.DeliveryCode = utils.UniqueCodeGeneration("O", int64(count), projectID)
 			importData = append(importData, dto.InvoiceOutputImportData{
 				Details: currentInvoiceOutput,
 				Items:   currentInvoiceMaterials,
