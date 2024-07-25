@@ -121,7 +121,6 @@ func (repo *invoiceMaterialsRepository) GetInvoiceMaterialsWithoutSerialNumbers(
     INNER JOIN material_costs ON material_costs.id = invoice_materials.material_cost_id
     INNER JOIN materials ON materials.id = material_costs.material_id
     WHERE
-      invoice_materials.project_id = materials.project_id AND
       invoice_materials.invoice_type = ? AND
       invoice_materials.invoice_id = ? AND
       materials.has_serial_number = false 

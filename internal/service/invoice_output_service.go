@@ -854,7 +854,7 @@ func (service *invoiceOutputService) Import(filePath string, projectID uint, wor
 		if err != nil {
 			f.Close()
 			os.Remove(filePath)
-			return fmt.Errorf("Имя %v в ячейке C%v не найдено в базе: %v", warehouseManagerName, index+1, err)
+			return fmt.Errorf("Имя %v в ячейке C%v не найдено в базе: %v", recipientName, index+1, err)
 		}
 
 		excelInvoiceOutput.RecipientWorkerID = recipient.ID
@@ -870,7 +870,7 @@ func (service *invoiceOutputService) Import(filePath string, projectID uint, wor
 		if err != nil {
 			f.Close()
 			os.Remove(filePath)
-			return fmt.Errorf("Имя %v в ячейке D%v не найдено в базе: %v", warehouseManagerName, index+1, err)
+			return fmt.Errorf("Имя %v в ячейке D%v не найдено в базе: %v", teamNumber, index+1, err)
 		}
 
     excelInvoiceOutput.TeamID = team.ID

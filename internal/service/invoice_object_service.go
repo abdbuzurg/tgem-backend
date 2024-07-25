@@ -5,18 +5,22 @@ import (
 	"backend-v2/internal/repository"
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
+	"errors"
+
+	"gorm.io/gorm"
 )
 
 type invoiceObjectService struct {
-	invoiceObjectRepo    repository.IInvoiceObjectRepository
-	objectRepo           repository.IObjectRepository
-	workerRepo           repository.IWorkerRepository
-	teamRepo             repository.ITeamRepository
-	materialLocationRepo repository.IMaterialLocationRepository
-	serialNumberRepo     repository.ISerialNumberRepository
-	materialCostRepo     repository.IMaterialCostRepository
-	invoiceMaterialRepo  repository.IInvoiceMaterialsRepository
-	objectTeamsRepo      repository.IObjectTeamsRepository
+	invoiceObjectRepo     repository.IInvoiceObjectRepository
+	objectRepo            repository.IObjectRepository
+	workerRepo            repository.IWorkerRepository
+	teamRepo              repository.ITeamRepository
+	materialLocationRepo  repository.IMaterialLocationRepository
+	serialNumberRepo      repository.ISerialNumberRepository
+	materialCostRepo      repository.IMaterialCostRepository
+	invoiceMaterialRepo   repository.IInvoiceMaterialsRepository
+	objectTeamsRepo       repository.IObjectTeamsRepository
+	operationMaterialRepo repository.IOperationMaterialRepository
 }
 
 func InitInvoiceObjectService(
@@ -29,17 +33,19 @@ func InitInvoiceObjectService(
 	materialCostRepo repository.IMaterialCostRepository,
 	invoiceMaterialRepo repository.IInvoiceMaterialsRepository,
 	objectTeamsRepo repository.IObjectTeamsRepository,
+	operationMaterialRepo repository.IOperationMaterialRepository,
 ) IInvoiceObjectService {
 	return &invoiceObjectService{
-		invoiceObjectRepo:    invoiceObjectRepo,
-		objectRepo:           objectRepo,
-		workerRepo:           workerRepo,
-		teamRepo:             teamRepo,
-		materialLocationRepo: materialLocation,
-		serialNumberRepo:     serialNumberRepo,
-		materialCostRepo:     materialCostRepo,
-		invoiceMaterialRepo:  invoiceMaterialRepo,
-		objectTeamsRepo:      objectTeamsRepo,
+		invoiceObjectRepo:     invoiceObjectRepo,
+		objectRepo:            objectRepo,
+		workerRepo:            workerRepo,
+		teamRepo:              teamRepo,
+		materialLocationRepo:  materialLocation,
+		serialNumberRepo:      serialNumberRepo,
+		materialCostRepo:      materialCostRepo,
+		invoiceMaterialRepo:   invoiceMaterialRepo,
+		objectTeamsRepo:       objectTeamsRepo,
+		operationMaterialRepo: operationMaterialRepo,
 	}
 }
 
@@ -169,7 +175,6 @@ func (service *invoiceObjectService) Create(data dto.InvoiceObjectCreate) (model
 				invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
 				index++
 			}
-
 		}
 
 		if len(invoiceMaterial.SerialNumbers) != 0 {
@@ -217,19 +222,40 @@ func (service *invoiceObjectService) Create(data dto.InvoiceObjectCreate) (model
 						Amount:         0,
 						Notes:          invoiceMaterial.Notes,
 					}
-
 				}
-
 			}
 
 			invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
 		}
+	}
 
+	objectOperations := []model.ObjectOperation{}
+	for _, invoiceMaterial := range invoiceMaterialForCreate {
+		operationMaterial, err := service.operationMaterialRepo.GetByMaterialCostID(invoiceMaterial.MaterialCostID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue
+		} else if err != nil {
+			return model.InvoiceObject{}, err
+		}
+
+		if operationMaterial.OperationID == 0 || operationMaterial.MaterialID == 0 {
+			continue
+		}
+
+		objectOperations = append(objectOperations, model.ObjectOperation{
+			ID:              0,
+			InvoiceObjectID: 0,
+			ProjectID:       data.Details.ProjectID,
+			OperationID:     operationMaterial.OperationID,
+			Amount:          invoiceMaterial.Amount,
+			Notes:           "",
+		})
 	}
 
 	invoiceObject, err := service.invoiceObjectRepo.Create(dto.InvoiceObjectCreateQueryData{
 		Invoice:               data.Details,
 		InvoiceMaterials:      invoiceMaterialForCreate,
+		ObjectOperations:      objectOperations,
 		SerialNumberMovements: serialNumberMovements,
 	})
 

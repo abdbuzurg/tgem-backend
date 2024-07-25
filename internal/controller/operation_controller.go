@@ -1,15 +1,14 @@
 package controller
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
-	"backend-v2/model"
 	"backend-v2/pkg/response"
 	"fmt"
 	"net/url"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 )
 
 type operationController struct {
@@ -32,7 +31,7 @@ type IOperationController interface {
 }
 
 func (controller *operationController) GetAll(c *gin.Context) {
-	data, err := controller.operationService.GetAll()
+	data, err := controller.operationService.GetAll(c.GetUint("projectID"))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get Operation data: %v", err))
 		return
@@ -56,20 +55,6 @@ func (controller *operationController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	costPrimerStr := c.DefaultQuery("costPrimer", "")
-	costPrime, err := decimal.NewFromString(costPrimerStr)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Cannot get the costPrime parameter: %v", err))
-		return
-	}
-
-	costWithCustomerStr := c.DefaultQuery("costWithCustomer", "")
-	costWithCustomer, err := decimal.NewFromString(costWithCustomerStr)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Cannot get the costWithCustomer parameter: %v", err))
-		return
-	}
-
 	name := c.DefaultQuery("name", "")
 	name, err = url.QueryUnescape(name)
 	if err != nil {
@@ -84,11 +69,18 @@ func (controller *operationController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	filter := model.Operation{
-		Name:             name,
-		Code:             code,
-		CostPrime:        costPrime,
-		CostWithCustomer: costWithCustomer,
+	materialIDStr := c.DefaultQuery("materialID", "0")
+	materialID, err := strconv.Atoi(materialIDStr)
+	if err != nil || materialID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for materialID: %v", err))
+		return
+	}
+
+	filter := dto.OperationSearchParameters{
+		Name:       name,
+		Code:       code,
+		ProjectID:  c.GetUint("projectID"),
+		MaterialID: uint(materialID),
 	}
 
 	data, err := controller.operationService.GetPaginated(page, limit, filter)
@@ -97,7 +89,7 @@ func (controller *operationController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	dataCount, err := controller.operationService.Count()
+	dataCount, err := controller.operationService.Count(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the total amount of Operation: %v", err))
 		return
@@ -124,9 +116,22 @@ func (controller *operationController) GetByID(c *gin.Context) {
 }
 
 func (controller *operationController) Create(c *gin.Context) {
-	var createData model.Operation
+	var createData dto.Operation
 	if err := c.ShouldBindJSON(&createData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
+
+	createData.ProjectID = c.GetUint("projectID")
+
+	operation, err := controller.operationService.GetByName(createData.Name, createData.ProjectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Ошибка проверки имени услуги: %v", err))
+		return
+	}
+
+	if operation.Name == createData.Name {
+		response.ResponseError(c, fmt.Sprint("Услуга с таким именем уже существует"))
 		return
 	}
 
@@ -140,9 +145,22 @@ func (controller *operationController) Create(c *gin.Context) {
 }
 
 func (controller *operationController) Update(c *gin.Context) {
-	var updateData model.Operation
+	var updateData dto.Operation
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
+
+	updateData.ProjectID = c.GetUint("projectID")
+
+	operation, err := controller.operationService.GetByName(updateData.Name, updateData.ProjectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Ошибка проверки имени услуги: %v", err))
+		return
+	}
+
+	if operation.Name == updateData.Name && operation.ID != updateData.ID {
+		response.ResponseError(c, fmt.Sprint("Услуга с таким именем уже существует"))
 		return
 	}
 

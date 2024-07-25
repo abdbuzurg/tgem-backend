@@ -147,10 +147,8 @@ func (controller *invoiceObjectController) Create(c *gin.Context) {
 
 	var data dto.InvoiceObjectCreate
 	if err := c.ShouldBindJSON(&data); err != nil {
-
 		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
 		return
-
 	}
 
 	workerID := c.GetUint("workerID")
@@ -159,10 +157,15 @@ func (controller *invoiceObjectController) Create(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	data.Details.ProjectID = projectID
 
-	date := time.Now()
+	location, err := time.LoadLocation("Asia/Dushanbe")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+	date := time.Now().In(location)
 	data.Details.DateOfInvoice = date
 
-	_, err := controller.invoiceObjectService.Create(data)
+	_, err = controller.invoiceObjectService.Create(data)
 	if err != nil {
 
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))

@@ -8,7 +8,6 @@ type Team struct {
 	Company      string `json:"company" gorm:"tinyText"`
 
 	TeamLeaderss     []TeamLeaders     `json:"-" gorm:"foreignKey:TeamID"`
-	ObjectOperations []ObjectOperation `json:"-" gorm:"foreignKey:TeamID"`
 	InvoiceOutputs   []InvoiceOutput   `json:"-" gorm:"foreignKey:TeamID"`
 	InvoiceObject    []InvoiceObject   `json:"-" gorm:"foreignKey:TeamID"`
 	ObjectTeams      []ObjectTeams     `json:"-" gorm:"foreignKey:TeamID"`

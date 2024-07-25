@@ -65,6 +65,14 @@ func (repo *invoiceObjectRepository) Create(data dto.InvoiceObjectCreateQueryDat
 		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
 			return err
 		}
+    
+    for index := range data.ObjectOperations {
+      data.ObjectOperations[index].InvoiceObjectID = invoice.ID
+    }
+
+    if err := tx.CreateInBatches(&data.ObjectOperations, 15).Error; err != nil {
+      return err
+    }
 
 		for index := range data.SerialNumberMovements {
 			data.SerialNumberMovements[index].InvoiceID = invoice.ID

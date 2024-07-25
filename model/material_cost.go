@@ -10,6 +10,5 @@ type MaterialCost struct {
 	CostWithCustomer decimal.Decimal `json:"costWithCustomer" gorm:"type:decimal(20,4)"`
 
 	InvoiceMaterials  []InvoiceMaterials `json:"-" gorm:"foreignKey:MaterialCostID"`
-	ObjectOperations  []ObjectOperation  `json:"-" gorm:"foreignKey:MaterialCostID"`
 	MaterialLocations []MaterialLocation `json:"-" gorm:"foreignKey:MaterialCostID"`
 }

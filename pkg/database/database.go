@@ -61,6 +61,7 @@ func AutoMigrate(db *gorm.DB) {
     model.ObjectTeams{},
     model.ObjectSupervisors{},
 		model.Operation{},
+    model.OperationMaterial{},
 		model.ObjectOperation{},
 		model.Permission{},
 		model.SerialNumber{},

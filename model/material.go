@@ -11,5 +11,6 @@ type Material struct {
 	Article         string `json:"article"`
 	ProjectID       uint   `json:"projectID"`
 
-	MaterialCosts []MaterialCost `json:"-" gorm:"foreignKey:MaterialID"`
+	MaterialCosts      []MaterialCost      `json:"-" gorm:"foreignKey:MaterialID"`
+	OperationMaterials []OperationMaterial `json:"-" gorm:"foreignKey:MaterialID"`
 }

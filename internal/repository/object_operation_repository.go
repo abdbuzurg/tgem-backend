@@ -42,18 +42,9 @@ func (repo *objectOperationRepository) GetPaginated(page, limit int) ([]model.Ob
 func (repo *objectOperationRepository) GetPaginatedFiltered(page, limit int, filter model.ObjectOperation) ([]model.ObjectOperation, error) {
 	data := []model.ObjectOperation{}
 	err := repo.db.
-		Raw(`SELECT * FROM materials WHERE
-			(nullif(?, '') IS NULL OR object_id = ?) AND
-			(nullif(?, '') IS NULL OR material_cost_id = ?) AND
-			(nullif(?, '') IS NULL OR operation_id = ?) AND
-			(nullif(?, '') IS NULL OR team_id = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.ObjectID, filter.ObjectID,
-			filter.MaterialCostID, filter.MaterialCostID,
-			filter.OperationID, filter.OperationID,
-			filter.TeamID, filter.TeamID,
-			limit, (page-1)*limit,
-		).
-		Scan(&data).Error
+		Raw(`SELECT * FROM materials`).
+		Scan(&data).
+    Error
 
 	return data, err
 }

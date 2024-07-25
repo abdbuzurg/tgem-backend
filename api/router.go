@@ -67,6 +67,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	substationObjectRepo := repository.InitSubstationObjectRepository(db)
 	tpNourashesObjectsRepo := repository.InitTPNourashesObjectsRepository(db)
 	invoiceCountRepo := repository.InitInvoiceCountRepository(db)
+  operationRepo := repository.InitOperationRepository(db)
+  operationMaterialRepo := repository.InitOperationMaterialRepository(db)
 
 	//Initialization of Services
 	invoiceInputService := service.InitInvoiceInputService(
@@ -122,6 +124,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		materialCostRepo,
 		invoiceMaterialRepo,
 		objectTeamsRepo,
+    operationMaterialRepo,
 	)
 	invoiceCorrectionService := service.InitInvoiceCorrectionService(
 		invoiceCorrectionRepo,
@@ -178,7 +181,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		tpObjectRepo,
 		objectTeamsRepo,
 	)
-	// operationService := service.InitOperationService(operationRepo)
+	operationService := service.InitOperationService(operationRepo)
 	projectService := service.InitProjectService(projectRepo)
 	sipObjectService := service.InitSIPObjectService(
 		sipObjectRepo,
@@ -241,7 +244,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	materialLocationController := controller.InitMaterialLocationController(materialLocationService)
 	objectController := controller.InitObjectController(objectService)
 	// objectOperationController := controller.InitObjectOperationController(objectOperationService)
-	// operationController := controller.InitOperationController(operationService)
+	operationController := controller.InitOperationController(operationService)
 	projectController := controller.InitProjectController(projectService)
 	teamController := controller.InitTeamController(teamService)
 	userController := controller.InitUserController(userService)
@@ -285,6 +288,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitTPObjectRoutes(router, tpObjectController)
 	InitSubstationObjectRoutes(router, substationObjectController)
 	InitInvoiceOutputOutOfProjectRoutes(router, invoiceOutputOutOfProjectController)
+  InitOperationRoutes(router, operationController)
 
 	return mainRouter
 }
@@ -643,4 +647,16 @@ func InitResourceRoutes(router *gin.RouterGroup, controller controller.IResource
 	resourceRoutes.Use(middleware.Authentication(), middleware.Permission(db))
 
 	resourceRoutes.GET("/", controller.GetAll)
+}
+
+func InitOperationRoutes(router *gin.RouterGroup, controller controller.IOperationController) {
+  operationRoutes := router.Group("/operation")
+  operationRoutes.Use(
+    middleware.Authentication(),
+  )
+  operationRoutes.GET("/paginated", controller.GetPaginated)
+  operationRoutes.GET("/all", controller.GetAll)
+  operationRoutes.POST("/", controller.Create)
+  operationRoutes.PATCH("/", controller.Update)
+  operationRoutes.DELETE("/:id", controller.Delete)
 }

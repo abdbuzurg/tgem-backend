@@ -30,6 +30,7 @@ type InvoiceObjectCreate struct {
 type InvoiceObjectCreateQueryData struct {
 	Invoice               model.InvoiceObject
 	InvoiceMaterials      []model.InvoiceMaterials
+	ObjectOperations      []model.ObjectOperation
 	SerialNumberMovements []model.SerialNumberMovement
 }
 

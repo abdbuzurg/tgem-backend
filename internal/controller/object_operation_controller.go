@@ -54,52 +54,7 @@ func (controller *objectOperationController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	objectIDStr := c.DefaultQuery("objectID", "")
-	objectID := 0
-	if objectIDStr != "" {
-		objectID, err = strconv.Atoi(objectIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode objectID parameter: %v", err))
-			return
-		}
-	}
-
-	materialCostIDStr := c.DefaultQuery("materialCostID", "")
-	materialCostID := 0
-	if materialCostIDStr != "" {
-		materialCostID, err = strconv.Atoi(materialCostIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode materialCostID parameter: %v", err))
-			return
-		}
-	}
-
-	operationIDStr := c.DefaultQuery("operationID", "")
-	operationID := 0
-	if operationIDStr != "" {
-		operationID, err = strconv.Atoi(operationIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode objectOperationCo parameter: %v", err))
-			return
-		}
-	}
-
-	teamIDStr := c.DefaultQuery("teamID", "")
-	teamID := 0
-	if teamIDStr != "" {
-		teamID, err = strconv.Atoi(teamIDStr)
-		if err != nil {
-			response.ResponseError(c, fmt.Sprintf("Cannot decode teamID parameter: %v", err))
-			return
-		}
-	}
-
-	filter := model.ObjectOperation{
-		ObjectID:       uint(objectID),
-		MaterialCostID: uint(materialCostID),
-		OperationID:    uint(operationID),
-		TeamID:         uint(teamID),
-	}
+	filter := model.ObjectOperation{}
 
 	data, err := controller.objectOperationService.GetPaginated(page, limit, filter)
 	if err != nil {
