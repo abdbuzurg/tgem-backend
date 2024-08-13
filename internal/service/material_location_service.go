@@ -55,6 +55,7 @@ type IMaterialLocationService interface {
 	UniqueObjects(projectID uint) ([]dto.ObjectDataForSelect, error)
 	UniqueTeams(projectID uint) ([]dto.TeamDataForSelect, error)
 	BalanceReport(projectID uint, data dto.ReportBalanceFilterRequest) (string, error)
+  Live(searchParameters dto.MaterialLocationLiveSearchParameters) ([]dto.MaterialLocationLiveView, error)
 }
 
 func (service *materialLocationService) GetAll() ([]model.MaterialLocation, error) {
@@ -298,4 +299,35 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 	}
 
 	return fileName, nil
+}
+
+func (service *materialLocationService) Live(data dto.MaterialLocationLiveSearchParameters) ([]dto.MaterialLocationLiveView, error) {
+  materialLocationLive, err :=  service.materialLocationRepo.Live(data)
+  if err != nil {
+    return []dto.MaterialLocationLiveView{}, err
+  }
+
+  if data.LocationType == "team" {
+    for index, materialLocation := range materialLocationLive {
+      team, err := service.teamRepo.GetByID(materialLocation.LocationID)
+      if err != nil {
+        return []dto.MaterialLocationLiveView{},  err
+      }
+
+      materialLocationLive[index].LocationName = team.Number
+    }
+  }
+
+  if data.LocationType == "object" {
+    for index, materialLocation := range materialLocationLive {
+      object, err := service.objectRepo.GetByID(materialLocation.LocationID)
+      if err != nil {
+        return []dto.MaterialLocationLiveView{},  err
+      }
+
+      materialLocationLive[index].LocationName = object.Name
+    }
+  }
+
+  return materialLocationLive, nil
 }

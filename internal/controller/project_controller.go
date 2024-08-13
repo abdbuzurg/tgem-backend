@@ -27,6 +27,7 @@ type IProjectController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	GetProjectName(c *gin.Context)
 }
 
 func (controller *projectController) GetAll(c *gin.Context) {
@@ -133,4 +134,14 @@ func (controller *projectController) Delete(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, "deleted")
+}
+
+func (controller *projectController) GetProjectName(c *gin.Context) {
+	projectName, err := controller.projectService.GetProjectName(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not perform the deletion of Project: %v", err))
+		return
+	}
+
+  response.ResponseSuccess(c, projectName)
 }

@@ -33,6 +33,7 @@ type InvoiceCorrectionCreateDetails struct {
 type InvoiceCorrectionCreate struct {
 	Details InvoiceCorrectionCreateDetails   `json:"details"`
 	Items   []InvoiceCorrectionMaterialsData `json:"items"`
+  Operations []InvoiceCorrectionOperationsData `json:"operations"`
 }
 
 type InvoiceCorrectionCreateQuery struct {
@@ -41,6 +42,7 @@ type InvoiceCorrectionCreateQuery struct {
 	Items           []model.InvoiceMaterials
 	TeamLocation    []model.MaterialLocation
 	ObjectLocation  []model.MaterialLocation
+  ObjectOperations []model.ObjectOperation
 }
 
 type InvoiceCorrectionReportFilter struct {
@@ -61,4 +63,11 @@ type InvoiceCorrectionReportData struct {
 	DateOfInvoice    time.Time
 	OperatorName     string
 	DateOfCorrection time.Time
+}
+
+type InvoiceCorrectionOperationsData struct {
+	OperationID   uint    `json:"operationID"`
+	OperationName string  `json:"operationName"`
+	Amount        float64 `json:"amount"`
+	MaterialName  string  `json:"materialName"`
 }

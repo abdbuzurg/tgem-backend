@@ -2,12 +2,14 @@ package controller
 
 import (
 	// "backend-v2/internal/dto"
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
-	"backend-v2/model"
 	"backend-v2/pkg/response"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,22 +25,15 @@ func InitInvoiceWriteOffController(invoiceWriteOffService service.IInvoiceWriteO
 }
 
 type IInvoiceWriteOffController interface {
-	GetAll(c *gin.Context)
 	GetPaginated(c *gin.Context)
-	// Create(c *gin.Context)
-	// Update(c *gin.Context)
+	GetInvoiceMaterialsWithoutSerialNumber(c *gin.Context)
+	Create(c *gin.Context)
+	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	GetMaterialsForEdit(c *gin.Context)
 	GetRawDocument(c *gin.Context)
-}
-
-func (controller *invoiceWriteOffController) GetAll(c *gin.Context) {
-	data, err := controller.invoiceWriteOffService.GetAll()
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Could not get Invoice Input data: %v", err))
-		return
-	}
-
-	response.ResponseSuccess(c, data)
+	Confirmation(c *gin.Context)
+	GetDocument(c *gin.Context)
 }
 
 func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
@@ -56,13 +51,6 @@ func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	deliveryCode := c.DefaultQuery("deliveryCode", "")
-	deliveryCode, err = url.QueryUnescape(deliveryCode)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for deliveryCode: %v", err))
-		return
-	}
-
 	writeOffType := c.DefaultQuery("writeOffType", "")
 	writeOffType, err = url.QueryUnescape(writeOffType)
 	if err != nil {
@@ -70,11 +58,10 @@ func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
-	filter := model.InvoiceWriteOff{
-    ProjectID: projectID,
-		WriteOffType:         writeOffType,
-		DeliveryCode:         deliveryCode,
+	projectID := c.GetUint("projectID")
+	filter := dto.InvoiceWriteOffSearchParameters{
+		ProjectID:    projectID,
+		WriteOffType: writeOffType,
 	}
 
 	data, err := controller.invoiceWriteOffService.GetPaginated(page, limit, filter)
@@ -83,7 +70,7 @@ func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	dataCount, err := controller.invoiceWriteOffService.Count(projectID)
+	dataCount, err := controller.invoiceWriteOffService.Count(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the total amount of Invoice: %v", err))
 		return
@@ -92,40 +79,43 @@ func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
 	response.ResponsePaginatedData(c, data, dataCount)
 }
 
-// func (controller *invoiceWriteOffController) Create(c *gin.Context) {
-// 	var createData dto.InvoiceWriteOff
-// 	if err := c.ShouldBindJSON(&createData); err != nil {
-// 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
-// 		return
-// 	}
+func (controller *invoiceWriteOffController) Create(c *gin.Context) {
+	var createData dto.InvoiceWriteOff
+	if err := c.ShouldBindJSON(&createData); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
 
-// 	data, err := controller.invoiceWriteOffService.Create(createData)
-// 	if err != nil {
-// 		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Invoice: %v", err))
-// 		return
-// 	}
+	createData.Details.ProjectID = c.GetUint("projectID")
+	createData.Details.ReleasedWorkerID = c.GetUint("workerID")
 
-// 	response.ResponseSuccess(c, data)
-// }
+	data, err := controller.invoiceWriteOffService.Create(createData)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could perform the creation of Invoice: %v", err))
+		return
+	}
 
-// func (controller *invoiceWriteOffController) Update(c *gin.Context) {
-// 	var updateData dto.InvoiceWriteOff
-// 	if err := c.ShouldBindJSON(&updateData); err != nil {
-// 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
-// 		return
-// 	}
+	response.ResponseSuccess(c, data)
+}
 
-// 	workerID := c.GetUint("workerID")
-// 	updateData.Details.OperatorEditWorkerID = workerID
+func (controller *invoiceWriteOffController) Update(c *gin.Context) {
+	var updateData dto.InvoiceWriteOff
+	if err := c.ShouldBindJSON(&updateData); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
 
-// 	data, err := controller.invoiceWriteOffService.Update(updateData)
-// 	if err != nil {
-// 		response.ResponseError(c, fmt.Sprintf("Could not perform the updation of Invoice: %v", err))
-// 		return
-// 	}
+	updateData.Details.ProjectID = c.GetUint("projectID")
+	updateData.Details.ReleasedWorkerID = c.GetUint("workerID")
 
-// 	response.ResponseSuccess(c, data)
-// }
+	data, err := controller.invoiceWriteOffService.Update(updateData)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not perform the updation of Invoice: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
 
 func (controller *invoiceWriteOffController) Delete(c *gin.Context) {
 	idRaw := c.Param("id")
@@ -137,7 +127,6 @@ func (controller *invoiceWriteOffController) Delete(c *gin.Context) {
 
 	err = controller.invoiceWriteOffService.Delete(uint(id))
 	if err != nil {
-
 		response.ResponseError(c, fmt.Sprintf("Could not perform the deletion of Invoice: %v", err))
 		return
 	}
@@ -148,4 +137,97 @@ func (controller *invoiceWriteOffController) Delete(c *gin.Context) {
 func (controller *invoiceWriteOffController) GetRawDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
 	c.FileAttachment("./pkg/excels/writeoff/"+deliveryCode+".xlsx", deliveryCode+".xlsx")
+}
+
+func (controller *invoiceWriteOffController) GetInvoiceMaterialsWithoutSerialNumber(c *gin.Context) {
+
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceWriteOffService.GetInvoiceMaterialsWithoutSerialNumbers(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+
+}
+
+func (controller *invoiceWriteOffController) GetMaterialsForEdit(c *gin.Context) {
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+
+	result, err := controller.invoiceWriteOffService.GetMaterialsForEdit(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, result)
+}
+
+func (controller *invoiceWriteOffController) Confirmation(c *gin.Context) {
+
+	projectID := c.GetUint("projectID")
+
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	invoiceWriteOff, err := controller.invoiceWriteOffService.GetByID(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	fileNameAndExtension := strings.Split(file.Filename, ".")
+	fileExtension := fileNameAndExtension[1]
+	file.Filename = invoiceWriteOff.DeliveryCode + "." + fileExtension
+	filePath := filepath.Join("./pkg/excels/writeoff/", file.Filename)
+
+	err = c.SaveUploadedFile(file, filePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	err = controller.invoiceWriteOffService.Confirmation(uint(id), projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, true)
+}
+
+func (controller *invoiceWriteOffController) GetDocument(c *gin.Context) {
+
+	deliveryCode := c.Param("deliveryCode")
+
+	filePath := filepath.Join("./pkg/excels/writeoff/", deliveryCode)
+	fileGlob, err := filepath.Glob(filePath + ".*")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	filePath = fileGlob[0]
+	pathSeparated := strings.Split(filePath, ".")
+	deliveryCodeExtension := pathSeparated[len(pathSeparated)-1]
+
+	c.FileAttachment(filePath, deliveryCode+"."+deliveryCodeExtension)
 }

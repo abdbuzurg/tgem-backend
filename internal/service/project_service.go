@@ -23,6 +23,7 @@ type IProjectService interface {
 	Update(data model.Project) (model.Project, error)
 	Delete(id uint) error
 	Count() (int64, error)
+  GetProjectName(projectID uint) (string, error)
 }
 
 func (service *projectService) GetAll() ([]model.Project, error) {
@@ -51,4 +52,8 @@ func (service *projectService) Delete(id uint) error {
 
 func (service *projectService) Count() (int64, error) {
 	return service.projectRepo.Count()
+}
+
+func (service *projectService) GetProjectName(projectID uint) (string, error) {
+  return service.projectRepo.GetProjectName(projectID)
 }

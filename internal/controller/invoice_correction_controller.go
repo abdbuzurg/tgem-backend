@@ -34,6 +34,7 @@ type IInvoiceCorrectionController interface {
 	UniqueTeam(c *gin.Context)
 	Report(c *gin.Context)
 	GetPaginated(c *gin.Context)
+	GetOperationsByInvoiceObjectID(c *gin.Context)
 }
 
 func (controller *invoiceCorrectionController) GetPaginated(c *gin.Context) {
@@ -51,7 +52,7 @@ func (controller *invoiceCorrectionController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
+	projectID := c.GetUint("projectID")
 
 	data, err := controller.invoiceCorrectionService.GetPaginated(page, limit, projectID)
 	if err != nil {
@@ -206,4 +207,22 @@ func (controller *invoiceCorrectionController) Report(c *gin.Context) {
 	reportFilePath := filepath.Join("./pkg/excels/temp/", reportFileName)
 	c.FileAttachment(reportFilePath, reportFileName)
 	os.Remove(reportFilePath)
+}
+
+func (controller *invoiceCorrectionController) GetOperationsByInvoiceObjectID(c *gin.Context) {
+
+	idRaw := c.Param("id")
+	id, err := strconv.ParseUint(idRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Incorrect parameter provided: %v", err))
+		return
+	}
+
+	data, err := controller.invoiceCorrectionService.GetOperationsByInvoiceObjectID(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

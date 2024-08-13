@@ -67,8 +67,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	substationObjectRepo := repository.InitSubstationObjectRepository(db)
 	tpNourashesObjectsRepo := repository.InitTPNourashesObjectsRepository(db)
 	invoiceCountRepo := repository.InitInvoiceCountRepository(db)
-  operationRepo := repository.InitOperationRepository(db)
-  operationMaterialRepo := repository.InitOperationMaterialRepository(db)
+	operationRepo := repository.InitOperationRepository(db)
+	operationMaterialRepo := repository.InitOperationMaterialRepository(db)
+	invoiceWriteOffRepo := repository.InitInvoiceWriteOffRepository(db)
 
 	//Initialization of Services
 	invoiceInputService := service.InitInvoiceInputService(
@@ -80,7 +81,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		materialRepo,
 		serialNumberRepo,
 		serialNumberMovementRepo,
-    invoiceCountRepo,
+		invoiceCountRepo,
 	)
 	invoiceOutputService := service.InitInvoiceOutputService(
 		invoiceOutputRepo,
@@ -93,14 +94,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		materialRepo,
 		districtRepo,
 		serialNumberRepo,
-    invoiceCountRepo,
+		invoiceCountRepo,
 	)
 	invoiceOutputOutOfProjectService := service.InitInvoiceOutputOutOfProjectService(
 		invoiceOutputOutOfProjectRepo,
 		invoiceOutputRepo,
 		materialLocationRepo,
 		invoiceCountRepo,
-    invoiceMaterialRepo,
+		invoiceMaterialRepo,
 	)
 	invoiceReturnService := service.InitInvoiceReturnService(
 		invoiceReturnRepo,
@@ -124,7 +125,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		materialCostRepo,
 		invoiceMaterialRepo,
 		objectTeamsRepo,
-    operationMaterialRepo,
+		operationMaterialRepo,
 	)
 	invoiceCorrectionService := service.InitInvoiceCorrectionService(
 		invoiceCorrectionRepo,
@@ -232,6 +233,17 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectSupervisorsRepo,
 		objectTeamsRepo,
 	)
+	invoiceWriteOffService := service.InitInvoiceWriteOffService(
+		invoiceWriteOffRepo,
+		workerRepo,
+		objectRepo,
+		teamRepo,
+		materialLocationRepo,
+		invoiceMaterialRepo,
+		materialRepo,
+		materialCostRepo,
+		invoiceCountRepo,
+	)
 
 	//Initialization of Controllers
 	invoiceInputController := controller.InitInvoiceInputController(invoiceInputService, userActionService)
@@ -262,6 +274,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	tpObjectController := controller.InitTPObjectController(tpObjctService)
 	substationObjectController := controller.InitSubstationObjectController(substationObjectService)
 	invoiceOutputOutOfProjectController := controller.InitInvoiceOutputOutOfProjectController(invoiceOutputOutOfProjectService)
+	invoiceWriteOffController := controller.InitInvoiceWriteOffController(invoiceWriteOffService)
 
 	//Initialization of Routes
 	InitInvoiceInputRoutes(router, invoiceInputController, db)
@@ -288,9 +301,26 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitTPObjectRoutes(router, tpObjectController)
 	InitSubstationObjectRoutes(router, substationObjectController)
 	InitInvoiceOutputOutOfProjectRoutes(router, invoiceOutputOutOfProjectController)
-  InitOperationRoutes(router, operationController)
+	InitOperationRoutes(router, operationController)
+	InitInvoiceWriteOffRoutes(router, invoiceWriteOffController)
 
 	return mainRouter
+}
+
+func InitInvoiceWriteOffRoutes(router *gin.RouterGroup, controller controller.IInvoiceWriteOffController) {
+	invoiceWriteOffRoutes := router.Group("/invoice-writeoff")
+	invoiceWriteOffRoutes.Use(
+		middleware.Authentication(),
+	)
+
+	invoiceWriteOffRoutes.GET("/paginated", controller.GetPaginated)
+	invoiceWriteOffRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumber)
+	invoiceWriteOffRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
+	invoiceWriteOffRoutes.GET("/document/:deliveryCode", controller.GetDocument)
+	invoiceWriteOffRoutes.POST("/", controller.Create)
+	invoiceWriteOffRoutes.POST("/confirm/:id", controller.Confirmation)
+	invoiceWriteOffRoutes.PATCH("/", controller.Update)
+	invoiceWriteOffRoutes.DELETE("/:id", controller.Delete)
 }
 
 func InitInvoiceOutputOutOfProjectRoutes(router *gin.RouterGroup, controller controller.IInvoiceOutputOutOfProjectController) {
@@ -304,8 +334,8 @@ func InitInvoiceOutputOutOfProjectRoutes(router *gin.RouterGroup, controller con
 	invoiceOutputOutOfProjectRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
 	invoiceOutputOutOfProjectRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
 	invoiceOutputOutOfProjectRoutes.POST("/", controller.Create)
-  invoiceOutputOutOfProjectRoutes.PATCH("/", controller.Update)
-  invoiceOutputOutOfProjectRoutes.POST("/confirm/:id", controller.Confirmation)
+	invoiceOutputOutOfProjectRoutes.PATCH("/", controller.Update)
+	invoiceOutputOutOfProjectRoutes.POST("/confirm/:id", controller.Confirmation)
 }
 
 func InitInvoiceCorrectionRoutes(router *gin.RouterGroup, controller controller.IInvoiceCorrectionController) {
@@ -317,6 +347,7 @@ func InitInvoiceCorrectionRoutes(router *gin.RouterGroup, controller controller.
 	invoiceCorrectionRoutes.GET("/paginated", controller.GetPaginated)
 	invoiceCorrectionRoutes.GET("/", controller.GetAll)
 	invoiceCorrectionRoutes.GET("/materials/:id", controller.GetInvoiceMaterialsByInvoiceObjectID)
+	invoiceCorrectionRoutes.GET("/operations/:id", controller.GetOperationsByInvoiceObjectID)
 	invoiceCorrectionRoutes.GET("/total-amount/:materialID/team/:teamNumber", controller.GetTotalMaterialInTeamByTeamNumber)
 	invoiceCorrectionRoutes.GET("/serial-number/material/:materialID/teams/:teamNumber", controller.GetSerialNumbersOfMaterial)
 	invoiceCorrectionRoutes.GET("unique/team", controller.UniqueTeam)
@@ -412,7 +443,7 @@ func InitInvoiceInputRoutes(router *gin.RouterGroup, controller controller.IInvo
 	invoiceInputRoutes.POST("/confirm/:id", controller.Confirmation)
 	invoiceInputRoutes.POST("/material/new", controller.NewMaterial)
 	invoiceInputRoutes.POST("/material-cost/new", controller.NewMaterialCost)
-  invoiceInputRoutes.POST("/import", controller.Import)
+	invoiceInputRoutes.POST("/import", controller.Import)
 	invoiceInputRoutes.PATCH("/", controller.Update)
 	invoiceInputRoutes.DELETE("/:id", controller.Delete)
 }
@@ -420,7 +451,10 @@ func InitInvoiceInputRoutes(router *gin.RouterGroup, controller controller.IInvo
 func InitProjectRoutes(router *gin.RouterGroup, controller controller.IProjectController) {
 	projectRoutes := router.Group("/project")
 	projectRoutes.GET("/all", controller.GetAll)
+
+	projectRoutes.Use(middleware.Authentication())
 	projectRoutes.GET("/paginated", controller.GetPaginated)
+	projectRoutes.GET("/name", controller.GetProjectName)
 	projectRoutes.POST("/", controller.Create)
 	projectRoutes.PATCH("/", controller.Update)
 	projectRoutes.DELETE("/:id", controller.Delete)
@@ -432,6 +466,7 @@ func InitMaterialLocationRoutes(router *gin.RouterGroup, controller controller.I
 	materialLocationRoutes.GET("/available/:locationType/:locationID", controller.GetMaterialInLocation)
 	materialLocationRoutes.GET("/unique/team", controller.UniqueTeams)
 	materialLocationRoutes.GET("/unique/object", controller.UniqueObjects)
+	materialLocationRoutes.GET("/live", controller.Live)
 	materialLocationRoutes.POST("/report/balance", controller.ReportBalance)
 }
 
@@ -650,13 +685,13 @@ func InitResourceRoutes(router *gin.RouterGroup, controller controller.IResource
 }
 
 func InitOperationRoutes(router *gin.RouterGroup, controller controller.IOperationController) {
-  operationRoutes := router.Group("/operation")
-  operationRoutes.Use(
-    middleware.Authentication(),
-  )
-  operationRoutes.GET("/paginated", controller.GetPaginated)
-  operationRoutes.GET("/all", controller.GetAll)
-  operationRoutes.POST("/", controller.Create)
-  operationRoutes.PATCH("/", controller.Update)
-  operationRoutes.DELETE("/:id", controller.Delete)
+	operationRoutes := router.Group("/operation")
+	operationRoutes.Use(
+		middleware.Authentication(),
+	)
+	operationRoutes.GET("/paginated", controller.GetPaginated)
+	operationRoutes.GET("/all", controller.GetAll)
+	operationRoutes.POST("/", controller.Create)
+	operationRoutes.PATCH("/", controller.Update)
+	operationRoutes.DELETE("/:id", controller.Delete)
 }

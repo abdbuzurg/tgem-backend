@@ -44,6 +44,7 @@ type IInvoiceCorrectionService interface {
 	UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error)
 	Report(filter dto.InvoiceCorrectionReportFilter) (string, error)
   Count(projectID uint) (int64, error)
+  GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error)
 }
 
 func (service *invoiceCorrectionService) GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error) {
@@ -150,6 +151,17 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 		toBeUpdatedObjectLocations = append(toBeUpdatedObjectLocations, materialInObjectLocation)
 	}
 
+  objectOperations := []model.ObjectOperation{}
+  for _, operation := range data.Operations {
+    objectOperations = append(objectOperations, model.ObjectOperation{
+      InvoiceObjectID: invoiceObject.ID,
+      ProjectID: invoiceObject.ProjectID,
+      OperationID: operation.OperationID,
+      Amount: operation.Amount,
+      Notes: "",
+    })
+  }
+
 	result, err := service.invoiceCorrectionRepo.Create(dto.InvoiceCorrectionCreateQuery{
 		Details:        invoiceObject,
 		Items:          invoiceMaterialForCreate,
@@ -159,6 +171,7 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 			OperatorWorkerID: data.Details.OperatorWorkerID,
 			InvoiceObjectID:  invoiceObject.ID,
 		},
+    ObjectOperations: objectOperations,
 	})
 
 	return result, nil
@@ -228,4 +241,8 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 	}
 
 	return fileName, nil
+}
+
+func(service *invoiceCorrectionService) GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error) {
+  return service.invoiceCorrectionRepo.GetOperationsByInvoiceObjectID(id) 
 }

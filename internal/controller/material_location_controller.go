@@ -35,12 +35,12 @@ type IMaterialLocationController interface {
 	UniqueObjects(c *gin.Context)
 	UniqueTeams(c *gin.Context)
 	ReportBalance(c *gin.Context)
+	Live(c *gin.Context)
 }
 
 func (controller *materialLocationController) GetAll(c *gin.Context) {
 	data, err := controller.materialLocationService.GetAll()
 	if err != nil {
-
 		response.ResponseError(c, fmt.Sprintf("Could not get MaterialLocation data: %v", err))
 		return
 	}
@@ -253,4 +253,37 @@ func (controller *materialLocationController) ReportBalance(c *gin.Context) {
 
 	c.FileAttachment(filePath, fileName)
 	os.Remove(filePath)
+}
+
+func (controller *materialLocationController) Live(c *gin.Context) {
+	locationType := c.DefaultQuery("locationType", "")
+
+	locationIDStr := c.DefaultQuery("locationID", "0")
+	locationID, err := strconv.Atoi(locationIDStr)
+	if err != nil || locationID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
+
+	materialIDStr := c.DefaultQuery("materialID", "0")
+	materialID, err := strconv.Atoi(materialIDStr)
+	if err != nil || materialID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
+
+	searchParameters := dto.MaterialLocationLiveSearchParameters{
+    ProjectID: c.GetUint("projectID"),
+		LocationType: locationType,
+		LocationID:   uint(locationID),
+		MaterialID:   uint(materialID),
+	}
+
+	data, err := controller.materialLocationService.Live(searchParameters)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not get MaterialLocation data: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

@@ -22,7 +22,7 @@ type IOperationRepository interface {
 	GetPaginated(page, limit int, filter dto.OperationSearchParameters) ([]dto.OperationPaginated, error)
 	GetByID(id uint) (model.Operation, error)
 	GetByName(name string, projectID uint) (model.Operation, error)
-	GetAll(projectID uint) ([]model.Operation, error)
+	GetAll(projectID uint) ([]dto.OperationPaginated, error)
 	Create(data dto.Operation) (model.Operation, error)
 	Update(data dto.Operation) (model.Operation, error)
 	Delete(id uint) error
@@ -79,6 +79,7 @@ func (repo *operationRepository) Create(data dto.Operation) (model.Operation, er
 	}
 
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
+
 		if err := tx.Create(&result).Error; err != nil {
 			return err
 		}
@@ -172,8 +173,23 @@ func (repo *operationRepository) GetByName(name string, projectID uint) (model.O
 	return result, err
 }
 
-func (repo *operationRepository) GetAll(projectID uint) ([]model.Operation, error) {
-	result := []model.Operation{}
-	err := repo.db.Find(&result, "project_id = ?", projectID).Error
+func (repo *operationRepository) GetAll(projectID uint) ([]dto.OperationPaginated, error) {
+	result := []dto.OperationPaginated{}
+	err := repo.db.Raw(`
+      SELECT 
+        operations.id as id,
+        operations.name as name,
+        operations.code as code,
+        operations.cost_prime as cost_prime,
+        operations.cost_with_customer as cost_with_customer,
+        materials.id as material_id,
+        materials.name as material_name
+      FROM operations 
+      FULL JOIN operation_materials ON operation_materials.operation_id = operations.id
+      FULL JOIN materials ON operation_materials.material_id = materials.id
+      WHERE
+        operations.project_id = ?
+    `, projectID).Scan(&result).Error
+
 	return result, err
 }

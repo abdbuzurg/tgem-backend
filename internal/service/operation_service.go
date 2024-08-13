@@ -17,7 +17,7 @@ func InitOperationService(operationRepo repository.IOperationRepository) IOperat
 }
 
 type IOperationService interface {
-	GetAll(projectID uint) ([]model.Operation, error)
+	GetAll(projectID uint) ([]dto.OperationPaginated, error)
 	GetPaginated(page, limit int, filter dto.OperationSearchParameters) ([]dto.OperationPaginated, error)
 	GetByID(id uint) (model.Operation, error)
   GetByName(name string, projectID uint) (model.Operation, error)
@@ -27,7 +27,7 @@ type IOperationService interface {
 	Count(filter dto.OperationSearchParameters) (int64, error)
 }
 
-func (service *operationService) GetAll(projectID uint) ([]model.Operation, error) {
+func (service *operationService) GetAll(projectID uint) ([]dto.OperationPaginated, error) {
 	return service.operationRepo.GetAll(projectID)
 }
 

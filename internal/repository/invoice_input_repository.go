@@ -125,12 +125,12 @@ func (repo *invoiceInputRespository) Update(data dto.InvoiceInputCreateQueryData
 	result := data.InvoiceData
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
 
-		err := repo.db.Model(&result).Select("*").Where("id = ?", result.ID).Updates(&result).Error
+		err := tx.Model(&result).Select("*").Where("id = ?", result.ID).Updates(&result).Error
 		if err != nil {
 			return err
 		}
 
-		err = repo.db.Exec(`
+		err = tx.Exec(`
       DELETE FROM invoice_materials
       WHERE invoice_type = 'input' AND invoice_id = ?
     `, result.ID).Error
@@ -146,7 +146,7 @@ func (repo *invoiceInputRespository) Update(data dto.InvoiceInputCreateQueryData
 			return err
 		}
 
-		err = repo.db.Exec(`
+		err = tx.Exec(`
       DELETE FROM serial_number_movements
       WHERE invoice_type = 'input' AND invoice_id = ?
       `, result.ID).Error

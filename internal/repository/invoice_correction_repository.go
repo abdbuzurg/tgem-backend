@@ -27,6 +27,7 @@ type IInvoiceCorrectionRepository interface {
 	UniqueObject(projectID uint) ([]dto.ObjectDataForSelect, error)
 	ReportFilterData(filter dto.InvoiceCorrectionReportFilter) ([]dto.InvoiceCorrectionReportData, error)
 	Count(projectID uint) (int64, error)
+  GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error)
 }
 
 func (repo *invoiceCorrectionRepository) GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error) {
@@ -115,6 +116,14 @@ func (repo *invoiceCorrectionRepository) Create(data dto.InvoiceCorrectionCreate
 		if err := tx.CreateInBatches(&data.Items, 15).Error; err != nil {
 			return err
 		}
+
+    if err := tx.Delete(&model.ObjectOperation{}, "invoice_object_id = ?", result.ID).Error; err != nil {
+      return err
+    }
+
+    if err := tx.CreateInBatches(&data.ObjectOperations, 15).Error; err != nil {
+      return err
+    }
 
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
@@ -227,4 +236,24 @@ func (repo *invoiceCorrectionRepository) Count(projectID uint) (int64, error) {
       confirmed_by_operator = false AND
       project_id = ?`, projectID).Scan(&count).Error
 	return count, err
+}
+
+func (repo *invoiceCorrectionRepository) GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error) {
+  result := []dto.InvoiceCorrectionOperationsData{}
+  err := repo.db.Raw(`
+    SELECT 
+      operations.id as operation_id,
+      operations.name as operation_name,
+      object_operations.amount as amount,
+      materials.name as material_name
+    FROM invoice_objects
+    INNER JOIN object_operations ON object_operations.invoice_object_id = invoice_objects.id
+    INNER JOIN operations ON operations.id = object_operations.operation_id
+    INNER JOIN operation_materials ON operation_materials.operation_id = operations.id
+    INNER JOIN materials ON operation_materials.material_id = materials.id
+    WHERE
+      invoice_objects.id = ?;
+    `, id).Scan(&result).Error
+
+  return result, err
 }

@@ -25,6 +25,7 @@ type IProjectRepository interface {
 	Update(data model.Project) (model.Project, error)
 	Delete(id uint) error
 	Count() (int64, error)
+	GetProjectName(projectID uint) (string, error)
 }
 
 func (repo *projectRepository) GetAll() ([]model.Project, error) {
@@ -35,7 +36,7 @@ func (repo *projectRepository) GetAll() ([]model.Project, error) {
 
 func (repo *projectRepository) GetPaginated(page, limit int) ([]model.Project, error) {
 	data := []model.Project{}
-	err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data, "name <> 'Администрирование'").Error
+	err := repo.db.Order("id desc").Offset((page-1)*limit).Limit(limit).Find(&data, "name <> 'Администрирование'").Error
 	return data, err
 }
 
@@ -64,19 +65,19 @@ func (repo *projectRepository) Create(data model.Project) (model.Project, error)
 
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
 		err := repo.db.Create(&data).Error
-    if err != nil {
-      return err
-    }
+		if err != nil {
+			return err
+		}
 
-    err = repo.db.Create(&model.UserInProject{
-      UserID: 1,
-      ProjectID: data.ID,
-    }).Error
-    if err != nil {
-      return err
-    }
+		err = repo.db.Create(&model.UserInProject{
+			UserID:    1,
+			ProjectID: data.ID,
+		}).Error
+		if err != nil {
+			return err
+		}
 
-    return nil
+		return nil
 	})
 	return data, err
 }
@@ -87,17 +88,17 @@ func (repo *projectRepository) Update(data model.Project) (model.Project, error)
 }
 
 func (repo *projectRepository) Delete(id uint) error {
-  err := repo.db.Transaction(func(tx *gorm.DB) error {
-    if err := repo.db.Delete(&model.UserInProject{}, "project_id = ?", id).Error; err != nil {
-      return err
-    } 
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := repo.db.Delete(&model.UserInProject{}, "project_id = ?", id).Error; err != nil {
+			return err
+		}
 
-    if err := repo.db.Delete(&model.Project{}, "id = ?", id).Error; err != nil {
-      return nil
-    }
+		if err := repo.db.Delete(&model.Project{}, "id = ?", id).Error; err != nil {
+			return nil
+		}
 
-    return nil
-  })
+		return nil
+	})
 	return err
 }
 
@@ -105,4 +106,10 @@ func (repo *projectRepository) Count() (int64, error) {
 	var count int64
 	err := repo.db.Model(&model.Project{}).Count(&count).Error
 	return count, err
+}
+
+func (repo *projectRepository) GetProjectName(projectID uint) (string, error) {
+	projectName := ""
+	err := repo.db.Raw(`SELECT name FROM projects WHERE id = ?`, projectID).Scan(&projectName).Error
+	return projectName, err
 }
