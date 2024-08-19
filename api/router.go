@@ -319,6 +319,7 @@ func InitInvoiceWriteOffRoutes(router *gin.RouterGroup, controller controller.II
 	invoiceWriteOffRoutes.GET("/document/:deliveryCode", controller.GetDocument)
 	invoiceWriteOffRoutes.POST("/", controller.Create)
 	invoiceWriteOffRoutes.POST("/confirm/:id", controller.Confirmation)
+  invoiceWriteOffRoutes.POST("/report", controller.Report)
 	invoiceWriteOffRoutes.PATCH("/", controller.Update)
 	invoiceWriteOffRoutes.DELETE("/:id", controller.Delete)
 }
@@ -468,6 +469,7 @@ func InitMaterialLocationRoutes(router *gin.RouterGroup, controller controller.I
 	materialLocationRoutes.GET("/unique/object", controller.UniqueObjects)
 	materialLocationRoutes.GET("/live", controller.Live)
 	materialLocationRoutes.POST("/report/balance", controller.ReportBalance)
+	materialLocationRoutes.POST("/report/balance/writeoff", controller.ReportBalanceWriteOff)
 }
 
 func InitMaterialCostRoutes(router *gin.RouterGroup, controller controller.IMaterialCostController) {

@@ -43,3 +43,8 @@ type MaterialLocationLiveView struct {
 	LocationID      uint    `json:"locationID"`
 	Amount          float64 `json:"amount"`
 }
+
+type ReportWriteOffBalanceFilter struct {
+	WriteOffType       string `json:"writeOffType"`
+	LocationID uint   `json:"locationID"`
+}

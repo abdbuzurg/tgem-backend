@@ -35,6 +35,7 @@ type IMaterialLocationController interface {
 	UniqueObjects(c *gin.Context)
 	UniqueTeams(c *gin.Context)
 	ReportBalance(c *gin.Context)
+	ReportBalanceWriteOff(c *gin.Context)
 	Live(c *gin.Context)
 }
 
@@ -273,7 +274,7 @@ func (controller *materialLocationController) Live(c *gin.Context) {
 	}
 
 	searchParameters := dto.MaterialLocationLiveSearchParameters{
-    ProjectID: c.GetUint("projectID"),
+		ProjectID:    c.GetUint("projectID"),
 		LocationType: locationType,
 		LocationID:   uint(locationID),
 		MaterialID:   uint(materialID),
@@ -286,4 +287,23 @@ func (controller *materialLocationController) Live(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, data)
+}
+
+func (controller *materialLocationController) ReportBalanceWriteOff(c *gin.Context) {
+	var filterData dto.ReportWriteOffBalanceFilter
+	if err := c.ShouldBindJSON(&filterData); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
+
+	fileName, err := controller.materialLocationService.BalanceReportWriteOff(c.GetUint("projectID"), filterData)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	filePath := filepath.Join("./pkg/excels/temp/", fileName)
+
+	c.FileAttachment(filePath, fileName)
+	os.Remove(filePath)
 }

@@ -7,6 +7,7 @@ import (
 	"backend-v2/pkg/response"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ type IInvoiceWriteOffController interface {
 	GetRawDocument(c *gin.Context)
 	Confirmation(c *gin.Context)
 	GetDocument(c *gin.Context)
+	Report(c *gin.Context)
 }
 
 func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
@@ -230,4 +232,24 @@ func (controller *invoiceWriteOffController) GetDocument(c *gin.Context) {
 	deliveryCodeExtension := pathSeparated[len(pathSeparated)-1]
 
 	c.FileAttachment(filePath, deliveryCode+"."+deliveryCodeExtension)
+}
+
+func (controller *invoiceWriteOffController) Report(c *gin.Context) {
+	var reportParameters dto.InvoiceWriteOffReportParameters
+	if err := c.ShouldBindJSON(&reportParameters); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
+
+	reportParameters.ProjectID = c.GetUint("projectID")
+
+	filename, err := controller.invoiceWriteOffService.Report(reportParameters)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	filePath := filepath.Join("./pkg/excels/temp/", filename)
+	c.FileAttachment(filePath, filename)
+	os.Remove(filePath)
 }

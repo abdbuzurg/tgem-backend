@@ -28,6 +28,7 @@ type IInvoiceWriteOffRepository interface {
 	Count(filter dto.InvoiceWriteOffSearchParameters) (int64, error)
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error)
 	Confirmation(data dto.InvoiceWriteOffConfirmationData) error
+	ReportFilterData(filter dto.InvoiceWriteOffReportParameters) ([]dto.InvoiceWriteOffReportData, error)
 }
 
 func (repo *invoiceWriteOffRepository) GetAll() ([]model.InvoiceWriteOff, error) {
@@ -43,6 +44,7 @@ func (repo *invoiceWriteOffRepository) GetPaginated(page, limit int, filter dto.
       SELECT 
         invoice_write_offs.id as id,
         invoice_write_offs.write_off_type as write_off_type,
+        invoice_write_offs.write_off_location_id as write_off_location_id, 
         invoice_write_offs.released_worker_id as released_worker_id,
         workers.name as released_worker_name,
         invoice_write_offs.delivery_code as delivery_code,
@@ -214,4 +216,35 @@ func (repo *invoiceWriteOffRepository) Confirmation(data dto.InvoiceWriteOffConf
 
 		return nil
 	})
+}
+
+func (repo *invoiceWriteOffRepository) ReportFilterData(filter dto.InvoiceWriteOffReportParameters) ([]dto.InvoiceWriteOffReportData, error) {
+	data := []dto.InvoiceWriteOffReportData{}
+	dateFrom := filter.DateFrom.String()
+	dateFrom = dateFrom[:len(dateFrom)-10]
+	dateTo := filter.DateTo.String()
+	dateTo = dateTo[:len(dateTo)-10]
+	err := repo.db.Raw(`
+    SELECT 
+      invoice_write_offs.id as id,
+      invoice_write_offs.delivery_code as delivery_code,
+      released.name as released_worker_name,
+      invoice_write_offs.date_of_invoice
+    FROM invoice_write_offs
+    INNER JOIN workers AS released ON released.id = invoice_write_offs.released_worker_id
+    WHERE
+      invoice_write_offs.project_id = ? AND
+      invoice_write_offs.write_off_type = ? AND
+      invoice_write_offs.confirmation = true AND
+      (nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= invoice_write_offs.date_of_invoice) AND 
+      (nullif(?, '0001-01-01 00:00:00') IS NULL OR invoice_write_offs.date_of_invoice <= ?) 
+    ORDER BY invoice_write_offs.id DESC
+    `,
+		filter.ProjectID,
+		filter.WriteOffType,
+		dateFrom, dateFrom,
+		dateTo, dateTo,
+	).Scan(&data).Error
+
+	return data, err
 }

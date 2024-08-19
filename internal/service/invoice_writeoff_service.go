@@ -6,6 +6,10 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
 	"fmt"
+	"path/filepath"
+	"time"
+
+	"github.com/xuri/excelize/v2"
 	// "github.com/xuri/excelize/v2"
 )
 
@@ -56,6 +60,7 @@ type IInvoiceWriteOffService interface {
 	Count(filter dto.InvoiceWriteOffSearchParameters) (int64, error)
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error)
 	Confirmation(id, projectID uint) error
+	Report(parameters dto.InvoiceWriteOffReportParameters) (string, error)
 }
 
 func (service *invoiceWriteOffService) GetAll() ([]model.InvoiceWriteOff, error) {
@@ -86,6 +91,16 @@ func (service *invoiceWriteOffService) GetPaginated(page, limit int, data dto.In
 
 			invoiceWriteOffs[index].WriteOffLocationName = team[0].TeamNumber + " (" + team[0].TeamLeaderName + ")"
 			break
+
+		case "writeoff-object":
+			object, err := service.objectRepo.GetByID(invoiceWriteOff.WriteOffLocationID)
+			if err != nil {
+				return []dto.InvoiceWriteOffPaginated{}, err
+			}
+
+			invoiceWriteOffs[index].WriteOffLocationName = object.Name
+			break
+
 		case "loss-object":
 			object, err := service.objectRepo.GetByID(invoiceWriteOff.WriteOffLocationID)
 			if err != nil {
@@ -258,18 +273,18 @@ func (service *invoiceWriteOffService) Confirmation(id, projectID uint) error {
 		if indexOfExistingMaterialInWriteOffLocation != -1 {
 			materialsInWriteOffLocation[indexOfExistingMaterialInWriteOffLocation].Amount += invoiceMaterial.Amount
 		} else {
-      materialsInWriteOffLocation = append(materialsInWriteOffLocation, model.MaterialLocation{
-        ID: 0,
-        MaterialCostID: invoiceMaterial.MaterialCostID,
-        ProjectID: invoiceWriteOff.ProjectID,
-        LocationID: 0,
-        LocationType: invoiceWriteOff.WriteOffType,
-        Amount: invoiceMaterial.Amount,
-      })
-    }
+			materialsInWriteOffLocation = append(materialsInWriteOffLocation, model.MaterialLocation{
+				ID:             0,
+				MaterialCostID: invoiceMaterial.MaterialCostID,
+				ProjectID:      invoiceWriteOff.ProjectID,
+				LocationID:     0,
+				LocationType:   invoiceWriteOff.WriteOffType,
+				Amount:         invoiceMaterial.Amount,
+			})
+		}
 
-    fmt.Println(materialsInTheLocation)
-    fmt.Println(materialsInWriteOffLocation)
+		fmt.Println(materialsInTheLocation)
+		fmt.Println(materialsInWriteOffLocation)
 	}
 
 	err = service.invoiceWriteOffRepo.Confirmation(dto.InvoiceWriteOffConfirmationData{
@@ -279,4 +294,98 @@ func (service *invoiceWriteOffService) Confirmation(id, projectID uint) error {
 	})
 
 	return err
+}
+
+func (service *invoiceWriteOffService) Report(parameters dto.InvoiceWriteOffReportParameters) (string, error) {
+	invoices, err := service.invoiceWriteOffRepo.ReportFilterData(parameters)
+	if err != nil {
+		return "", err
+	}
+
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Invoice Writeoff Report.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
+	if err != nil {
+		return "", err
+	}
+
+	sheetName := "Sheet1"
+
+	rowCount := 2
+	for _, invoice := range invoices {
+		invoiceMaterials, err := service.invoiceMaterialsRepo.GetDataForReport(invoice.ID, "writeoff")
+		if err != nil {
+			return "", err
+		}
+
+		for _, invoiceMaterial := range invoiceMaterials {
+			f.SetCellStr(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
+			f.SetCellStr(sheetName, "B"+fmt.Sprint(rowCount), invoice.ReleasedWorkerName)
+
+			switch parameters.WriteOffType {
+			case "writeoff-warehouse":
+				f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), "Склад")
+				break
+
+			case "loss-warehouse":
+				f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), "Склад")
+				break
+
+			case "loss-team":
+				team, err := service.teamRepo.GetByID(parameters.WriteOffLocationID)
+				if err != nil {
+					return "", err
+				}
+
+				f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), team.Number)
+				break
+
+			case "loss-object":
+				object, err := service.objectRepo.GetByID(parameters.WriteOffLocationID)
+				if err != nil {
+					return "", err
+				}
+
+				f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), object.Name)
+				break
+
+			case "writeoff-object":
+				object, err := service.objectRepo.GetByID(parameters.WriteOffLocationID)
+				if err != nil {
+					return "", err
+				}
+
+				f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), object.Name)
+				break
+			}
+
+			dateOfInvoice := invoice.DateOfInvoice.String()
+			dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
+			f.SetCellStr(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
+
+			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), invoiceMaterial.MaterialName)
+			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), invoiceMaterial.MaterialUnit)
+			f.SetCellFloat(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.InvoiceMaterialAmount, 2, 64)
+
+			costM19, _ := invoiceMaterial.MaterialCostM19.Float64()
+			f.SetCellFloat(sheetName, "H"+fmt.Sprint(rowCount), costM19, 2, 64)
+			f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.InvoiceMaterialNotes)
+			rowCount++
+		}
+	}
+
+	currentTime := time.Now()
+	fileName := fmt.Sprintf(
+		"Отсчет накладной списание - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+
+	tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
+
+	f.SaveAs(tempFilePath)
+
+	if err := f.Close(); err != nil {
+		fmt.Println(err)
+	}
+
+	return fileName, nil
 }

@@ -35,8 +35,8 @@ type InvoiceWriteOffSearchParameters struct {
 }
 
 type InvoiceWriteOffMutationData struct {
-  InvoiceWriteOff model.InvoiceWriteOff
-  InvoiceMaterials []model.InvoiceMaterials
+	InvoiceWriteOff  model.InvoiceWriteOff
+	InvoiceMaterials []model.InvoiceMaterials
 }
 
 type InvoiceWriteOffMaterialsForEdit struct {
@@ -52,7 +52,22 @@ type InvoiceWriteOffMaterialsForEdit struct {
 }
 
 type InvoiceWriteOffConfirmationData struct {
-  InvoiceWriteOff model.InvoiceWriteOff
-  MaterialsInLocation []model.MaterialLocation
-  MaterialsInWriteOff []model.MaterialLocation
+	InvoiceWriteOff     model.InvoiceWriteOff
+	MaterialsInLocation []model.MaterialLocation
+	MaterialsInWriteOff []model.MaterialLocation
+}
+
+type InvoiceWriteOffReportParameters struct {
+	ProjectID          uint
+	WriteOffType       string    `json:"writeOffType"`
+	WriteOffLocationID uint      `json:"writeOffLocationID"`
+	DateFrom           time.Time `json:"dateFrom"`
+	DateTo             time.Time `json:"dateTo"`
+}
+
+type InvoiceWriteOffReportData struct {
+  ID uint
+  DeliveryCode string
+  ReleasedWorkerName string
+  DateOfInvoice time.Time
 }
