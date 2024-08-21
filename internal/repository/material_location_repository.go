@@ -231,10 +231,7 @@ func (repo *materialLocationRepository) GetUniqueMaterialsFromLocation(
 	return data, err
 }
 
-func (repo *materialLocationRepository) GetUniqueMaterialCostsFromLocation(
-	projectID, materialID, locationID uint,
-	locationType string,
-) ([]model.MaterialCost, error) {
+func (repo *materialLocationRepository) GetUniqueMaterialCostsFromLocation(projectID, materialID, locationID uint, locationType string) ([]model.MaterialCost, error) {
 	var data []model.MaterialCost
 	err := repo.db.Raw(`
     SELECT DISTINCT 

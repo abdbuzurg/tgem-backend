@@ -5,6 +5,11 @@ import (
 	"backend-v2/internal/repository"
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
+	"fmt"
+	"path/filepath"
+	"time"
+
+	"github.com/xuri/excelize/v2"
 )
 
 type invoiceOutputOutOfProjectService struct {
@@ -13,6 +18,7 @@ type invoiceOutputOutOfProjectService struct {
 	materialLocationRepo          repository.IMaterialLocationRepository
 	invoiceCountRepo              repository.IInvoiceCountRepository
 	invoiceMaterialsRepo          repository.IInvoiceMaterialsRepository
+	materialsRepo                 repository.IMaterialRepository
 }
 
 func InitInvoiceOutputOutOfProjectService(
@@ -21,6 +27,7 @@ func InitInvoiceOutputOutOfProjectService(
 	materialLocationRepo repository.IMaterialLocationRepository,
 	invoiceCountRepo repository.IInvoiceCountRepository,
 	invoiceMaterialsRepo repository.IInvoiceMaterialsRepository,
+	materialsRepo repository.IMaterialRepository,
 ) IInvoiceOutputOutOfProjectService {
 	return &invoiceOutputOutOfProjectService{
 		invoiceOutputOutOfProjectRepo: invoiceOutputOutOfProjectRepo,
@@ -28,6 +35,7 @@ func InitInvoiceOutputOutOfProjectService(
 		materialLocationRepo:          materialLocationRepo,
 		invoiceCountRepo:              invoiceCountRepo,
 		invoiceMaterialsRepo:          invoiceMaterialsRepo,
+		materialsRepo:                 materialsRepo,
 	}
 }
 
@@ -42,6 +50,8 @@ type IInvoiceOutputOutOfProjectService interface {
 	Update(data dto.InvoiceOutputOutOfProject) (model.InvoiceOutputOutOfProject, error)
 	Confirmation(id uint) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
+	GetUniqueNameOfProjects(projectID uint) ([]string, error)
+	Report(filter dto.InvoiceOutputOutOfProjectReportFilter) (string, error)
 }
 
 func (service *invoiceOutputOutOfProjectService) GetPaginated(page, limit int, filter dto.InvoiceOutputOutOfProjectSearchParameters) ([]dto.InvoiceOutputOutOfProjectPaginated, error) {
@@ -54,17 +64,17 @@ func (service *invoiceOutputOutOfProjectService) Count(filter dto.InvoiceOutputO
 
 func (service *invoiceOutputOutOfProjectService) Create(data dto.InvoiceOutputOutOfProject) (model.InvoiceOutputOutOfProject, error) {
 
-	count, err := service.invoiceCountRepo.CountInvoice("output", data.Details.FromProjectID)
+	count, err := service.invoiceCountRepo.CountInvoice("output", data.Details.ProjectID)
 	if err != nil {
 		return model.InvoiceOutputOutOfProject{}, err
 	}
 
-	data.Details.DeliveryCode = utils.UniqueCodeGeneration("О", int64(count+1), data.Details.FromProjectID)
+	data.Details.DeliveryCode = utils.UniqueCodeGeneration("О", int64(count+1), data.Details.ProjectID)
 
 	invoiceMaterialForCreate := []model.InvoiceMaterials{}
 	for _, invoiceMaterial := range data.Items {
 		if len(invoiceMaterial.SerialNumbers) == 0 {
-			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.FromProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
+			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
 			if err != nil {
 				return model.InvoiceOutputOutOfProject{}, err
 			}
@@ -72,7 +82,7 @@ func (service *invoiceOutputOutOfProjectService) Create(data dto.InvoiceOutputOu
 			index := 0
 			for invoiceMaterial.Amount > 0 {
 				invoiceMaterialCreate := model.InvoiceMaterials{
-					ProjectID:      data.Details.FromProjectID,
+					ProjectID:      data.Details.ProjectID,
 					ID:             0,
 					MaterialCostID: materialInfoSorted[index].MaterialCostID,
 					InvoiceID:      0,
@@ -174,7 +184,7 @@ func (service *invoiceOutputOutOfProjectService) Update(data dto.InvoiceOutputOu
 	invoiceMaterialForCreate := []model.InvoiceMaterials{}
 	for _, invoiceMaterial := range data.Items {
 		if len(invoiceMaterial.SerialNumbers) == 0 {
-			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.FromProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
+			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
 			if err != nil {
 				return model.InvoiceOutputOutOfProject{}, err
 			}
@@ -182,7 +192,7 @@ func (service *invoiceOutputOutOfProjectService) Update(data dto.InvoiceOutputOu
 			index := 0
 			for invoiceMaterial.Amount > 0 {
 				invoiceMaterialCreate := model.InvoiceMaterials{
-					ProjectID:      data.Details.FromProjectID,
+					ProjectID:      data.Details.ProjectID,
 					ID:             0,
 					MaterialCostID: materialInfoSorted[index].MaterialCostID,
 					InvoiceID:      0,
@@ -231,12 +241,17 @@ func (service *invoiceOutputOutOfProjectService) Confirmation(id uint) error {
 	}
 	invoiceOutputOutOfProject.Confirmation = true
 
-	invoiceMaterials, err := service.invoiceMaterialsRepo.GetByInvoice(invoiceOutputOutOfProject.FromProjectID, invoiceOutputOutOfProject.ID, "output-out-of-project")
+	invoiceMaterials, err := service.invoiceMaterialsRepo.GetByInvoice(invoiceOutputOutOfProject.ProjectID, invoiceOutputOutOfProject.ID, "output-out-of-project")
 	if err != nil {
 		return err
 	}
 
 	materialsInWarehouse, err := service.materialLocationRepo.GetMaterialsInLocationBasedOnInvoiceID(0, "warehouse", id, "output-out-of-project")
+	if err != nil {
+		return err
+	}
+
+	materialsOutOfProject, err := service.materialLocationRepo.GetMaterialsInLocationBasedOnInvoiceID(0, "out-of-project", id, "output-out-of-project")
 	if err != nil {
 		return err
 	}
@@ -250,12 +265,41 @@ func (service *invoiceOutputOutOfProjectService) Confirmation(id uint) error {
 			}
 		}
 
+		if materialsInWarehouse[materialInWarehouseIndex].Amount < invoiceMaterial.Amount {
+			material, err := service.materialsRepo.GetByMaterialCostID(invoiceMaterial.MaterialCostID)
+			if err != nil {
+				return fmt.Errorf("Недостаточно материалов в складе и данные про материал не были получены: %v", err)
+			}
+
+			return fmt.Errorf("Недостаточно материала %v на складе: в накладной указано - %v а на складе - %v", material.Name, invoiceMaterial.Amount, materialsInWarehouse[materialInWarehouseIndex].Amount)
+		}
 		materialsInWarehouse[materialInWarehouseIndex].Amount -= invoiceMaterial.Amount
+
+		materialOutOfProjectIndex := -1
+		for index, materialOutOfProject := range materialsOutOfProject {
+			if materialOutOfProject.MaterialCostID == invoiceMaterial.MaterialCostID {
+				materialInWarehouseIndex = index
+				break
+			}
+		}
+
+		if materialOutOfProjectIndex != -1 {
+		} else {
+			materialsOutOfProject = append(materialsOutOfProject, model.MaterialLocation{
+				ID:             0,
+				ProjectID:      invoiceOutputOutOfProject.ProjectID,
+				MaterialCostID: invoiceMaterial.MaterialCostID,
+				LocationID:     0,
+				LocationType:   "out-of-project",
+				Amount:         invoiceMaterial.Amount,
+			})
+		}
 	}
 
 	err = service.invoiceOutputOutOfProjectRepo.Confirmation(dto.InvoiceOutputOutOfProjectConfirmationQueryData{
-		InvoiceData:        invoiceOutputOutOfProject,
-		WarehouseMaterials: materialsInWarehouse,
+		InvoiceData:           invoiceOutputOutOfProject,
+		WarehouseMaterials:    materialsInWarehouse,
+		OutOfProjectMaterials: materialsOutOfProject,
 	})
 
 	return nil
@@ -264,3 +308,65 @@ func (service *invoiceOutputOutOfProjectService) Confirmation(id uint) error {
 func (service *invoiceOutputOutOfProjectService) GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error) {
 	return service.invoiceOutputOutOfProjectRepo.GetMaterialsForEdit(id)
 }
+
+func (service *invoiceOutputOutOfProjectService) GetUniqueNameOfProjects(projectID uint) ([]string, error) {
+	return service.invoiceOutputOutOfProjectRepo.GetUniqueNameOfProjects(projectID)
+}
+
+func (service *invoiceOutputOutOfProjectService) Report(filter dto.InvoiceOutputOutOfProjectReportFilter) (string, error) {
+	invoices, err := service.invoiceOutputOutOfProjectRepo.ReportFilterData(filter)
+	if err != nil {
+		return "", err
+	}
+
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Invoice Output Out Of Project.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
+	if err != nil {
+		return "", err
+	}
+	sheetName := "Sheet1"
+
+	rowCount := 2
+	for _, invoice := range invoices {
+		invoiceMaterials, err := service.invoiceMaterialsRepo.GetDataForReport(invoice.ID, "output-out-of-project")
+		if err != nil {
+			return "", err
+		}
+
+		for _, invoiceMaterial := range invoiceMaterials {
+			f.SetCellStr(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
+			f.SetCellStr(sheetName, "B"+fmt.Sprint(rowCount), invoice.ReleasedWorkerName)
+			f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), invoice.NameOfProject)
+
+			dateOfInvoice := invoice.DateOfInvoice.String()
+			dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
+			f.SetCellStr(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
+
+			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), invoiceMaterial.MaterialName)
+			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), invoiceMaterial.MaterialUnit)
+			f.SetCellFloat(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.InvoiceMaterialAmount, 2, 64)
+
+			costM19, _ := invoiceMaterial.MaterialCostM19.Float64()
+			f.SetCellFloat(sheetName, "H"+fmt.Sprint(rowCount), costM19, 2, 64)
+			f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.InvoiceMaterialNotes)
+			rowCount++
+		}
+	}
+
+	currentTime := time.Now()
+	fileName := fmt.Sprintf(
+		"Отсчет накладной отпуск вне проекта - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+
+	tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
+
+	f.SaveAs(tempFilePath)
+
+	if err := f.Close(); err != nil {
+		fmt.Println(err)
+	}
+
+	return fileName, nil
+}
+

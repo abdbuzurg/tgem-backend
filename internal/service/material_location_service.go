@@ -51,12 +51,15 @@ type IMaterialLocationService interface {
 	Update(data model.MaterialLocation) (model.MaterialLocation, error)
 	Delete(id uint) error
 	Count() (int64, error)
-	GetMaterialsInLocation(locationType string, locationID uint) ([]model.Material, error)
+	GetMaterialsInLocation(locationType string, locationID uint, projectID uint) ([]model.Material, error)
 	UniqueObjects(projectID uint) ([]dto.ObjectDataForSelect, error)
 	UniqueTeams(projectID uint) ([]dto.TeamDataForSelect, error)
 	BalanceReport(projectID uint, data dto.ReportBalanceFilterRequest) (string, error)
 	BalanceReportWriteOff(projectID uint, data dto.ReportWriteOffBalanceFilter) (string, error)
+	BalanceReportOutOfProject(projectID uint) (string, error)
 	Live(searchParameters dto.MaterialLocationLiveSearchParameters) ([]dto.MaterialLocationLiveView, error)
+	GetMaterialCostsInLocation(projectID, materialID, locationID uint, locationType string) ([]model.MaterialCost, error)
+	GetMaterialAmountBasedOnCost(projectID, materialCost, locationID uint, locationType string) (float64, error)
 }
 
 func (service *materialLocationService) GetAll() ([]model.MaterialLocation, error) {
@@ -91,41 +94,8 @@ func (service *materialLocationService) Count() (int64, error) {
 	return service.materialLocationRepo.Count()
 }
 
-func (service *materialLocationService) GetMaterialsInLocation(
-	locationType string,
-	locationID uint,
-) ([]model.Material, error) {
-	materialCostIDs, err := service.materialLocationRepo.GetUniqueMaterialCostsByLocation(locationType, locationID)
-	if err != nil {
-		return []model.Material{}, err
-	}
-
-	var result []model.Material
-	for _, materialCostID := range materialCostIDs {
-		materialCost, err := service.materialCostRepo.GetByID(materialCostID)
-		if err != nil {
-			return []model.Material{}, err
-		}
-
-		material, err := service.materialRepo.GetByID(materialCost.MaterialID)
-		if err != nil {
-			return []model.Material{}, err
-		}
-
-		exist := false
-		for _, alreadyIn := range result {
-			if alreadyIn.ID == material.ID {
-				exist = true
-				break
-			}
-		}
-
-		if !exist {
-			result = append(result, material)
-		}
-	}
-
-	return result, nil
+func (service *materialLocationService) GetMaterialsInLocation(locationType string, locationID uint, projectID uint) ([]model.Material, error) {
+	return service.materialLocationRepo.GetUniqueMaterialsFromLocation(projectID, locationID, locationType)
 }
 
 func (service *materialLocationService) UniqueTeams(projectID uint) ([]dto.TeamDataForSelect, error) {
@@ -471,4 +441,60 @@ func (service *materialLocationService) BalanceReportWriteOff(projectID uint, da
 	}
 
 	return fileName, nil
+}
+
+func (service *materialLocationService) BalanceReportOutOfProject(projectID uint) (string, error) {
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Отчет Остатка.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
+	if err != nil {
+		return "", err
+	}
+
+	sheetName := "Отчет"
+	rowCount := 2
+
+	materialsData, err := service.materialLocationRepo.GetDataForBalanceReport(projectID, "out-of-project", 0)
+	if err != nil {
+		return "", err
+	}
+
+	for _, entry := range materialsData {
+
+		f.SetCellStr(sheetName, "A"+fmt.Sprint(rowCount), entry.MaterialCode)
+		f.SetCellStr(sheetName, "B"+fmt.Sprint(rowCount), entry.MaterialName)
+		f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), entry.MaterialUnit)
+		f.SetCellFloat(sheetName, "D"+fmt.Sprint(rowCount), entry.TotalAmount, 2, 64)
+		f.SetCellFloat(sheetName, "E"+fmt.Sprint(rowCount), entry.DefectAmount, 2, 64)
+
+		costM19, _ := entry.MaterialCostM19.Float64()
+		totalCost, _ := entry.TotalCost.Float64()
+		totalDefectCost, _ := entry.TotalDefectCost.Float64()
+		f.SetCellFloat(sheetName, "F"+fmt.Sprint(rowCount), costM19, 2, 64)
+		f.SetCellFloat(sheetName, "G"+fmt.Sprint(rowCount), totalCost, 2, 64)
+		f.SetCellFloat(sheetName, "H"+fmt.Sprint(rowCount), totalDefectCost, 2, 64)
+
+		rowCount++
+	}
+
+	currentTime := time.Now()
+	fileName := fmt.Sprintf(
+		"Report Balance %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+
+	tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
+	f.SaveAs(tempFilePath)
+	if err := f.Close(); err != nil {
+		fmt.Println(err)
+	}
+
+	return fileName, nil
+}
+
+func (service *materialLocationService) GetMaterialCostsInLocation(projectID, materialID, locationID uint, locationType string) ([]model.MaterialCost, error) {
+	return service.materialLocationRepo.GetUniqueMaterialCostsFromLocation(projectID, materialID, locationID, locationType)
+}
+
+func (service *materialLocationService) GetMaterialAmountBasedOnCost(projectID, materialCost, locationID uint, locationType string) (float64, error) {
+	return service.materialLocationRepo.GetUniqueMaterialTotalAmount(projectID, materialCost, locationID, locationType)
 }

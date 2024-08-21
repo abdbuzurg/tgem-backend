@@ -21,12 +21,13 @@ type IMaterialRepository interface {
 	GetPaginated(page, limit int, projectID uint) ([]model.Material, error)
 	GetPaginatedFiltered(page, limit int, filter model.Material) ([]model.Material, error)
 	GetByID(id uint) (model.Material, error)
+	GetByMaterialCostID(materialCostID uint) (model.Material, error)
 	Create(data model.Material) (model.Material, error)
 	CreateInBatches(data []model.Material) ([]model.Material, error)
 	Update(data model.Material) (model.Material, error)
 	Delete(id uint) error
 	Count(filter model.Material) (int64, error)
-  GetByName(name string) (model.Material, error)
+	GetByName(name string) (model.Material, error)
 }
 
 func (repo *materialRepository) GetAll(projectID uint) ([]model.Material, error) {
@@ -113,7 +114,22 @@ func (repo *materialRepository) Count(filter model.Material) (int64, error) {
 }
 
 func (repo *materialRepository) GetByName(name string) (model.Material, error) {
-  result := model.Material{}
-  err := repo.db.First(&result, "name = ?", name).Error
-  return result, err
+	result := model.Material{}
+	err := repo.db.First(&result, "name = ?", name).Error
+	return result, err
+}
+
+func (repo *materialRepository) GetByMaterialCostID(materialCostID uint) (model.Material, error) {
+	result := model.Material{}
+	err := repo.db.Raw(`
+    SELECT *
+    FROM materials
+    WHERE materials.id IN (
+      SELECT material_costs.material_id
+      FROM material_costs
+      WHERE material_costs.id = ?
+    )
+    `, materialCostID).Scan(&result).Error
+
+	return result, err
 }

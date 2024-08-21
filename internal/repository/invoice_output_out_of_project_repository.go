@@ -3,6 +3,7 @@ package repository
 import (
 	"backend-v2/internal/dto"
 	"backend-v2/model"
+	"fmt"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -27,6 +28,8 @@ type IInvoiceOutputOutOfProjectRepository interface {
 	Delete(id uint) error
 	Update(data dto.InvoiceOutputOutOfProjectCreateQueryData) (model.InvoiceOutputOutOfProject, error)
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
+	GetUniqueNameOfProjects(projectID uint) ([]string, error)
+	ReportFilterData(filter dto.InvoiceOutputOutOfProjectReportFilter) ([]dto.InvoiceOutputOutOfProjectReportData, error)
 }
 
 func (repo *invoiceOutputOutOfProjectRepository) GetPaginated(page, limit int, filter dto.InvoiceOutputOutOfProjectSearchParameters) ([]dto.InvoiceOutputOutOfProjectPaginated, error) {
@@ -34,27 +37,23 @@ func (repo *invoiceOutputOutOfProjectRepository) GetPaginated(page, limit int, f
 	err := repo.db.Raw(`
     SELECT 
       invoice_output_out_of_projects.id as id,
-      invoice_output_out_of_projects.from_project_id as from_project_id,
-      invoice_output_out_of_projects.to_project_id as to_project_id,
-      projects.name as to_project_name,    
-      projects.project_manager as to_project_manager,
+      invoice_output_out_of_projects.name_of_project as name_of_project,
       invoice_output_out_of_projects.delivery_code as delivery_code,
       workers.name as released_worker_name,
       invoice_output_out_of_projects.date_of_invoice as date_of_invoice,
       invoice_output_out_of_projects.confirmation as confirmation
     FROM invoice_output_out_of_projects 
-    INNER JOIN projects ON invoice_output_out_of_projects.to_project_id = projects.id
     INNER JOIN workers ON invoice_output_out_of_projects.released_worker_id = workers.id
     WHERE 
-      from_project_id = ? AND
-      (nullif(?, 0) IS NULL OR to_project_id = ?) AND
+      invoice_output_out_of_projects.project_id = ? AND
+      (nullif(?, '') IS NULL OR name_of_project = ?) AND
 			(nullif(?, 0) IS NULL OR released_worker_id = ?)
     ORDER BY invoice_output_out_of_projects.id 
     LIMIT ? 
     OFFSET ?
     `,
-		filter.FromProjectID,
-		filter.ToProjectID, filter.ToProjectID,
+		filter.ProjectID,
+		filter.NameOfProject, filter.NameOfProject,
 		filter.ReleasedWorkerID, filter.ReleasedWorkerID,
 		limit, (page-1)*limit,
 	).Scan(&data).Error
@@ -84,7 +83,7 @@ func (repo *invoiceOutputOutOfProjectRepository) Create(data dto.InvoiceOutputOu
       WHERE
         invoice_type = 'output' AND
         project_id = ?
-      `, result.FromProjectID).Error
+      `, result.ProjectID).Error
 		if err != nil {
 			return err
 		}
@@ -109,12 +108,12 @@ func (repo *invoiceOutputOutOfProjectRepository) Count(filter dto.InvoiceOutputO
     SELECT COUNT(*) 
     FROM invoice_output_out_of_projects 
     WHERE 
-      from_project_id = ? AND
-      (nullif(?, 0) IS NULL OR to_project_id = ?) AND
+      project_id = ? AND
+      (nullif(?, '') IS NULL OR name_of_project = ?) AND
 			(nullif(?, 0) IS NULL OR released_worker_id = ?)
     `,
-		filter.FromProjectID,
-		filter.ToProjectID, filter.ToProjectID,
+		filter.ProjectID,
+		filter.NameOfProject, filter.NameOfProject,
 		filter.ReleasedWorkerID, filter.ReleasedWorkerID,
 	).Scan(&count).Error
 	return count, err
@@ -130,6 +129,13 @@ func (repo *invoiceOutputOutOfProjectRepository) Confirmation(data dto.InvoiceOu
 			Columns:   []clause.Column{{Name: "id"}},
 			DoUpdates: clause.AssignmentColumns([]string{"amount"}),
 		}).Create(&data.WarehouseMaterials).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"amount"}),
+		}).Create(&data.OutOfProjectMaterials).Error; err != nil {
 			return err
 		}
 
@@ -204,6 +210,47 @@ func (repo *invoiceOutputOutOfProjectRepository) GetMaterialsForEdit(id uint) ([
       invoice_materials.invoice_type = 'output-out-of-project' AND
       invoice_materials.invoice_id = ?
     `, id).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *invoiceOutputOutOfProjectRepository) GetUniqueNameOfProjects(projectID uint) ([]string, error) {
+	result := []string{}
+	err := repo.db.Raw(`
+    SELECT DISTINCT(invoice_output_out_of_projects.name_of_project)
+    FROM invoice_output_out_of_projects
+    `).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *invoiceOutputOutOfProjectRepository) ReportFilterData(filter dto.InvoiceOutputOutOfProjectReportFilter) ([]dto.InvoiceOutputOutOfProjectReportData, error) {
+	result := []dto.InvoiceOutputOutOfProjectReportData{}
+	dateFrom := filter.DateFrom.String()
+	dateFrom = dateFrom[:len(dateFrom)-10]
+	dateTo := filter.DateTo.String()
+	dateTo = dateTo[:len(dateTo)-10]
+  fmt.Println(dateFrom, dateTo)
+	err := repo.db.Raw(`
+    SELECT 
+      invoice_output_out_of_projects.id as id,
+      invoice_output_out_of_projects.name_of_project as name_of_project,
+      invoice_output_out_of_projects.delivery_code as delivery_code,
+      workers.name as released_worker_name,
+      invoice_output_out_of_projects.date_of_invoice as date_of_invoice
+    FROM invoice_output_out_of_projects 
+    INNER JOIN workers ON invoice_output_out_of_projects.released_worker_id = workers.id
+    WHERE 
+      invoice_output_out_of_projects.project_id = ? AND
+      invoice_output_out_of_projects.confirmation = true AND
+      (nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= invoice_output_out_of_projects.date_of_invoice) AND 
+      (nullif(?, '0001-01-01 00:00:00') IS NULL OR invoice_output_out_of_projects.date_of_invoice <= ?)
+    ORDER BY invoice_output_out_of_projects.id DESC 
+    `,
+		filter.ProjectID,
+		dateFrom, dateFrom,
+		dateTo, dateTo,
+	).Scan(&result).Error
 
 	return result, err
 }

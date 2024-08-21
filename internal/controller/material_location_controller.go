@@ -32,10 +32,13 @@ type IMaterialLocationController interface {
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
 	GetMaterialInLocation(c *gin.Context)
+	GetMaterialCostsInLocation(c *gin.Context)
+	GetMaterialAmountBasedOnCost(c *gin.Context)
 	UniqueObjects(c *gin.Context)
 	UniqueTeams(c *gin.Context)
 	ReportBalance(c *gin.Context)
 	ReportBalanceWriteOff(c *gin.Context)
+	ReportBalanceOutOfProject(c *gin.Context)
 	Live(c *gin.Context)
 }
 
@@ -202,7 +205,7 @@ func (controller *materialLocationController) GetMaterialInLocation(c *gin.Conte
 		return
 	}
 
-	data, err := controller.materialLocationService.GetMaterialsInLocation(locationType, uint(locationID))
+	data, err := controller.materialLocationService.GetMaterialsInLocation(locationType, uint(locationID), c.GetUint("projectID"))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
 		return
@@ -306,4 +309,69 @@ func (controller *materialLocationController) ReportBalanceWriteOff(c *gin.Conte
 
 	c.FileAttachment(filePath, fileName)
 	os.Remove(filePath)
+}
+
+func (controller *materialLocationController) ReportBalanceOutOfProject(c *gin.Context) {
+	fileName, err := controller.materialLocationService.BalanceReportOutOfProject(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	filePath := filepath.Join("./pkg/excels/temp/", fileName)
+
+	c.FileAttachment(filePath, fileName)
+	os.Remove(filePath)
+}
+
+func (controller *materialLocationController) GetMaterialCostsInLocation(c *gin.Context) {
+	locationType := c.Param("locationType")
+
+	locationIDStr := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDStr)
+	if err != nil || locationID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
+
+	materialIDStr := c.Param("materialID")
+	materialID, err := strconv.Atoi(materialIDStr)
+	if err != nil || materialID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
+
+	data, err := controller.materialLocationService.GetMaterialCostsInLocation(c.GetUint("projectID"), uint(materialID), uint(locationID), locationType)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *materialLocationController) GetMaterialAmountBasedOnCost(c *gin.Context) {
+	locationType := c.Param("locationType")
+
+	locationIDStr := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDStr)
+	if err != nil || locationID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
+
+	materialCostIDStr := c.Param("materialCostID")
+	materialCostID, err := strconv.Atoi(materialCostIDStr)
+	if err != nil || materialCostID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
+
+	data, err := controller.materialLocationService.GetMaterialAmountBasedOnCost(c.GetUint("projectID"), uint(materialCostID), uint(locationID), locationType)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

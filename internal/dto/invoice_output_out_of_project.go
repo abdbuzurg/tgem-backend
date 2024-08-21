@@ -7,10 +7,7 @@ import (
 
 type InvoiceOutputOutOfProjectPaginated struct {
 	ID                 uint      `json:"id" gorm:"primaryKey"`
-	FromProjectID      uint      `json:"fromProjectID"`
-	ToProjectID        uint      `json:"toProjectID"`
-	ToProjectName      string    `json:"toProjectName"`
-	ToProjectManager   string    `json:"toProjectManager"`
+	NameOfProject      string    `json:"nameOfProject"`
 	DeliveryCode       string    `json:"deliveryCode"`
 	ReleasedWorkerName string    `json:"releasedWorkerName"`
 	DateOfInvoice      time.Time `json:"dateOfInvoice"`
@@ -23,8 +20,9 @@ type InvoiceOutputOutOfProjectCreateQueryData struct {
 }
 
 type InvoiceOutputOutOfProjectConfirmationQueryData struct {
-	InvoiceData        model.InvoiceOutputOutOfProject
-	WarehouseMaterials []model.MaterialLocation
+	InvoiceData           model.InvoiceOutputOutOfProject
+	WarehouseMaterials    []model.MaterialLocation
+	OutOfProjectMaterials []model.MaterialLocation
 }
 
 type InvoiceOutputOutOfProject struct {
@@ -33,8 +31,21 @@ type InvoiceOutputOutOfProject struct {
 }
 
 type InvoiceOutputOutOfProjectSearchParameters struct {
-	ToProjectID      uint
-	FromProjectID    uint
+	ProjectID        uint
+	NameOfProject    string
 	ReleasedWorkerID uint
 }
 
+type InvoiceOutputOutOfProjectReportFilter struct {
+	DateFrom  time.Time `json:"dateFrom"`
+	DateTo    time.Time `json:"dateTo"`
+	ProjectID uint
+}
+
+type InvoiceOutputOutOfProjectReportData struct {
+	ID                 uint
+	NameOfProject      string
+	DeliveryCode       string
+	ReleasedWorkerName string
+	DateOfInvoice      time.Time
+}

@@ -102,6 +102,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		materialLocationRepo,
 		invoiceCountRepo,
 		invoiceMaterialRepo,
+		materialRepo,
 	)
 	invoiceReturnService := service.InitInvoiceReturnService(
 		invoiceReturnRepo,
@@ -319,7 +320,7 @@ func InitInvoiceWriteOffRoutes(router *gin.RouterGroup, controller controller.II
 	invoiceWriteOffRoutes.GET("/document/:deliveryCode", controller.GetDocument)
 	invoiceWriteOffRoutes.POST("/", controller.Create)
 	invoiceWriteOffRoutes.POST("/confirm/:id", controller.Confirmation)
-  invoiceWriteOffRoutes.POST("/report", controller.Report)
+	invoiceWriteOffRoutes.POST("/report", controller.Report)
 	invoiceWriteOffRoutes.PATCH("/", controller.Update)
 	invoiceWriteOffRoutes.DELETE("/:id", controller.Delete)
 }
@@ -334,7 +335,9 @@ func InitInvoiceOutputOutOfProjectRoutes(router *gin.RouterGroup, controller con
 	invoiceOutputOutOfProjectRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumbers)
 	invoiceOutputOutOfProjectRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
 	invoiceOutputOutOfProjectRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
+	invoiceOutputOutOfProjectRoutes.GET("/unique/name-of-project", controller.UniqueNameOfProjects)
 	invoiceOutputOutOfProjectRoutes.POST("/", controller.Create)
+  invoiceOutputOutOfProjectRoutes.POST("/report", controller.Report)
 	invoiceOutputOutOfProjectRoutes.PATCH("/", controller.Update)
 	invoiceOutputOutOfProjectRoutes.POST("/confirm/:id", controller.Confirmation)
 }
@@ -465,11 +468,14 @@ func InitMaterialLocationRoutes(router *gin.RouterGroup, controller controller.I
 	materialLocationRoutes := router.Group("/material-location")
 	materialLocationRoutes.Use(middleware.Authentication())
 	materialLocationRoutes.GET("/available/:locationType/:locationID", controller.GetMaterialInLocation)
+  materialLocationRoutes.GET("/costs/:materialID/:locationType/:locationID", controller.GetMaterialCostsInLocation)
+  materialLocationRoutes.GET("/amount/:materialCostID/:locationType/:locationID", controller.GetMaterialAmountBasedOnCost)
 	materialLocationRoutes.GET("/unique/team", controller.UniqueTeams)
 	materialLocationRoutes.GET("/unique/object", controller.UniqueObjects)
 	materialLocationRoutes.GET("/live", controller.Live)
 	materialLocationRoutes.POST("/report/balance", controller.ReportBalance)
 	materialLocationRoutes.POST("/report/balance/writeoff", controller.ReportBalanceWriteOff)
+  materialLocationRoutes.POST("/report/balance/out-of-project", controller.ReportBalanceOutOfProject)
 }
 
 func InitMaterialCostRoutes(router *gin.RouterGroup, controller controller.IMaterialCostController) {
@@ -483,7 +489,6 @@ func InitMaterialCostRoutes(router *gin.RouterGroup, controller controller.IMate
 	materialCostRoutes.POST("/", controller.Create)
 	materialCostRoutes.PATCH("/", controller.Update)
 	materialCostRoutes.DELETE("/:id", controller.Delete)
-
 }
 
 func InitMaterialRoutes(router *gin.RouterGroup, controller controller.IMaterialController) {

@@ -33,6 +33,8 @@ type IInvoiceOutputOutOfProjectController interface {
 	Confirmation(c *gin.Context)
 	Update(c *gin.Context)
 	GetMaterialsForEdit(c *gin.Context)
+	UniqueNameOfProjects(c *gin.Context)
+	Report(c *gin.Context)
 }
 
 func (controller *invoiceOutputOutOfProjectController) GetPaginated(c *gin.Context) {
@@ -50,12 +52,7 @@ func (controller *invoiceOutputOutOfProjectController) GetPaginated(c *gin.Conte
 		return
 	}
 
-	toProjectIDStr := c.DefaultQuery("toProjectID", "0")
-	toProjectID, err := strconv.Atoi(toProjectIDStr)
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for toProjectID: %v", err))
-		return
-	}
+	nameOfProject := c.DefaultQuery("nameOfProject", "")
 
 	releasedWorkerIDStr := c.DefaultQuery("releasedWorkerID", "0")
 	releasedWorkerID, err := strconv.Atoi(releasedWorkerIDStr)
@@ -65,8 +62,8 @@ func (controller *invoiceOutputOutOfProjectController) GetPaginated(c *gin.Conte
 	}
 
 	filter := dto.InvoiceOutputOutOfProjectSearchParameters{
-		ToProjectID:      uint(toProjectID),
-		FromProjectID:    c.GetUint("projectID"),
+		ProjectID:        c.GetUint("projectID"),
+		NameOfProject:    nameOfProject,
 		ReleasedWorkerID: uint(releasedWorkerID),
 	}
 
@@ -96,7 +93,7 @@ func (controller *invoiceOutputOutOfProjectController) Create(c *gin.Context) {
 	createData.Details.ReleasedWorkerID = workerID
 
 	projectID := c.GetUint("projectID")
-	createData.Details.FromProjectID = projectID
+	createData.Details.ProjectID = projectID
 
 	data, err := controller.invoiceOutputOutOfProjectService.Create(createData)
 	if err != nil {
@@ -171,7 +168,7 @@ func (controller *invoiceOutputOutOfProjectController) Update(c *gin.Context) {
 	updateData.Details.ReleasedWorkerID = workerID
 
 	projectID := c.GetUint("projectID")
-	updateData.Details.FromProjectID = projectID
+	updateData.Details.ProjectID = projectID
 
 	data, err := controller.invoiceOutputOutOfProjectService.Update(updateData)
 	if err != nil {
@@ -235,4 +232,34 @@ func (controller *invoiceOutputOutOfProjectController) GetMaterialsForEdit(c *gi
 	}
 
 	response.ResponseSuccess(c, result)
+}
+
+func (controller *invoiceOutputOutOfProjectController) UniqueNameOfProjects(c *gin.Context) {
+	result, err := controller.invoiceOutputOutOfProjectService.GetUniqueNameOfProjects(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, result)
+}
+
+func (controller *invoiceOutputOutOfProjectController) Report(c *gin.Context) {
+	var filter dto.InvoiceOutputOutOfProjectReportFilter
+	if err := c.ShouldBindJSON(&filter); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
+		return
+	}
+
+	filter.ProjectID = c.GetUint("projectID")
+	filename, err := controller.invoiceOutputOutOfProjectService.Report(filter)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	filePath := filepath.Join("./pkg/excels/temp/", filename)
+	c.FileAttachment(filePath, filename)
+	os.Remove(filePath)
+
 }

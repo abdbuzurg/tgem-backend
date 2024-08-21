@@ -18,24 +18,23 @@ type Project struct {
 	DateEnd              time.Time       `json:"dateEnd"`
 	ProjectManager       string          `json:"projectManager"`
 
-	UserActions                   []UserAction                `json:"-" gorm:"foreignKey:ProjectID"`
-	UserInProjects                []UserInProject             `json:"-" gorm:"foreignKey:ProjectID"`
-	Materials                     []Material                  `json:"-" gorm:"foreignKey:ProjectID"`
-	MaterialLocations             []MaterialLocation          `json:"-" gorm:"foreignKey:ProjectID"`
-	SerialNumbers                 []SerialNumber              `json:"-" gorm:"foreignKey:ProjectID"`
-	SerialNumberMovements         []SerialNumberMovement      `json:"-" gorm:"foreignKey:ProjectID"`
-	SerialNumberLocations         []SerialNumberLocation      `json:"-" gorm:"foreignKey:ProjectID"`
-	Objects                       []Object                    `json:"-" gorm:"foreignKey:ProjectID"`
-	Teams                         []Team                      `json:"-" gorm:"foreignKey:ProjectID"`
-	InvoiceInputs                 []InvoiceInput              `json:"-" gorm:"foreignKey:ProjectID"`
-	InvoiceOutputs                []InvoiceOutput             `json:"-" gorm:"foreignKey:ProjectID"`
-	InvoiceReturns                []InvoiceReturn             `json:"-" gorm:"foreignKey:ProjectID"`
-	InvoiceObject                 []InvoiceObject             `json:"-" gorm:"foreignKey:ProjectID"`
-	InvoiceWriteOffs              []InvoiceWriteOff           `json:"-" gorm:"foreignKey:ProjectID"`
-	InvoiceMaterials              []InvoiceMaterials          `json:"-" gorm:"foreignKey:ProjectID"`
-	InvoiceOutputOutOfProjectTo   []InvoiceOutputOutOfProject `json:"-" gorm:"foreignKey:ToProjectID"`
-	InvoiceOutputOutOfProjectFrom []InvoiceOutputOutOfProject `json:"-" gorm:"foreignKey:FromProjectID"`
-	InvoiceCounts                 []InvoiceCount              `json:"-" gorm:"foreignKey:ProjectID"`
-	Operations                    []Operation                 `json:"-" gorm:"foreignKey:ProjectID"`
-	ObjectOperations              []ObjectOperation           `json:"-" gorm:"foreignKey:ProjectID"`
+	UserActions                []UserAction                `json:"-" gorm:"foreignKey:ProjectID"`
+	UserInProjects             []UserInProject             `json:"-" gorm:"foreignKey:ProjectID"`
+	Materials                  []Material                  `json:"-" gorm:"foreignKey:ProjectID"`
+	MaterialLocations          []MaterialLocation          `json:"-" gorm:"foreignKey:ProjectID"`
+	SerialNumbers              []SerialNumber              `json:"-" gorm:"foreignKey:ProjectID"`
+	SerialNumberMovements      []SerialNumberMovement      `json:"-" gorm:"foreignKey:ProjectID"`
+	SerialNumberLocations      []SerialNumberLocation      `json:"-" gorm:"foreignKey:ProjectID"`
+	Objects                    []Object                    `json:"-" gorm:"foreignKey:ProjectID"`
+	Teams                      []Team                      `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceInputs              []InvoiceInput              `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceOutputs             []InvoiceOutput             `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceReturns             []InvoiceReturn             `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceObject              []InvoiceObject             `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceWriteOffs           []InvoiceWriteOff           `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceMaterials           []InvoiceMaterials          `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceOutputOutOfProjects []InvoiceOutputOutOfProject `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceCounts              []InvoiceCount              `json:"-" gorm:"foreignKey:ProjectID"`
+	Operations                 []Operation                 `json:"-" gorm:"foreignKey:ProjectID"`
+	ObjectOperations           []ObjectOperation           `json:"-" gorm:"foreignKey:ProjectID"`
 }
