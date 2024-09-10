@@ -40,4 +40,6 @@ type Worker struct {
 
 	//Invoice WriteOff Relased
 	InvoiceWriteOffReleaseds []InvoiceWriteOff `json:"-" gorm:"foreignKey:ReleasedWorkerID"`
+
+	WorkerAttendances []WorkerAttendance `json:"-" gorm:"foreignKey:WorkerID"`
 }

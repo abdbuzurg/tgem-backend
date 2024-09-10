@@ -70,6 +70,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	operationRepo := repository.InitOperationRepository(db)
 	operationMaterialRepo := repository.InitOperationMaterialRepository(db)
 	invoiceWriteOffRepo := repository.InitInvoiceWriteOffRepository(db)
+  workerAttendanceRepo := repository.InitWorkerAttendanceRepository(db)
 
 	//Initialization of Services
 	invoiceInputService := service.InitInvoiceInputService(
@@ -245,6 +246,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		materialCostRepo,
 		invoiceCountRepo,
 	)
+  workerAttendanceService := service.InitWorkerAttendanceService(
+    workerAttendanceRepo,
+    workerRepo,
+  )
 
 	//Initialization of Controllers
 	invoiceInputController := controller.InitInvoiceInputController(invoiceInputService, userActionService)
@@ -276,6 +281,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	substationObjectController := controller.InitSubstationObjectController(substationObjectService)
 	invoiceOutputOutOfProjectController := controller.InitInvoiceOutputOutOfProjectController(invoiceOutputOutOfProjectService)
 	invoiceWriteOffController := controller.InitInvoiceWriteOffController(invoiceWriteOffService)
+  workerAttendanceController := controller.InitWorkerAttendanceController(workerAttendanceService)
 
 	//Initialization of Routes
 	InitInvoiceInputRoutes(router, invoiceInputController, db)
@@ -304,8 +310,19 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitInvoiceOutputOutOfProjectRoutes(router, invoiceOutputOutOfProjectController)
 	InitOperationRoutes(router, operationController)
 	InitInvoiceWriteOffRoutes(router, invoiceWriteOffController)
+  InitWorkerAttendanceRoutes(router, workerAttendanceController)
 
 	return mainRouter
+}
+
+func InitWorkerAttendanceRoutes(router *gin.RouterGroup, controller controller.IWorkerAttendanceController) {
+  workerAttendanceRoutes := router.Group("/worker-attendance")
+  workerAttendanceRoutes.Use(
+    middleware.Authentication(),
+  )
+
+  workerAttendanceRoutes.GET("/paginated", controller.GetPaginated)
+  workerAttendanceRoutes.POST("/", controller.Import)
 }
 
 func InitInvoiceWriteOffRoutes(router *gin.RouterGroup, controller controller.IInvoiceWriteOffController) {

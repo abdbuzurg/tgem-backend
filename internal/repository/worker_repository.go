@@ -23,6 +23,7 @@ type IWorkerRepository interface {
 	GetByJobTitleInProject(jobTitleInProject string, projectID uint) ([]model.Worker, error)
   GetByName(name string) (model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
+  GetByCompanyID(companyID string) (model.Worker, error)
 	Create(data model.Worker) (model.Worker, error)
   CreateInBatches(data []model.Worker) ([]model.Worker, error)
 	Update(data model.Worker) (model.Worker, error)
@@ -98,4 +99,10 @@ func (repo *workerRepository) Count() (int64, error) {
 	var count int64
 	err := repo.db.Model(&model.Worker{}).Count(&count).Error
 	return count, err
+}
+
+func (repo *workerRepository) GetByCompanyID(companyID string) (model.Worker, error) {
+  var result model.Worker
+  err := repo.db.First(&result, "company_worker_id = ?", companyID).Error
+  return result, err
 }
