@@ -36,6 +36,7 @@ type IInvoiceWriteOffController interface {
 	Confirmation(c *gin.Context)
 	GetDocument(c *gin.Context)
 	Report(c *gin.Context)
+	GetMaterialsInLocation(c *gin.Context)
 }
 
 func (controller *invoiceWriteOffController) GetPaginated(c *gin.Context) {
@@ -252,4 +253,26 @@ func (controller *invoiceWriteOffController) Report(c *gin.Context) {
 	filePath := filepath.Join("./pkg/excels/temp/", filename)
 	c.FileAttachment(filePath, filename)
 	os.Remove(filePath)
+}
+
+func (controller *invoiceWriteOffController) GetMaterialsInLocation(c *gin.Context) {
+
+	projectID := c.GetUint("projectID")
+
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+	locationType := c.Param("locationType")
+
+	data, err := controller.invoiceWriteOffService.GetMaterialsInLocation(projectID, uint(locationID), locationType)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

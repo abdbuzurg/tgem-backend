@@ -61,6 +61,7 @@ type IInvoiceWriteOffService interface {
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error)
 	Confirmation(id, projectID uint) error
 	Report(parameters dto.InvoiceWriteOffReportParameters) (string, error)
+	GetMaterialsInLocation(projectID, locationID uint, locationType string) ([]dto.InvoiceReturnMaterialForSelect, error)
 }
 
 func (service *invoiceWriteOffService) GetAll() ([]model.InvoiceWriteOff, error) {
@@ -127,25 +128,45 @@ func (service *invoiceWriteOffService) Create(data dto.InvoiceWriteOff) (model.I
 
 	data.Details.DeliveryCode = utils.UniqueCodeGeneration("С", int64(count+1), data.Details.ProjectID)
 
-	invoiceMaterials := []model.InvoiceMaterials{}
+	invoiceMaterialForCreate := []model.InvoiceMaterials{}
 	for _, invoiceMaterial := range data.Items {
-		invoiceMaterialForCreate := model.InvoiceMaterials{
-			ID:             0,
-			ProjectID:      data.Details.ProjectID,
-			MaterialCostID: invoiceMaterial.MaterialCostID,
-			InvoiceID:      0,
-			InvoiceType:    "writeoff",
-			IsDefected:     false,
-			Amount:         invoiceMaterial.Amount,
-			Notes:          invoiceMaterial.Notes,
-		}
+		if len(invoiceMaterial.SerialNumbers) == 0 {
+			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
+			if err != nil {
+				return model.InvoiceWriteOff{}, err
+			}
 
-		invoiceMaterials = append(invoiceMaterials, invoiceMaterialForCreate)
+			index := 0
+			for invoiceMaterial.Amount > 0 {
+				invoiceMaterialCreate := model.InvoiceMaterials{
+					ProjectID:      data.Details.ProjectID,
+					ID:             0,
+					MaterialCostID: materialInfoSorted[index].MaterialCostID,
+					InvoiceID:      0,
+					InvoiceType:    "writeoff",
+					IsDefected:     false,
+					Amount:         0,
+					Notes:          invoiceMaterial.Notes,
+				}
+
+				if materialInfoSorted[index].MaterialAmount <= invoiceMaterial.Amount {
+					invoiceMaterialCreate.Amount = materialInfoSorted[index].MaterialAmount
+					invoiceMaterial.Amount -= materialInfoSorted[index].MaterialAmount
+				} else {
+					invoiceMaterialCreate.Amount = invoiceMaterial.Amount
+					invoiceMaterial.Amount = 0
+				}
+
+				invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
+				index++
+			}
+
+		}
 	}
 
 	invoiceWriteOff, err := service.invoiceWriteOffRepo.Create(dto.InvoiceWriteOffMutationData{
 		InvoiceWriteOff:  data.Details,
-		InvoiceMaterials: invoiceMaterials,
+		InvoiceMaterials: invoiceMaterialForCreate,
 	})
 	if err != nil {
 		return model.InvoiceWriteOff{}, err
@@ -155,25 +176,45 @@ func (service *invoiceWriteOffService) Create(data dto.InvoiceWriteOff) (model.I
 }
 
 func (service *invoiceWriteOffService) Update(data dto.InvoiceWriteOff) (model.InvoiceWriteOff, error) {
-	invoiceMaterials := []model.InvoiceMaterials{}
+	invoiceMaterialForCreate := []model.InvoiceMaterials{}
 	for _, invoiceMaterial := range data.Items {
-		invoiceMaterialForCreate := model.InvoiceMaterials{
-			ID:             0,
-			ProjectID:      data.Details.ProjectID,
-			MaterialCostID: invoiceMaterial.MaterialCostID,
-			InvoiceID:      0,
-			InvoiceType:    "writeoff",
-			IsDefected:     false,
-			Amount:         invoiceMaterial.Amount,
-			Notes:          invoiceMaterial.Notes,
-		}
+		if len(invoiceMaterial.SerialNumbers) == 0 {
+			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
+			if err != nil {
+				return model.InvoiceWriteOff{}, err
+			}
 
-		invoiceMaterials = append(invoiceMaterials, invoiceMaterialForCreate)
+			index := 0
+			for invoiceMaterial.Amount > 0 {
+				invoiceMaterialCreate := model.InvoiceMaterials{
+					ProjectID:      data.Details.ProjectID,
+					ID:             0,
+					MaterialCostID: materialInfoSorted[index].MaterialCostID,
+					InvoiceID:      0,
+					InvoiceType:    "writeoff",
+					IsDefected:     false,
+					Amount:         0,
+					Notes:          invoiceMaterial.Notes,
+				}
+
+				if materialInfoSorted[index].MaterialAmount <= invoiceMaterial.Amount {
+					invoiceMaterialCreate.Amount = materialInfoSorted[index].MaterialAmount
+					invoiceMaterial.Amount -= materialInfoSorted[index].MaterialAmount
+				} else {
+					invoiceMaterialCreate.Amount = invoiceMaterial.Amount
+					invoiceMaterial.Amount = 0
+				}
+
+				invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
+				index++
+			}
+
+		}
 	}
 
 	invoiceWriteOff, err := service.invoiceWriteOffRepo.Update(dto.InvoiceWriteOffMutationData{
 		InvoiceWriteOff:  data.Details,
-		InvoiceMaterials: invoiceMaterials,
+		InvoiceMaterials: invoiceMaterialForCreate,
 	})
 	if err != nil {
 		return model.InvoiceWriteOff{}, err
@@ -388,4 +429,30 @@ func (service *invoiceWriteOffService) Report(parameters dto.InvoiceWriteOffRepo
 	}
 
 	return fileName, nil
+}
+
+func (service *invoiceWriteOffService) GetMaterialsInLocation(projectID, locationID uint, locationType string) ([]dto.InvoiceReturnMaterialForSelect, error) {
+
+	materialsInLocation, err := service.materialLocationRepo.GetUniqueMaterialsFromLocation(projectID, locationID, locationType)
+	if err != nil {
+		return []dto.InvoiceReturnMaterialForSelect{}, err
+	}
+
+	var result []dto.InvoiceReturnMaterialForSelect
+	for _, entry := range materialsInLocation {
+		amount, err := service.materialLocationRepo.GetTotalAmountInLocation(projectID, entry.ID, locationID, locationType)
+		if err != nil {
+			return []dto.InvoiceReturnMaterialForSelect{}, err
+		}
+
+		result = append(result, dto.InvoiceReturnMaterialForSelect{
+			MaterialID:      entry.ID,
+			MaterialName:    entry.Name,
+			MaterialUnit:    entry.Unit,
+			Amount:          amount,
+			HasSerialNumber: entry.HasSerialNumber,
+		})
+	}
+
+	return result, nil
 }

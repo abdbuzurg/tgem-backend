@@ -19,9 +19,10 @@ type InvoiceWriteOffPaginated struct {
 }
 
 type InvoiceWriteOffItem struct {
-	MaterialCostID uint    `json:"materialCostID"`
-	Amount         float64 `json:"amount"`
-	Notes          string  `json:"notes"`
+	MaterialID    uint     `json:"materialID"`
+	Amount        float64  `json:"amount"`
+	Notes         string   `json:"notes"`
+	SerialNumbers []string `json:"serialNumbers"`
 }
 
 type InvoiceWriteOff struct {
@@ -66,8 +67,8 @@ type InvoiceWriteOffReportParameters struct {
 }
 
 type InvoiceWriteOffReportData struct {
-  ID uint
-  DeliveryCode string
-  ReleasedWorkerName string
-  DateOfInvoice time.Time
+	ID                 uint
+	DeliveryCode       string
+	ReleasedWorkerName string
+	DateOfInvoice      time.Time
 }
