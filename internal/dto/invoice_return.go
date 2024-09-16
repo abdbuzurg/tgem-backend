@@ -67,11 +67,11 @@ type InvoiceReturnObjectPaginated struct {
 }
 
 type InvoiceReturnItem struct {
-	MaterialCostID uint     `json:"materialCostID"`
-	Amount         float64  `json:"amount"`
-	IsDefected     bool     `json:"isDefected"`
-	SerialNumbers  []string `json:"serialNumbers"`
-	Notes          string   `json:"notes"`
+	MaterialID    uint     `json:"materialID"`
+	Amount        float64  `json:"amount"`
+	IsDefected    bool     `json:"isDefected"`
+	SerialNumbers []string `json:"serialNumbers"`
+	Notes         string   `json:"notes"`
 }
 
 type InvoiceReturn struct {
@@ -152,4 +152,12 @@ type InvoiceReturnMaterialForEdit struct {
 	SerialNumbers   []string `json:"serialNumbers"`
 	IsDefective     bool     `json:"isDefective"`
 	Notes           string   `json:"notes"`
+}
+
+type InvoiceReturnMaterialForSelect struct {
+	MaterialID      uint    `json:"materialID"`
+	MaterialName    string  `json:"materialName"`
+	MaterialUnit    string  `json:"materialUnit"`
+	Amount          float64 `json:"amount"`
+	HasSerialNumber bool    `json:"hasSerialNumber"`
 }

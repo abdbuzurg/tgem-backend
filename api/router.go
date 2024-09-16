@@ -411,6 +411,7 @@ func InitInvoiceReturnRoutes(router *gin.RouterGroup, controller controller.IInv
 	invoiceReturnRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumbers)
 	invoiceReturnRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
 	invoiceReturnRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
+  invoiceReturnRoutes.GET("/amount/:locationType/:locationID/:materialID", controller.GetMaterialAmountByMaterialID)
 	invoiceReturnRoutes.POST("/confirm/:id", controller.Confirmation)
 	invoiceReturnRoutes.POST("/", controller.Create)
 	invoiceReturnRoutes.POST("/report", controller.Report)

@@ -42,6 +42,7 @@ type IInvoiceReturnController interface {
 	GetInvoiceMaterialsWithSerialNumbers(c *gin.Context)
 	GetInvoiceMaterialsWithoutSerialNumbers(c *gin.Context)
 	GetMaterialsForEdit(c *gin.Context)
+	GetMaterialAmountByMaterialID(c *gin.Context)
 }
 
 func (controller *invoiceReturnController) GetAll(c *gin.Context) {
@@ -186,8 +187,8 @@ func (controller *invoiceReturnController) Confirmation(c *gin.Context) {
 		return
 	}
 
-  excelFilePath := filepath.Join("./pkg/excels/output/", invoiceReturn.DeliveryCode + ".xlsx") 
-  os.Remove(excelFilePath)
+	excelFilePath := filepath.Join("./pkg/excels/output/", invoiceReturn.DeliveryCode+".xlsx")
+	os.Remove(excelFilePath)
 
 	err = controller.invoiceReturnService.Confirmation(uint(id))
 	if err != nil {
@@ -416,6 +417,33 @@ func (controller *invoiceReturnController) GetMaterialsForEdit(c *gin.Context) {
 	id, err := strconv.ParseUint(idRaw, 10, 64)
 
 	result, err := controller.invoiceReturnService.GetMaterialsForEdit(uint(id))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, result)
+}
+
+func (controller *invoiceReturnController) GetMaterialAmountByMaterialID(c *gin.Context) {
+
+	locationType := c.Param("locationType")
+
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.ParseUint(locationIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	materialIDRaw := c.Param("materialID")
+	materialID, err := strconv.ParseUint(materialIDRaw, 10, 64)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	result, err := controller.invoiceReturnService.GetMaterialAmountByMaterialID(c.GetUint("projectID"), uint(materialID), uint(locationID), locationType)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
