@@ -200,6 +200,10 @@ func (controller *invoiceOutputOutOfProjectController) Confirmation(c *gin.Conte
 
 	fileNameAndExtension := strings.Split(file.Filename, ".")
 	fileExtension := fileNameAndExtension[1]
+	if fileExtension != "pdf" {
+		response.ResponseError(c, fmt.Sprintf("Файл должен быть формата PDF"))
+		return
+	}
 	file.Filename = invoiceOutputOutOfProject.DeliveryCode + "." + fileExtension
 	filePath := filepath.Join("./pkg/excels/output/", file.Filename)
 

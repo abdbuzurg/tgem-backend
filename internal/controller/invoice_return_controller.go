@@ -178,6 +178,10 @@ func (controller *invoiceReturnController) Confirmation(c *gin.Context) {
 
 	fileNameAndExtension := strings.Split(file.Filename, ".")
 	fileExtension := fileNameAndExtension[1]
+	if fileExtension != "pdf" {
+		response.ResponseError(c, fmt.Sprintf("Файл должен быть формата PDF"))
+		return
+	}
 	file.Filename = invoiceReturn.DeliveryCode + "." + fileExtension
 	filePath := filepath.Join("./pkg/excels/return/", file.Filename)
 
@@ -187,7 +191,7 @@ func (controller *invoiceReturnController) Confirmation(c *gin.Context) {
 		return
 	}
 
-	excelFilePath := filepath.Join("./pkg/excels/output/", invoiceReturn.DeliveryCode+".xlsx")
+	excelFilePath := filepath.Join("./pkg/excels/return/", invoiceReturn.DeliveryCode+".xlsx")
 	os.Remove(excelFilePath)
 
 	err = controller.invoiceReturnService.Confirmation(uint(id))
