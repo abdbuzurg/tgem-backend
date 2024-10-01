@@ -28,7 +28,7 @@ type ITeamRepository interface {
 	Update(data dto.TeamMutation) (model.Team, error)
 	Delete(id uint) error
 	Count(projectID uint) (int64, error)
-	GetTeamNumberAndTeamLeadersByID(projectID, id uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error)
+	GetTeamNumberAndTeamLeadersByID(projectID, teamId uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error)
 	DoesTeamNumberAlreadyExistForCreate(teamNumber string, projectID uint) (bool, error)
 	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error)
 	GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error)
@@ -213,7 +213,7 @@ func (repo *teamRepository) CreateInBatches(data []dto.TeamMutation) ([]model.Te
 	return teams, err
 }
 
-func (repo *teamRepository) GetTeamNumberAndTeamLeadersByID(projectID, id uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error) {
+func (repo *teamRepository) GetTeamNumberAndTeamLeadersByID(projectID, teamID uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error) {
 	data := []dto.TeamNumberAndTeamLeaderNameQueryResult{}
 	err := repo.db.Raw(`
     SELECT 
@@ -225,7 +225,7 @@ func (repo *teamRepository) GetTeamNumberAndTeamLeadersByID(projectID, id uint) 
     WHERE
       teams.project_id = ? AND
       teams.id = ?
-	  `, projectID, id).Scan(&data).Error
+	  `, projectID, teamID).Scan(&data).Error
 
 	return data, err
 }

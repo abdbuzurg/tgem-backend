@@ -18,6 +18,7 @@ type InvoiceCorrectionPaginated struct {
 	DeliveryCode        string    `json:"deliveryCode"`
 	SupervisorName      string    `json:"supervisorName"`
 	ObjectName          string    `json:"objectName"`
+	ObjectType          string    `json:"objectType"`
 	TeamNumber          string    `json:"teamNumber"`
 	TeamID              uint      `json:"teamID"`
 	DateOfInvoice       time.Time `json:"dateOfInvoice"`
@@ -31,18 +32,18 @@ type InvoiceCorrectionCreateDetails struct {
 }
 
 type InvoiceCorrectionCreate struct {
-	Details InvoiceCorrectionCreateDetails   `json:"details"`
-	Items   []InvoiceCorrectionMaterialsData `json:"items"`
-  Operations []InvoiceCorrectionOperationsData `json:"operations"`
+	Details    InvoiceCorrectionCreateDetails    `json:"details"`
+	Items      []InvoiceCorrectionMaterialsData  `json:"items"`
+	Operations []InvoiceCorrectionOperationsData `json:"operations"`
 }
 
 type InvoiceCorrectionCreateQuery struct {
-	Details         model.InvoiceObject
-	OperatorDetails model.InvoiceObjectOperator
-	Items           []model.InvoiceMaterials
-	TeamLocation    []model.MaterialLocation
-	ObjectLocation  []model.MaterialLocation
-  ObjectOperations []model.ObjectOperation
+	Details          model.InvoiceObject
+	OperatorDetails  model.InvoiceObjectOperator
+	Items            []model.InvoiceMaterials
+	TeamLocation     []model.MaterialLocation
+	ObjectLocation   []model.MaterialLocation
+	ObjectOperations []model.ObjectOperation
 }
 
 type InvoiceCorrectionReportFilter struct {

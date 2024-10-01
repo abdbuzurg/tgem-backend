@@ -48,7 +48,7 @@ func (repo *invoiceOutputOutOfProjectRepository) GetPaginated(page, limit int, f
       invoice_output_out_of_projects.project_id = ? AND
       (nullif(?, '') IS NULL OR name_of_project = ?) AND
 			(nullif(?, 0) IS NULL OR released_worker_id = ?)
-    ORDER BY invoice_output_out_of_projects.id 
+    ORDER BY invoice_output_out_of_projects.id DESC
     LIMIT ? 
     OFFSET ?
     `,
@@ -209,6 +209,7 @@ func (repo *invoiceOutputOutOfProjectRepository) GetMaterialsForEdit(id uint) ([
       material_locations.location_type = 'warehouse' AND
       invoice_materials.invoice_type = 'output-out-of-project' AND
       invoice_materials.invoice_id = ?
+    ORDER BY materials.id
     `, id).Scan(&result).Error
 
 	return result, err

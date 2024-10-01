@@ -70,7 +70,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	operationRepo := repository.InitOperationRepository(db)
 	operationMaterialRepo := repository.InitOperationMaterialRepository(db)
 	invoiceWriteOffRepo := repository.InitInvoiceWriteOffRepository(db)
-  workerAttendanceRepo := repository.InitWorkerAttendanceRepository(db)
+	workerAttendanceRepo := repository.InitWorkerAttendanceRepository(db)
 
 	//Initialization of Services
 	invoiceInputService := service.InitInvoiceInputService(
@@ -96,6 +96,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		districtRepo,
 		serialNumberRepo,
 		invoiceCountRepo,
+		projectRepo,
 	)
 	invoiceOutputOutOfProjectService := service.InitInvoiceOutputOutOfProjectService(
 		invoiceOutputOutOfProjectRepo,
@@ -104,6 +105,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		invoiceCountRepo,
 		invoiceMaterialRepo,
 		materialRepo,
+		workerRepo,
+		materialCostRepo,
 	)
 	invoiceReturnService := service.InitInvoiceReturnService(
 		invoiceReturnRepo,
@@ -116,6 +119,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		materialCostRepo,
 		materialDefectRepo,
 		serialNumberRepo,
+		projectRepo,
+		districtRepo,
+		objectSupervisorsRepo,
+    invoiceCountRepo,
 	)
 	invoiceObjectService := service.InitInvoiceObjectService(
 		invoiceObjectRepo,
@@ -246,10 +253,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		materialCostRepo,
 		invoiceCountRepo,
 	)
-  workerAttendanceService := service.InitWorkerAttendanceService(
-    workerAttendanceRepo,
-    workerRepo,
-  )
+	workerAttendanceService := service.InitWorkerAttendanceService(
+		workerAttendanceRepo,
+		workerRepo,
+	)
 
 	//Initialization of Controllers
 	invoiceInputController := controller.InitInvoiceInputController(invoiceInputService, userActionService)
@@ -281,7 +288,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	substationObjectController := controller.InitSubstationObjectController(substationObjectService)
 	invoiceOutputOutOfProjectController := controller.InitInvoiceOutputOutOfProjectController(invoiceOutputOutOfProjectService)
 	invoiceWriteOffController := controller.InitInvoiceWriteOffController(invoiceWriteOffService)
-  workerAttendanceController := controller.InitWorkerAttendanceController(workerAttendanceService)
+	workerAttendanceController := controller.InitWorkerAttendanceController(workerAttendanceService)
 
 	//Initialization of Routes
 	InitInvoiceInputRoutes(router, invoiceInputController, db)
@@ -310,19 +317,19 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitInvoiceOutputOutOfProjectRoutes(router, invoiceOutputOutOfProjectController)
 	InitOperationRoutes(router, operationController)
 	InitInvoiceWriteOffRoutes(router, invoiceWriteOffController)
-  InitWorkerAttendanceRoutes(router, workerAttendanceController)
+	InitWorkerAttendanceRoutes(router, workerAttendanceController)
 
 	return mainRouter
 }
 
 func InitWorkerAttendanceRoutes(router *gin.RouterGroup, controller controller.IWorkerAttendanceController) {
-  workerAttendanceRoutes := router.Group("/worker-attendance")
-  workerAttendanceRoutes.Use(
-    middleware.Authentication(),
-  )
+	workerAttendanceRoutes := router.Group("/worker-attendance")
+	workerAttendanceRoutes.Use(
+		middleware.Authentication(),
+	)
 
-  workerAttendanceRoutes.GET("/paginated", controller.GetPaginated)
-  workerAttendanceRoutes.POST("/", controller.Import)
+	workerAttendanceRoutes.GET("/paginated", controller.GetPaginated)
+	workerAttendanceRoutes.POST("/", controller.Import)
 }
 
 func InitInvoiceWriteOffRoutes(router *gin.RouterGroup, controller controller.IInvoiceWriteOffController) {
@@ -335,7 +342,7 @@ func InitInvoiceWriteOffRoutes(router *gin.RouterGroup, controller controller.II
 	invoiceWriteOffRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumber)
 	invoiceWriteOffRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
 	invoiceWriteOffRoutes.GET("/document/:deliveryCode", controller.GetDocument)
-  invoiceWriteOffRoutes.GET("/material/:locationType/:locationID", controller.GetMaterialsInLocation)
+	invoiceWriteOffRoutes.GET("/material/:locationType/:locationID", controller.GetMaterialsInLocation)
 	invoiceWriteOffRoutes.POST("/", controller.Create)
 	invoiceWriteOffRoutes.POST("/confirm/:id", controller.Confirmation)
 	invoiceWriteOffRoutes.POST("/report", controller.Report)
@@ -354,10 +361,12 @@ func InitInvoiceOutputOutOfProjectRoutes(router *gin.RouterGroup, controller con
 	invoiceOutputOutOfProjectRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
 	invoiceOutputOutOfProjectRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
 	invoiceOutputOutOfProjectRoutes.GET("/unique/name-of-project", controller.UniqueNameOfProjects)
+	invoiceOutputOutOfProjectRoutes.GET("/document/:deliveryCode", controller.GetDocument)
 	invoiceOutputOutOfProjectRoutes.POST("/", controller.Create)
-  invoiceOutputOutOfProjectRoutes.POST("/report", controller.Report)
+	invoiceOutputOutOfProjectRoutes.POST("/report", controller.Report)
 	invoiceOutputOutOfProjectRoutes.PATCH("/", controller.Update)
 	invoiceOutputOutOfProjectRoutes.POST("/confirm/:id", controller.Confirmation)
+	invoiceOutputOutOfProjectRoutes.DELETE("/:id", controller.Delete)
 }
 
 func InitInvoiceCorrectionRoutes(router *gin.RouterGroup, controller controller.IInvoiceCorrectionController) {
@@ -387,13 +396,12 @@ func InitInvoiceObjectRoutes(router *gin.RouterGroup, controller controller.IInv
 
 	invoiceObjectRoutes.GET("/:id", controller.GetInvoiceObjectDescriptiveDataByID)
 	invoiceObjectRoutes.GET("/paginated", controller.GetPaginated)
-	invoiceObjectRoutes.GET("/materials/team/:teamID", controller.GetTeamsMaterials)
+	invoiceObjectRoutes.GET("/team/:teamID", controller.GetTeamsMaterials)
 	invoiceObjectRoutes.GET("/serial-number/material/:materialID/teams/:teamID", controller.GetSerialNumbersOfMaterial)
 	invoiceObjectRoutes.GET("/material/:materialID/team/:teamID", controller.GetMaterialAmountInTeam)
 	invoiceObjectRoutes.GET("/object/:objectID", controller.GetTeamsFromObjectID)
 	invoiceObjectRoutes.POST("/", controller.Create)
 }
-
 func InitInvoiceReturnRoutes(router *gin.RouterGroup, controller controller.IInvoiceReturnController, db *gorm.DB) {
 	invoiceReturnRoutes := router.Group("/return")
 	invoiceReturnRoutes.Use(
@@ -411,8 +419,8 @@ func InitInvoiceReturnRoutes(router *gin.RouterGroup, controller controller.IInv
 	invoiceReturnRoutes.GET("/serial-number/:locationType/:locationID/:materialID", controller.GetSerialNumberCodesInLocation)
 	invoiceReturnRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumbers)
 	invoiceReturnRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
-	invoiceReturnRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
-  invoiceReturnRoutes.GET("/amount/:locationType/:locationID/:materialID", controller.GetMaterialAmountByMaterialID)
+  invoiceReturnRoutes.GET("/invoice-materials/:id/:locationType/:locationID", controller.GetMaterialsForEdit)
+	invoiceReturnRoutes.GET("/amount/:locationType/:locationID/:materialID", controller.GetMaterialAmountByMaterialID)
 	invoiceReturnRoutes.POST("/confirm/:id", controller.Confirmation)
 	invoiceReturnRoutes.POST("/", controller.Create)
 	invoiceReturnRoutes.POST("/report", controller.Report)
@@ -487,14 +495,14 @@ func InitMaterialLocationRoutes(router *gin.RouterGroup, controller controller.I
 	materialLocationRoutes := router.Group("/material-location")
 	materialLocationRoutes.Use(middleware.Authentication())
 	materialLocationRoutes.GET("/available/:locationType/:locationID", controller.GetMaterialInLocation)
-  materialLocationRoutes.GET("/costs/:materialID/:locationType/:locationID", controller.GetMaterialCostsInLocation)
-  materialLocationRoutes.GET("/amount/:materialCostID/:locationType/:locationID", controller.GetMaterialAmountBasedOnCost)
+	materialLocationRoutes.GET("/costs/:materialID/:locationType/:locationID", controller.GetMaterialCostsInLocation)
+	materialLocationRoutes.GET("/amount/:materialCostID/:locationType/:locationID", controller.GetMaterialAmountBasedOnCost)
 	materialLocationRoutes.GET("/unique/team", controller.UniqueTeams)
 	materialLocationRoutes.GET("/unique/object", controller.UniqueObjects)
 	materialLocationRoutes.GET("/live", controller.Live)
 	materialLocationRoutes.POST("/report/balance", controller.ReportBalance)
 	materialLocationRoutes.POST("/report/balance/writeoff", controller.ReportBalanceWriteOff)
-  materialLocationRoutes.POST("/report/balance/out-of-project", controller.ReportBalanceOutOfProject)
+	materialLocationRoutes.POST("/report/balance/out-of-project", controller.ReportBalanceOutOfProject)
 }
 
 func InitMaterialCostRoutes(router *gin.RouterGroup, controller controller.IMaterialCostController) {

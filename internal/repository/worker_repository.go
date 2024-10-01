@@ -17,7 +17,7 @@ func InitWorkerRepository(db *gorm.DB) IWorkerRepository {
 }
 
 type IWorkerRepository interface {
-	GetAll() ([]model.Worker, error)
+	GetAll(projectID uint) ([]model.Worker, error)
 	GetPaginated(page, limit int) ([]model.Worker, error)
 	GetPaginatedFiltered(page, limit int, filter model.Worker) ([]model.Worker, error)
 	GetByJobTitleInProject(jobTitleInProject string, projectID uint) ([]model.Worker, error)
@@ -31,9 +31,9 @@ type IWorkerRepository interface {
 	Count() (int64, error)
 }
 
-func (repo *workerRepository) GetAll() ([]model.Worker, error) {
+func (repo *workerRepository) GetAll(projectID uint) ([]model.Worker, error) {
 	data := []model.Worker{}
-	err := repo.db.Order("id DESC").Find(&data, "id <> 1").Error
+	err := repo.db.Order("id DESC").Find(&data, "id <> 1 AND project_id = ?", projectID).Error
 	return data, err
 }
 

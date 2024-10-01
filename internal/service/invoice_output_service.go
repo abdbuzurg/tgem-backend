@@ -7,7 +7,9 @@ import (
 	"backend-v2/pkg/utils"
 	"fmt"
 	"os"
+	// "os/exec"
 	"path/filepath"
+	// "runtime"
 	"strconv"
 	"time"
 
@@ -26,6 +28,7 @@ type invoiceOutputService struct {
 	districtRepo         repository.IDistrictRepository
 	serialNumberRepo     repository.ISerialNumberRepository
 	invoiceCountRepo     repository.IInvoiceCountRepository
+	projectRepo          repository.IProjectRepository
 }
 
 func InitInvoiceOutputService(
@@ -40,6 +43,7 @@ func InitInvoiceOutputService(
 	districtRepo repository.IDistrictRepository,
 	serialNumberRepo repository.ISerialNumberRepository,
 	invoiceCountRepo repository.IInvoiceCountRepository,
+	projectRepo repository.IProjectRepository,
 ) IInvoiceOutputService {
 	return &invoiceOutputService{
 		invoiceOutputRepo:    invoiceOutputRepo,
@@ -53,6 +57,7 @@ func InitInvoiceOutputService(
 		districtRepo:         districtRepo,
 		serialNumberRepo:     serialNumberRepo,
 		invoiceCountRepo:     invoiceCountRepo,
+		projectRepo:          projectRepo,
 	}
 }
 
@@ -149,12 +154,12 @@ func (service *invoiceOutputService) GetInvoiceMaterialsWithSerialNumbers(id uin
 }
 
 func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.InvoiceOutput, error) {
-	count, err := service.invoiceOutputRepo.Count(data.Details.ProjectID)
+	count, err := service.invoiceCountRepo.CountInvoice("output", data.Details.ProjectID)
 	if err != nil {
 		return model.InvoiceOutput{}, err
 	}
 
-	data.Details.DeliveryCode = utils.UniqueCodeGeneration("О", count+1, data.Details.ProjectID)
+	data.Details.DeliveryCode = utils.UniqueCodeGeneration("О", int64(count+1), data.Details.ProjectID)
 
 	invoiceMaterialForCreate := []model.InvoiceMaterials{}
 	serialNumberMovements := []model.SerialNumberMovement{}
@@ -248,6 +253,10 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.Invoi
 
 	}
 
+	if err := service.GenerateExcelFile(data); err != nil {
+		return model.InvoiceOutput{}, err
+	}
+
 	invoiceOutput, err := service.invoiceOutputRepo.Create(dto.InvoiceOutputCreateQueryData{
 		Invoice:               data.Details,
 		InvoiceMaterials:      invoiceMaterialForCreate,
@@ -257,112 +266,7 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.Invoi
 		return model.InvoiceOutput{}, err
 	}
 
-	templateFilePath := filepath.Join("./pkg/excels/templates/output.xlsx")
-	f, err := excelize.OpenFile(templateFilePath)
-	if err != nil {
-		return model.InvoiceOutput{}, err
-	}
-
-	sheetName := "Отпуск"
-	startingRow := 5
-	f.InsertRows(sheetName, startingRow, len(data.Items))
-
-	defaultStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:      8,
-			VertAlign: "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "#000000", Style: 1},
-			{Type: "top", Color: "#000000", Style: 1},
-			{Type: "right", Color: "#000000", Style: 1},
-			{Type: "bottom", Color: "#000000", Style: 1},
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "left",
-			WrapText:   true,
-			Vertical:   "center",
-		},
-	})
-
-	materialNamingStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:      8,
-			VertAlign: "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "#000000", Style: 1},
-			{Type: "top", Color: "#000000", Style: 1},
-			{Type: "bottom", Color: "#000000", Style: 1},
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "left",
-			Vertical:   "center",
-			WrapText:   true,
-		},
-	})
-
-	workerNamingStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:      8,
-			VertAlign: "center",
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "left",
-			WrapText:   true,
-			Vertical:   "center",
-		},
-	})
-
-	invoiceOutputDescriptive, err := service.invoiceOutputRepo.GetDataForExcel(invoiceOutput.ID)
-	if err != nil {
-		return model.InvoiceOutput{}, err
-	}
-
-	f.SetCellValue(sheetName, "C1", fmt.Sprintf(`НАКЛАДНАЯ 
-№ %s
-от %s года       
-на отпуск материала 
-`, invoiceOutput.DeliveryCode, utils.DateConverter(invoiceOutputDescriptive.DateOfInvoice)))
-
-	f.MergeCell(sheetName, "D1", "F1")
-	f.SetCellStr(sheetName, "D1", fmt.Sprintf(`%s
-Регион: %s `, invoiceOutputDescriptive.ProjectName, invoiceOutputDescriptive.DistrictName))
-	f.SetCellStr(sheetName, "B2", fmt.Sprintf("%s", utils.ObjectTypeConverter(invoiceOutputDescriptive.ObjectType)))
-	f.SetCellStr(sheetName, "B3", invoiceOutputDescriptive.ObjectName)
-
-	for index, oneEntry := range data.Items {
-		material, err := service.materialRepo.GetByID(oneEntry.MaterialID)
-		if err != nil {
-			return model.InvoiceOutput{}, err
-		}
-		f.SetCellStyle(sheetName, "A"+fmt.Sprint(startingRow+index), "F"+fmt.Sprint(startingRow+index), defaultStyle)
-		f.SetCellStyle(sheetName, "B"+fmt.Sprint(startingRow+index), "B"+fmt.Sprint(startingRow+index), materialNamingStyle)
-
-		f.SetCellInt(sheetName, "A"+fmt.Sprint(startingRow+index), index+1)
-		f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), material.Code)
-		f.SetCellStr(sheetName, "C"+fmt.Sprint(startingRow+index), material.Name)
-		f.SetCellStr(sheetName, "D"+fmt.Sprint(startingRow+index), material.Unit)
-		f.SetCellFloat(sheetName, "E"+fmt.Sprint(startingRow+index), oneEntry.Amount, 3, 64)
-		f.SetCellStr(sheetName, "F"+fmt.Sprint(startingRow+index), oneEntry.Notes)
-	}
-
-	f.SetCellStyle(sheetName, "C"+fmt.Sprint(8+len(data.Items)), "C"+fmt.Sprint(8+len(data.Items)), workerNamingStyle)
-	f.SetCellStr(sheetName, "C"+fmt.Sprint(8+len(data.Items)), invoiceOutputDescriptive.ReleasedName)
-
-	f.SetCellStyle(sheetName, "C"+fmt.Sprint(10+len(data.Items)), "C"+fmt.Sprint(10+len(data.Items)), workerNamingStyle)
-	f.SetCellStr(sheetName, "C"+fmt.Sprint(10+len(data.Items)), invoiceOutputDescriptive.TeamLeaderName)
-
-	f.SetCellStyle(sheetName, "C"+fmt.Sprint(12+len(data.Items)), "C"+fmt.Sprint(12+len(data.Items)), workerNamingStyle)
-	f.SetCellStr(sheetName, "C"+fmt.Sprint(12+len(data.Items)), invoiceOutputDescriptive.RecipientName)
-
-	filePath := filepath.Join("./pkg/excels/output/", data.Details.DeliveryCode+".xlsx")
-	f.SaveAs(filePath)
-	if err := f.Close(); err != nil {
-		fmt.Println(err)
-	}
-
-	return invoiceOutput, nil
+	return invoiceOutput, err
 }
 
 func (service *invoiceOutputService) Update(data dto.InvoiceOutput) (model.InvoiceOutput, error) {
@@ -458,6 +362,15 @@ func (service *invoiceOutputService) Update(data dto.InvoiceOutput) (model.Invoi
 
 	}
 
+	excelFilePath := filepath.Join("./pkg/excels/output/", data.Details.DeliveryCode+".xlsx")
+  if err := os.Remove(excelFilePath); err != nil {
+		return model.InvoiceOutput{}, err
+	}
+
+	if err := service.GenerateExcelFile(data); err != nil {
+		return model.InvoiceOutput{}, err
+	}
+
 	invoiceOutput, err := service.invoiceOutputRepo.Update(dto.InvoiceOutputCreateQueryData{
 		Invoice:               data.Details,
 		InvoiceMaterials:      invoiceMaterialForCreate,
@@ -467,120 +380,21 @@ func (service *invoiceOutputService) Update(data dto.InvoiceOutput) (model.Invoi
 		return model.InvoiceOutput{}, err
 	}
 
-	excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode+".xlsx")
-	err = os.Remove(excelFilePath)
-	if err != nil {
-		return model.InvoiceOutput{}, err
-	}
-
-	templateFilePath := filepath.Join("./pkg/excels/templates/output.xlsx")
-	f, err := excelize.OpenFile(templateFilePath)
-	if err != nil {
-		return model.InvoiceOutput{}, err
-	}
-
-	sheetName := "Отпуск"
-	startingRow := 5
-	f.InsertRows(sheetName, startingRow, len(data.Items))
-
-	defaultStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:      8,
-			VertAlign: "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "#000000", Style: 1},
-			{Type: "top", Color: "#000000", Style: 1},
-			{Type: "right", Color: "#000000", Style: 1},
-			{Type: "bottom", Color: "#000000", Style: 1},
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "left",
-			WrapText:   true,
-			Vertical:   "center",
-		},
-	})
-
-	materialNamingStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:      8,
-			VertAlign: "center",
-		},
-		Border: []excelize.Border{
-			{Type: "left", Color: "#000000", Style: 1},
-			{Type: "top", Color: "#000000", Style: 1},
-			{Type: "bottom", Color: "#000000", Style: 1},
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "left",
-			Vertical:   "center",
-			WrapText:   true,
-		},
-	})
-
-	workerNamingStyle, _ := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{
-			Size:      8,
-			VertAlign: "center",
-		},
-		Alignment: &excelize.Alignment{
-			Horizontal: "left",
-			WrapText:   true,
-			Vertical:   "center",
-		},
-	})
-
-	invoiceOutputDescriptive, err := service.invoiceOutputRepo.GetDataForExcel(invoiceOutput.ID)
-	if err != nil {
-		return model.InvoiceOutput{}, err
-	}
-
-	f.SetCellValue(sheetName, "C1", fmt.Sprintf(`НАКЛАДНАЯ 
-№ %s
-от %s года       
-на отпуск материала 
-`, invoiceOutput.DeliveryCode, utils.DateConverter(invoiceOutputDescriptive.DateOfInvoice)))
-
-	f.MergeCell(sheetName, "D1", "F1")
-	f.SetCellStr(sheetName, "D1", fmt.Sprintf(`%s
-Регион: %s `, invoiceOutputDescriptive.ProjectName, invoiceOutputDescriptive.DistrictName))
-	f.SetCellStr(sheetName, "B2", fmt.Sprintf("%s", utils.ObjectTypeConverter(invoiceOutputDescriptive.ObjectType)))
-	f.SetCellStr(sheetName, "B3", invoiceOutputDescriptive.ObjectName)
-
-	for index, oneEntry := range data.Items {
-		material, err := service.materialRepo.GetByID(oneEntry.MaterialID)
-		if err != nil {
-			return model.InvoiceOutput{}, err
-		}
-		f.SetCellStyle(sheetName, "A"+fmt.Sprint(startingRow+index), "F"+fmt.Sprint(startingRow+index), defaultStyle)
-		f.SetCellStyle(sheetName, "B"+fmt.Sprint(startingRow+index), "B"+fmt.Sprint(startingRow+index), materialNamingStyle)
-
-		f.SetCellInt(sheetName, "A"+fmt.Sprint(startingRow+index), index+1)
-		f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), material.Code)
-		f.SetCellStr(sheetName, "C"+fmt.Sprint(startingRow+index), material.Name)
-		f.SetCellStr(sheetName, "D"+fmt.Sprint(startingRow+index), material.Unit)
-		f.SetCellFloat(sheetName, "E"+fmt.Sprint(startingRow+index), oneEntry.Amount, 3, 64)
-		f.SetCellStr(sheetName, "F"+fmt.Sprint(startingRow+index), oneEntry.Notes)
-	}
-
-	f.SetCellStyle(sheetName, "C"+fmt.Sprint(8+len(data.Items)), "C"+fmt.Sprint(8+len(data.Items)), workerNamingStyle)
-	f.SetCellStr(sheetName, "C"+fmt.Sprint(8+len(data.Items)), invoiceOutputDescriptive.ReleasedName)
-
-	f.SetCellStyle(sheetName, "C"+fmt.Sprint(10+len(data.Items)), "C"+fmt.Sprint(10+len(data.Items)), workerNamingStyle)
-	f.SetCellStr(sheetName, "C"+fmt.Sprint(10+len(data.Items)), invoiceOutputDescriptive.TeamLeaderName)
-
-	f.SetCellStyle(sheetName, "C"+fmt.Sprint(12+len(data.Items)), "C"+fmt.Sprint(12+len(data.Items)), workerNamingStyle)
-	f.SetCellStr(sheetName, "C"+fmt.Sprint(12+len(data.Items)), invoiceOutputDescriptive.RecipientName)
-
-	f.SaveAs(excelFilePath)
-	if err := f.Close(); err != nil {
-		fmt.Println(err)
-	}
-
 	return invoiceOutput, nil
 }
 
 func (service *invoiceOutputService) Delete(id uint) error {
+  
+  invoiceOutput, err := service.invoiceOutputRepo.GetByID(id)
+  if err != nil {
+    return err
+  }
+
+  excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode+".xlsx")
+  if err := os.Remove(excelFilePath); err != nil {
+    return err
+  }
+
 	return service.invoiceOutputRepo.Delete(id)
 }
 
@@ -766,7 +580,28 @@ func (service *invoiceOutputService) GetAvailableMaterialsInWarehouse(projectID 
 }
 
 func (service *invoiceOutputService) GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error) {
-	return service.invoiceOutputRepo.GetMaterialsForEdit(id)
+	data, err := service.invoiceOutputRepo.GetMaterialsForEdit(id)
+	if err != nil {
+		return []dto.InvoiceOutputMaterialsForEdit{}, nil
+	}
+
+	var result []dto.InvoiceOutputMaterialsForEdit
+	for index, entry := range data {
+		if index == 0 {
+			result = append(result, entry)
+			continue
+		}
+
+		lastItemIndex := len(result) - 1
+		if result[lastItemIndex].MaterialID == entry.MaterialID {
+			result[lastItemIndex].Amount += entry.Amount
+			result[lastItemIndex].WarehouseAmount += entry.WarehouseAmount
+		} else {
+			result = append(result, entry)
+		}
+	}
+
+	return result, nil
 }
 
 func (service *invoiceOutputService) Import(filePath string, projectID uint, workerID uint) error {
@@ -873,7 +708,7 @@ func (service *invoiceOutputService) Import(filePath string, projectID uint, wor
 			return fmt.Errorf("Имя %v в ячейке D%v не найдено в базе: %v", teamNumber, index+1, err)
 		}
 
-    excelInvoiceOutput.TeamID = team.ID
+		excelInvoiceOutput.TeamID = team.ID
 
 		dateOfInvoiceInExcel, err := f.GetCellValue(sheetName, "F"+fmt.Sprint(index+1))
 		if err != nil {
@@ -964,4 +799,127 @@ func (service *invoiceOutputService) Import(filePath string, projectID uint, wor
 	})
 
 	return service.invoiceOutputRepo.Import(importData)
+}
+
+func (service *invoiceOutputService) GenerateExcelFile(data dto.InvoiceOutput) error {
+
+	templateFilePath := filepath.Join("./pkg/excels/templates/output.xlsx")
+	f, err := excelize.OpenFile(templateFilePath)
+	if err != nil {
+		return err
+	}
+
+	sheetName := "Отпуск"
+	startingRow := 5
+	f.InsertRows(sheetName, startingRow, len(data.Items))
+
+	defaultStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Size:      8,
+			VertAlign: "center",
+		},
+		Border: []excelize.Border{
+			{Type: "left", Color: "#000000", Style: 1},
+			{Type: "top", Color: "#000000", Style: 1},
+			{Type: "right", Color: "#000000", Style: 1},
+			{Type: "bottom", Color: "#000000", Style: 1},
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "left",
+			WrapText:   true,
+			Vertical:   "center",
+		},
+	})
+
+	materialNamingStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Size:      8,
+			VertAlign: "center",
+		},
+		Border: []excelize.Border{
+			{Type: "left", Color: "#000000", Style: 1},
+			{Type: "top", Color: "#000000", Style: 1},
+			{Type: "bottom", Color: "#000000", Style: 1},
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "left",
+			Vertical:   "center",
+			WrapText:   true,
+		},
+	})
+
+	workerNamingStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Size:      8,
+			VertAlign: "center",
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "left",
+			WrapText:   true,
+			Vertical:   "center",
+		},
+	})
+
+	f.SetCellValue(sheetName, "C1", fmt.Sprintf(`НАКЛАДНАЯ 
+№ %s
+от %s года       
+на отпуск материала 
+`, data.Details.DeliveryCode, utils.DateConverter(data.Details.DateOfInvoice)))
+
+	project, err := service.projectRepo.GetByID(data.Details.ProjectID)
+	if err != nil {
+		return err
+	}
+
+	district, err := service.districtRepo.GetByID(data.Details.DistrictID)
+	if err != nil {
+		return err
+	}
+	f.MergeCell(sheetName, "D1", "F1")
+	f.SetCellStr(sheetName, "D1", fmt.Sprintf(`%s
+Регион: %s `, project.Name, district.Name))
+
+	for index, oneEntry := range data.Items {
+		material, err := service.materialRepo.GetByID(oneEntry.MaterialID)
+		if err != nil {
+			return err
+		}
+		f.SetCellStyle(sheetName, "A"+fmt.Sprint(startingRow+index), "F"+fmt.Sprint(startingRow+index), defaultStyle)
+		f.SetCellStyle(sheetName, "B"+fmt.Sprint(startingRow+index), "B"+fmt.Sprint(startingRow+index), materialNamingStyle)
+
+		f.SetCellInt(sheetName, "A"+fmt.Sprint(startingRow+index), index+1)
+		f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), material.Code)
+		f.SetCellStr(sheetName, "C"+fmt.Sprint(startingRow+index), material.Name)
+		f.SetCellStr(sheetName, "D"+fmt.Sprint(startingRow+index), material.Unit)
+		f.SetCellFloat(sheetName, "E"+fmt.Sprint(startingRow+index), oneEntry.Amount, 3, 64)
+		f.SetCellStr(sheetName, "F"+fmt.Sprint(startingRow+index), oneEntry.Notes)
+	}
+
+	released, err := service.workerRepo.GetByID(data.Details.ReleasedWorkerID)
+	if err != nil {
+		return err
+	}
+	f.SetCellStyle(sheetName, "C"+fmt.Sprint(8+len(data.Items)), "C"+fmt.Sprint(8+len(data.Items)), workerNamingStyle)
+	f.SetCellStr(sheetName, "C"+fmt.Sprint(8+len(data.Items)), released.Name)
+
+	teamData, err := service.teamRepo.GetTeamNumberAndTeamLeadersByID(data.Details.ProjectID, data.Details.TeamID)
+	if err != nil {
+		return err
+	}
+	f.SetCellStyle(sheetName, "C"+fmt.Sprint(10+len(data.Items)), "C"+fmt.Sprint(10+len(data.Items)), workerNamingStyle)
+	f.SetCellStr(sheetName, "C"+fmt.Sprint(10+len(data.Items)), teamData[0].TeamLeaderName)
+
+	recipient, err := service.workerRepo.GetByID(data.Details.RecipientWorkerID)
+	if err != nil {
+		return err
+	}
+	f.SetCellStyle(sheetName, "C"+fmt.Sprint(12+len(data.Items)), "C"+fmt.Sprint(12+len(data.Items)), workerNamingStyle)
+	f.SetCellStr(sheetName, "C"+fmt.Sprint(12+len(data.Items)), recipient.Name)
+
+	excelFilePath := filepath.Join("./pkg/excels/output/", data.Details.DeliveryCode+".xlsx")
+  if err := f.SaveAs(excelFilePath); err != nil {
+    return err
+  }
+
+	return nil
 }

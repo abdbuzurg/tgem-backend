@@ -75,6 +75,10 @@ func (controller *invoiceObjectController) GetPaginated(c *gin.Context) {
 	}
 
 	dataCount, err := controller.invoiceObjectService.Count(projectID)
+  if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal Server Error: %v", err))
+		return
+  }
 
 	response.ResponsePaginatedData(c, data, dataCount)
 }

@@ -10,6 +10,7 @@ type InvoiceObjectPaginated struct {
 	DeliveryCode        string    `json:"deliveryCode"`
 	SupervisorName      string    `json:"supervisorName"`
 	ObjectName          string    `json:"objectName"`
+	ObjectType          string    `json:"objectType"`
 	TeamNumber          string    `json:"teamNumber"`
 	DateOfInvoice       time.Time `json:"dateOfInvoice"`
 	ConfirmedByOperator bool      `json:"confirmedByOperator"`
@@ -50,4 +51,12 @@ type InvoiceObjectWithMaterialsDescriptive struct {
 	InvoiceData                  InvoiceObjectPaginated                    `json:"invoiceData"`
 	MaterialsWithSerialNumber    []InvoiceMaterialsWithSerialNumberView    `json:"materialsWithSN"`
 	MaterialsWithoutSerialNumber []InvoiceMaterialsWithoutSerialNumberView `json:"materialsWithoutSN"`
+}
+
+type InvoiceObjectTeamMaterials struct {
+	MaterialID      uint    `json:"materialID"`
+	MaterialName    string  `json:"materialName"`
+	MaterialUnit    string  `json:"materialUnit"`
+	HasSerialNumber bool    `json:"hasSerialNumber"`
+	Amount          float64 `json:"amount"`
 }

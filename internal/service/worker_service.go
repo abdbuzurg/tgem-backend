@@ -20,7 +20,7 @@ func InitWorkerService(workerRepo repository.IWorkerRepository) IWorkerService {
 }
 
 type IWorkerService interface {
-	GetAll() ([]model.Worker, error)
+	GetAll(projectID uint) ([]model.Worker, error)
 	GetPaginated(page, limit int, data model.Worker) ([]model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
 	GetByJobTitleInProject(jobTitleInProject string, projectID uint) ([]model.Worker, error)
@@ -31,8 +31,8 @@ type IWorkerService interface {
 	Import(filepath string, projectID uint) error
 }
 
-func (service *workerService) GetAll() ([]model.Worker, error) {
-	return service.workerRepo.GetAll()
+func (service *workerService) GetAll(projectID uint) ([]model.Worker, error) {
+	return service.workerRepo.GetAll(projectID)
 }
 
 func (service *workerService) GetPaginated(page, limit int, data model.Worker) ([]model.Worker, error) {

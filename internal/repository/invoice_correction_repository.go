@@ -37,6 +37,7 @@ func (repo *invoiceCorrectionRepository) GetPaginated(page, limit int, projectID
       invoice_objects.id as id,
       workers.name as supervisor_name,
       objects.name as object_name,
+      objects.type as object_type,
       teams.id as team_id,
       teams.number as team_number,
       invoice_objects.date_of_invoice as date_of_invoice,

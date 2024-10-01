@@ -133,6 +133,17 @@ func (repo *invoiceOutputRepository) Create(data dto.InvoiceOutputCreateQueryDat
 			return err
 		}
 
+		err := tx.Exec(`
+      UPDATE invoice_counts
+      SET count = count + 1
+      WHERE
+        invoice_type = 'output' AND
+        project_id = ?
+      `, result.ProjectID).Error
+		if err != nil {
+			return err
+		}
+
 		return nil
 
 	})

@@ -34,7 +34,7 @@ type IWorkerController interface {
 }
 
 func (controller *workerController) GetAll(c *gin.Context) {
-	data, err := controller.workerService.GetAll()
+	data, err := controller.workerService.GetAll(c.GetUint("projectID"))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get Worker data: %v", err))
 		return

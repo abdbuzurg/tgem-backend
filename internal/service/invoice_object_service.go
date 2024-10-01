@@ -55,7 +55,7 @@ type IInvoiceObjectService interface {
 	Delete(id uint) error
 	GetObjects(projectID, userID, roleID uint) ([]model.Object, error)
 	GetInvoiceObjectDescriptiveDataByID(id uint) (dto.InvoiceObjectWithMaterialsDescriptive, error)
-	GetTeamsMaterials(projectID, teamID uint) ([]model.Material, error)
+	GetTeamsMaterials(projectID, teamID uint) ([]dto.InvoiceObjectTeamMaterials, error)
 	GetSerialNumberOfMaterial(projectID, materialID uint, locationID uint) ([]string, error)
 	GetAvailableMaterialAmount(projectID, materialID, teamID uint) (float64, error)
 	Count(projectID uint) (int64, error)
@@ -272,8 +272,29 @@ func (service *invoiceObjectService) GetObjects(projectID, userID, roleID uint) 
 	return result, nil
 }
 
-func (service *invoiceObjectService) GetTeamsMaterials(projectID, teamID uint) ([]model.Material, error) {
-	return service.materialLocationRepo.GetUniqueMaterialsFromLocation(projectID, teamID, "team")
+func (service *invoiceObjectService) GetTeamsMaterials(projectID, teamID uint) ([]dto.InvoiceObjectTeamMaterials, error) {
+  materialsInTeam, err := service.materialLocationRepo.GetUniqueMaterialsFromLocation(projectID, teamID, "team")
+  if err != nil {
+    return []dto.InvoiceObjectTeamMaterials{}, err
+  }
+
+  result := []dto.InvoiceObjectTeamMaterials{}
+  for _, entry := range materialsInTeam {
+    amount, err := service.materialLocationRepo.GetTotalAmountInLocation(projectID, entry.ID, teamID, "team")
+    if err != nil {
+      return []dto.InvoiceObjectTeamMaterials{}, err
+    }
+
+    result = append(result, dto.InvoiceObjectTeamMaterials{
+      MaterialID: entry.ID,
+      MaterialName: entry.Name,
+      MaterialUnit: entry.Unit,
+      HasSerialNumber: entry.HasSerialNumber,
+      Amount: amount,
+    })
+  }
+  
+	return result, nil 
 }
 
 func (service *invoiceObjectService) GetSerialNumberOfMaterial(projectID, materialID uint, locationID uint) ([]string, error) {

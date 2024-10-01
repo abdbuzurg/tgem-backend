@@ -216,19 +216,8 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 
 func (controller *invoiceOutputController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
-
-	filePath := filepath.Join("./pkg/excels/output/", deliveryCode)
-	fileGlob, err := filepath.Glob(filePath + ".*")
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
-		return
-	}
-
-	filePath = fileGlob[0]
-	pathSeparated := strings.Split(filePath, ".")
-	deliveryCodeExtension := pathSeparated[len(pathSeparated)-1]
-
-	c.FileAttachment(filePath, deliveryCode+"."+deliveryCodeExtension)
+	filePath := filepath.Join("./pkg/excels/output/", deliveryCode + ".xlsx")
+	c.FileAttachment(filePath, deliveryCode+".xlsx")
 }
 
 func (controller *invoiceOutputController) UniqueCode(c *gin.Context) {

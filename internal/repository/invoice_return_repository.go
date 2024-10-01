@@ -36,7 +36,7 @@ type IInvoiceReturnRepository interface {
 	GetInvoiceReturnTeamDataForExcel(id uint) (dto.InvoiceReturnTeamDataForExcel, error)
 	GetInvoiceReturnObjectDataForExcel(id uint) (dto.InvoiceReturnObjectDataForExcel, error)
 	Confirmation(data dto.InvoiceReturnConfirmDataQuery) error
-	GetMaterialsForEdit(id uint) ([]dto.InvoiceReturnMaterialForEdit, error)
+	GetMaterialsForEdit(id uint, locationType string, locationID uint) ([]dto.InvoiceReturnMaterialForEdit, error)
 }
 
 func (repo *invoiceReturnRepository) GetAll() ([]model.InvoiceReturn, error) {
@@ -136,6 +136,17 @@ func (repo *invoiceReturnRepository) Create(data dto.InvoiceReturnCreateQueryDat
 			return err
 		}
 
+		err := tx.Exec(`
+      UPDATE invoice_counts
+      SET count = count + 1
+      WHERE
+        invoice_type = 'return' AND
+        project_id = ?
+      `, result.ProjectID).Error
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 
@@ -180,7 +191,18 @@ func (repo *invoiceReturnRepository) Update(data dto.InvoiceReturnCreateQueryDat
 }
 
 func (repo *invoiceReturnRepository) Delete(id uint) error {
-	return repo.db.Delete(&model.InvoiceReturn{}, "id = ?", id).Error
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&model.InvoiceReturn{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&model.InvoiceMaterials{}, "invoice_type = 'return' AND invoice_id = ?", id).Error; err != nil {
+			return err
+		}
+
+		return nil
+
+	})
 }
 
 func (repo *invoiceReturnRepository) CountBasedOnType(projectID uint, invoiceType string) (int64, error) {
@@ -385,7 +407,7 @@ func (repo *invoiceReturnRepository) Confirmation(data dto.InvoiceReturnConfirmD
 	})
 }
 
-func (repo *invoiceReturnRepository) GetMaterialsForEdit(id uint) ([]dto.InvoiceReturnMaterialForEdit, error) {
+func (repo *invoiceReturnRepository) GetMaterialsForEdit(id uint, locationType string, locationID uint) ([]dto.InvoiceReturnMaterialForEdit, error) {
 	result := []dto.InvoiceReturnMaterialForEdit{}
 	err := repo.db.Raw(`
     SELECT 
@@ -393,18 +415,21 @@ func (repo *invoiceReturnRepository) GetMaterialsForEdit(id uint) ([]dto.Invoice
       materials.name as material_name,
       materials.unit as unit,
       invoice_materials.amount as amount,
-      material_costs.id  as material_cost_id,
-      material_costs.cost_m19 as material_cost,
       invoice_materials.notes as  notes,
       materials.has_serial_number as has_serial_number,
-      invoice_materials.is_defected as is_defective 
+      invoice_materials.is_defected as is_defective, 
+      material_locations.amount as holder_amount
     FROM invoice_materials
     INNER JOIN material_costs ON invoice_materials.material_cost_id = material_costs.id
     INNER JOIN materials ON material_costs.material_id = materials.id
+    INNER JOIN material_locations ON material_locations.material_cost_id = invoice_materials.material_cost_id
     WHERE
       invoice_materials.invoice_type='return' AND
-      invoice_materials.invoice_id = ?;
-    `, id).Scan(&result).Error
+      invoice_materials.invoice_id = ? AND
+      material_locations.location_type = ? AND
+      material_locations.location_id = ?
+    ORDER BY materials.id
+    `, id, locationType, locationID).Scan(&result).Error
 
 	return result, err
 }

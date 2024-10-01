@@ -17,38 +17,25 @@ func InitDistrictRepository(db *gorm.DB) IDistrictRepository {
 }
 
 type IDistrictRepository interface {
-	GetAll() ([]model.District, error)
-	GetPaginated(page, limit int) ([]model.District, error)
-	GetPaginatedFiltered(page, limit int, filter model.District) ([]model.District, error)
+	GetAll(projectID uint) ([]model.District, error)
+	GetPaginated(page, limit int, projectID uint) ([]model.District, error)
 	GetByID(id uint) (model.District, error)
 	Create(data model.District) (model.District, error)
 	Update(data model.District) (model.District, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(projectID uint) (int64, error)
 	GetByName(name string) (model.District, error)
 }
 
-func (repo *districtRepository) GetAll() ([]model.District, error) {
+func (repo *districtRepository) GetAll(projectID uint) ([]model.District, error) {
 	data := []model.District{}
-	err := repo.db.Order("id desc").Find(&data).Error
+	err := repo.db.Order("id desc").Find(&data, "project_id = ?", projectID).Error
 	return data, err
 }
 
-func (repo *districtRepository) GetPaginated(page, limit int) ([]model.District, error) {
+func (repo *districtRepository) GetPaginated(page, limit int, projectID uint) ([]model.District, error) {
 	data := []model.District{}
-	err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data).Error
-	return data, err
-}
-
-func (repo *districtRepository) GetPaginatedFiltered(page, limit int, filter model.District) ([]model.District, error) {
-	data := []model.District{}
-	err := repo.db.
-		Raw(`SELECT * FROM districts WHERE
-			(nullif(?, '') IS NULL OR name = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.Name, filter.Name, limit, (page-1)*limit,
-		).
-		Scan(&data).Error
-
+  err := repo.db.Order("id desc").Offset((page - 1) * limit).Limit(limit).Find(&data, "project_id = ?", projectID).Error
 	return data, err
 }
 
@@ -72,9 +59,9 @@ func (repo *districtRepository) Delete(id uint) error {
 	return repo.db.Delete(&model.District{}, "id = ?", id).Error
 }
 
-func (repo *districtRepository) Count() (int64, error) {
+func (repo *districtRepository) Count(projectID uint) (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.District{}).Count(&count).Error
+	err := repo.db.Raw(`SELECT COUNT(*) FROM districts WHERE project_id = ?`, projectID).Scan(&count).Error
 	return count, err
 }
 

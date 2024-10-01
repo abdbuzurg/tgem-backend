@@ -142,12 +142,10 @@ type InvoiceReturnConfirmDataQuery struct {
 
 type InvoiceReturnMaterialForEdit struct {
 	MaterialID      uint     `json:"materialID"`
-	MaterialCostID  uint     `json:"materialCostID"`
 	MaterialName    string   `json:"materialName"`
 	Unit            string   `json:"uint"`
 	HolderAmount    float64  `json:"holderAmount"`
 	Amount          float64  `json:"amount"`
-	MaterialCost    string   `json:"materialCost"`
 	HasSerialNumber bool     `json:"hasSerialNumber"`
 	SerialNumbers   []string `json:"serialNumbers"`
 	IsDefective     bool     `json:"isDefective"`

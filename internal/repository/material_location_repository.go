@@ -227,6 +227,7 @@ func (repo *materialLocationRepository) GetUniqueMaterialsFromLocation(
       material_locations.location_id = ? AND
       material_locations.location_type = ? AND
       material_locations.amount > 0
+    ORDER BY materials.id
     `, projectID, locationID, locationType).Scan(&data).Error
 
 	return data, err

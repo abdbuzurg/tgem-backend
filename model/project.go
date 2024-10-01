@@ -18,6 +18,7 @@ type Project struct {
 	DateEnd              time.Time       `json:"dateEnd"`
 	ProjectManager       string          `json:"projectManager"`
 
+	Districts                  []District                  `json:"-" gorm:"foreignKey:ProjectID"`
 	UserActions                []UserAction                `json:"-" gorm:"foreignKey:ProjectID"`
 	UserInProjects             []UserInProject             `json:"-" gorm:"foreignKey:ProjectID"`
 	Materials                  []Material                  `json:"-" gorm:"foreignKey:ProjectID"`

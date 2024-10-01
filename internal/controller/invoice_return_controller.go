@@ -420,7 +420,16 @@ func (controller *invoiceReturnController) GetMaterialsForEdit(c *gin.Context) {
 	idRaw := c.Param("id")
 	id, err := strconv.ParseUint(idRaw, 10, 64)
 
-	result, err := controller.invoiceReturnService.GetMaterialsForEdit(uint(id))
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+	locationType := c.Param("locationType")
+
+	result, err := controller.invoiceReturnService.GetMaterialsForEdit(uint(id), locationType, uint(locationID))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
