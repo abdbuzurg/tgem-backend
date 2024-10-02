@@ -199,7 +199,10 @@ func (controller *kl04kvObjectController) Export(c *gin.Context) {
 
 	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
 	c.FileAttachment(exportFilePath, exportFileName)
-	os.Remove(exportFileName)
+  if err := os.Remove(exportFilePath); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+  }
 }
 
 func (controller *kl04kvObjectController) GetObjectNamesForSearch(c *gin.Context) {

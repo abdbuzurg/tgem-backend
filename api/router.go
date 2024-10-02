@@ -122,7 +122,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		projectRepo,
 		districtRepo,
 		objectSupervisorsRepo,
-    invoiceCountRepo,
+		invoiceCountRepo,
 	)
 	invoiceObjectService := service.InitInvoiceObjectService(
 		invoiceObjectRepo,
@@ -199,12 +199,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectSupervisorsRepo,
 		objectTeamsRepo,
 		teamRepo,
+		tpObjectRepo,
 	)
 	stvtObjectService := service.InitSTVTObjectService(
 		stvtObjectRepo,
 		workerRepo,
 		objectSupervisorsRepo,
 		objectTeamsRepo,
+    teamRepo,
 	)
 	teamService := service.InitTeamService(
 		teamRepo,
@@ -217,6 +219,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectSupervisorsRepo,
 		objectTeamsRepo,
 		objectRepo,
+    teamRepo,
 	)
 	userService := service.InitUserService(
 		userRepo,
@@ -419,7 +422,7 @@ func InitInvoiceReturnRoutes(router *gin.RouterGroup, controller controller.IInv
 	invoiceReturnRoutes.GET("/serial-number/:locationType/:locationID/:materialID", controller.GetSerialNumberCodesInLocation)
 	invoiceReturnRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumbers)
 	invoiceReturnRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
-  invoiceReturnRoutes.GET("/invoice-materials/:id/:locationType/:locationID", controller.GetMaterialsForEdit)
+	invoiceReturnRoutes.GET("/invoice-materials/:id/:locationType/:locationID", controller.GetMaterialsForEdit)
 	invoiceReturnRoutes.GET("/amount/:locationType/:locationID/:materialID", controller.GetMaterialAmountByMaterialID)
 	invoiceReturnRoutes.POST("/confirm/:id", controller.Confirmation)
 	invoiceReturnRoutes.POST("/", controller.Create)
@@ -584,6 +587,8 @@ func InitTPObjectRoutes(router *gin.RouterGroup, controller controller.ITPObject
 	tpObjectRoutes.GET("/paginated", controller.GetPaginated)
 	tpObjectRoutes.GET("/document/template", controller.GetTemplateFile)
 	tpObjectRoutes.GET("/all", controller.GetAll)
+	tpObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
+  tpObjectRoutes.GET("/document/export", controller.Export)
 	tpObjectRoutes.POST("/", controller.Create)
 	tpObjectRoutes.POST("/document/import", controller.Import)
 	tpObjectRoutes.PATCH("/", controller.Update)
@@ -610,6 +615,8 @@ func InitSTVTObjectRoutes(router *gin.RouterGroup, controller controller.ISTVTOb
 	)
 	stvtObjectRoutes.GET("/paginated", controller.GetPaginated)
 	stvtObjectRoutes.GET("/document/template", controller.GetTemplateFile)
+	stvtObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
+	stvtObjectRoutes.GET("/document/export", controller.Export)
 	stvtObjectRoutes.POST("/", controller.Create)
 	stvtObjectRoutes.POST("/document/import", controller.Import)
 	stvtObjectRoutes.PATCH("/", controller.Update)
@@ -623,6 +630,9 @@ func InitSIPObjectRoutes(router *gin.RouterGroup, controller controller.ISIPObje
 	)
 	sipObjectRoutes.GET("/paginated", controller.GetPaginated)
 	sipObjectRoutes.GET("/document/template", controller.GetTemplateFile)
+	sipObjectRoutes.GET("/tp-names", controller.GetTPNames)
+	sipObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
+	sipObjectRoutes.GET("/document/export", controller.Export)
 	sipObjectRoutes.POST("/", controller.Create)
 	sipObjectRoutes.POST("/document/import", controller.Import)
 	sipObjectRoutes.PATCH("/", controller.Update)

@@ -154,13 +154,19 @@ func (service *kl04kvObjectService) TemplateFile(filePath string, projectID uint
 		f.SetCellStr(tpObjectSheetName, "A"+fmt.Sprint(index+2), tp.Name)
 	}
 
-  date := time.Now()
-  temporaryFilePath := filepath.Join("./pkg/excels/temp/", date.String() + " Шаблон для импорта КЛ 04 КВ.xlsx")
+	currentTime := time.Now()
+	temporaryFileName := fmt.Sprintf(
+		"Шаблон импорта КЛ04КВ - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+	temporaryFilePath := filepath.Join("./pkg/excels/temp/", temporaryFileName)
 	if err := f.SaveAs(temporaryFilePath); err != nil {
 		return "", fmt.Errorf("Не удалось обновить шаблон с новыми данными: %v", err)
 	}
 
-	f.Close()
+  if err := f.Close(); err != nil {
+    return "", err
+  }
 
 	return temporaryFilePath, nil
 }
@@ -340,7 +346,7 @@ func (service *kl04kvObjectService) Export(projectID uint) (string, error) {
 		f.Close()
 		return "", fmt.Errorf("Не смог открыть файл: %v", err)
 	}
-	sheetName := "Материалы"
+	sheetName := "КЛ 04 КВ"
 	startingRow := 2
 
 	kl04kvCount, err := service.kl04kvObjectRepo.Count(dto.KL04KVObjectSearchParameters{ProjectID: projectID})
@@ -417,7 +423,11 @@ func (service *kl04kvObjectService) Export(projectID uint) (string, error) {
 		kl04kvCount -= int64(limit)
 	}
 
-	exportFileName := "Экспорт КЛ04КВ.xlsx"
+	currentTime := time.Now()
+	exportFileName := fmt.Sprintf(
+		"Экспорт СИП - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
 	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
 	if err := f.SaveAs(exportFilePath); err != nil {
 		return "", err

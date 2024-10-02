@@ -30,6 +30,9 @@ type ISIPObjectController interface {
 	Delete(c *gin.Context)
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
+	GetTPNames(c *gin.Context)
+	GetObjectNamesForSearch(c *gin.Context)
+	Export(c *gin.Context)
 }
 
 func (controller *sipObjectController) GetPaginated(c *gin.Context) {
@@ -48,15 +51,34 @@ func (controller *sipObjectController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	projectID := c.GetUint("projectID")
+	teamIDStr := c.DefaultQuery("teamID", "0")
+	teamID, err := strconv.Atoi(teamIDStr)
+	if err != nil || teamID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса teamID: %v", err))
+		return
+	}
 
-	data, err := controller.sipObjectService.GetPaginated(page, limit, projectID)
+	supervisorWorkerIDStr := c.DefaultQuery("supervisorWorkerID", "0")
+	supervisorWorkerID, err := strconv.Atoi(supervisorWorkerIDStr)
+	if err != nil || supervisorWorkerID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса supervisorWorkerID: %v", err))
+		return
+	}
+
+	filter := dto.SIPObjectSearchParameters{
+		ProjectID:          c.GetUint("projectID"),
+		TeamID:             uint(teamID),
+		SupervisorWorkerID: uint(supervisorWorkerID),
+		ObjectName:         c.DefaultQuery("objectName", ""),
+	}
+
+	data, err := controller.sipObjectService.GetPaginated(page, limit, filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	dataCount, err := controller.sipObjectService.Count(projectID)
+	dataCount, err := controller.sipObjectService.Count(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -135,7 +157,10 @@ func (controller *sipObjectController) GetTemplateFile(c *gin.Context) {
 	}
 
 	c.FileAttachment(tmpFilePath, "Шаблон для импорта СИП.xlsx")
-	os.Remove(tmpFilePath)
+	if err := os.Remove(tmpFilePath); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
 }
 
 func (controller *sipObjectController) Import(c *gin.Context) {
@@ -161,4 +186,41 @@ func (controller *sipObjectController) Import(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, true)
+}
+
+func (controller *sipObjectController) GetTPNames(c *gin.Context) {
+	result, err := controller.sipObjectService.GetTPNames(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, result)
+}
+
+func (controller *sipObjectController) GetObjectNamesForSearch(c *gin.Context) {
+	data, err := controller.sipObjectService.GetObjectNamesForSearch(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *sipObjectController) Export(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+
+	exportFileName, err := controller.sipObjectService.Export(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
+	c.FileAttachment(exportFilePath, exportFileName)
+	if err := os.Remove(exportFilePath); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
 }

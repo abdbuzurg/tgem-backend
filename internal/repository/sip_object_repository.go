@@ -18,46 +18,68 @@ func InitSIPObjectRepository(db *gorm.DB) ISIPObjectRepository {
 }
 
 type ISIPObjectRepository interface {
-	GetPaginated(page, limit int, projectID uint) ([]dto.SIPObjectPaginatedQuery, error)
-	Count(projectID uint) (int64, error)
+	GetPaginated(page, limit int, filter dto.SIPObjectSearchParameters) ([]dto.SIPObjectPaginatedQuery, error)
+	Count(filter dto.SIPObjectSearchParameters) (int64, error)
 	Create(data dto.SIPObjectCreate) (model.SIP_Object, error)
 	Update(data dto.SIPObjectCreate) (model.SIP_Object, error)
 	Delete(id, projectID uint) error
 	CreateInBatches(objects []model.Object, sips []model.SIP_Object, supervisors []uint) ([]model.SIP_Object, error)
 	Import(data []dto.SIPObjectImportData) error
+	GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error)
 }
 
-func (repo *sipObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.SIPObjectPaginatedQuery, error) {
+func (repo *sipObjectRepository) GetPaginated(page, limit int, filter dto.SIPObjectSearchParameters) ([]dto.SIPObjectPaginatedQuery, error) {
 	data := []dto.SIPObjectPaginatedQuery{}
 	err := repo.db.Raw(`
-      SELECT 
-        objects.id as object_id,
-        objects.object_detailed_id as object_detailed_id,
-        objects.name as name,
-        objects.status as status,
-        s_ip_objects.amount_feeders
-      FROM objects
-        INNER JOIN s_ip_objects ON objects.object_detailed_id = s_ip_objects.id
-     WHERE
-        objects.type = 'sip_objects' AND
-        objects.project_id = ?
-      ORDER BY s_ip_objects.id DESC 
-      LIMIT ? 
-      OFFSET ?;
-    `, projectID, limit, (page-1)*limit).Scan(&data).Error
+    SELECT DISTINCT 
+      objects.id as object_id,
+      s_ip_objects.id as object_detailed_id,
+      objects.name as name,
+      objects.status as status,
+      s_ip_objects.amount_feeders
+    FROM objects
+    INNER JOIN s_ip_objects ON objects.object_detailed_id = s_ip_objects.id
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    WHERE
+      objects.type = 'sip_objects' AND
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
+    ORDER BY s_ip_objects.id DESC 
+    LIMIT ? 
+    OFFSET ?;
+    `, filter.ProjectID,
+		filter.ObjectName, filter.ObjectName,
+		filter.TeamID, filter.TeamID,
+		filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+		limit, (page-1)*limit,
+	).Scan(&data).Error
 
 	return data, err
 }
 
-func (repo *sipObjectRepository) Count(projectID uint) (int64, error) {
+func (repo *sipObjectRepository) Count(filter dto.SIPObjectSearchParameters) (int64, error) {
 	var count int64
 	err := repo.db.Raw(`
-    SELECT COUNT(*)
+    SELECT DISTINCT COUNT(*)
     FROM objects
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
     WHERE
       objects.type = 'sip_objects' AND
-      objects.project_id = ?
-    `, projectID).Scan(&count).Error
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
+    `,
+    filter.ProjectID,
+    filter.ObjectName, filter.ObjectName,
+    filter.TeamID, filter.TeamID,
+    filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+    ).Scan(&count).Error
 	return count, err
 }
 
@@ -289,4 +311,20 @@ func (repo *sipObjectRepository) Import(data []dto.SIPObjectImportData) error {
 
 		return nil
 	})
+}
+
+func (repo *sipObjectRepository) GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error) {
+	data := []dto.DataForSelect[string]{}
+	err := repo.db.Raw(`
+    SELECT 
+      objects.name as "label",
+      objects.name as "value"
+    FROM objects
+    INNER JOIN s_ip_objects ON s_ip_objects.id = objects.object_detailed_id
+    WHERE
+      objects.project_id = ? AND
+      objects.type = 'sip_objects'
+    `, projectID).Scan(&data).Error
+
+	return data, err
 }

@@ -18,46 +18,66 @@ func InitSTVTObjectRepository(db *gorm.DB) ISTVTObjectRepository {
 }
 
 type ISTVTObjectRepository interface {
-	GetPaginated(page, limit int, projectID uint) ([]dto.STVTObjectPaginatedQuery, error)
-	Count(projectID uint) (int64, error)
+	GetPaginated(page, limit int, filter dto.STVTObjectSearchParameters) ([]dto.STVTObjectPaginatedQuery, error)
+	Count(filter dto.STVTObjectSearchParameters) (int64, error)
 	Create(data dto.STVTObjectCreate) (model.STVT_Object, error)
 	Update(data dto.STVTObjectCreate) (model.STVT_Object, error)
 	Delete(id, projectID uint) error
-	CreateInBatches(objects []model.Object, stvts []model.STVT_Object, supervisors []uint) ([]model.STVT_Object, error)
+	CreateInBatches(data []dto.STVTObjectImportData) error
+  GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error)
 }
 
-func (repo *stvtObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.STVTObjectPaginatedQuery, error) {
+func (repo *stvtObjectRepository) GetPaginated(page, limit int, filter dto.STVTObjectSearchParameters) ([]dto.STVTObjectPaginatedQuery, error) {
 	data := []dto.STVTObjectPaginatedQuery{}
 	err := repo.db.Raw(`
-      SELECT 
-        objects.id as object_id,
-        objects.object_detailed_id as object_detailed_id,
-        objects.name as name,
-        objects.status as status,
-        stvt_objects.voltage_class as voltage_class,
-        stvt_objects.tt_coefficient as tt_coefficient
-      FROM objects
-        INNER JOIN stvt_objects ON objects.object_detailed_id = stvt_objects.id
-     WHERE
-        objects.type = 'stvt_objects' AND
-        objects.project_id = ?
-      ORDER BY stvt_objects.id DESC 
-      LIMIT ? 
-      OFFSET ?;
-    `, projectID, limit, (page-1)*limit).Scan(&data).Error
+    SELECT DISTINCT
+      objects.id as object_id,
+      stvt_objects.id as object_detailed_id,
+      objects.name as name,
+      objects.status as status,
+      stvt_objects.voltage_class as voltage_class,
+      stvt_objects.tt_coefficient as tt_coefficient
+    FROM objects
+    INNER JOIN stvt_objects ON objects.object_detailed_id = stvt_objects.id
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
+    WHERE
+      objects.type = 'stvt_objects' AND
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
+    ORDER BY stvt_objects.id DESC 
+    LIMIT ? 
+    OFFSET ?;
+    `, filter.ProjectID,
+		filter.ObjectName, filter.ObjectName,
+		filter.TeamID, filter.TeamID,
+		filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+		limit, (page-1)*limit).Scan(&data).Error
 
 	return data, err
 }
 
-func (repo *stvtObjectRepository) Count(projectID uint) (int64, error) {
+func (repo *stvtObjectRepository) Count(filter dto.STVTObjectSearchParameters) (int64, error) {
 	var count int64
 	err := repo.db.Raw(`
-    SELECT COUNT(*)
+    SELECT DISTINCT COUNT(*)
     FROM objects
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
     WHERE
       objects.type = 'stvt_objects' AND
-      objects.project_id = ?
-    `, projectID).Scan(&count).Error
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
+    `, filter.ProjectID,
+    filter.ObjectName, filter.ObjectName,
+    filter.TeamID, filter.TeamID,
+    filter.SupervisorWorkerID, filter.SupervisorWorkerID).Scan(&count).Error
 	return count, err
 }
 
@@ -237,22 +257,53 @@ func (repo *stvtObjectRepository) Delete(id, projectID uint) error {
 	})
 }
 
-func (repo *stvtObjectRepository) CreateInBatches(objects []model.Object, stvts []model.STVT_Object, supervisors []uint) ([]model.STVT_Object, error) {
-	err := repo.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.CreateInBatches(&stvts, 10).Error; err != nil {
-			return err
-		}
+func (repo *stvtObjectRepository) CreateInBatches(data []dto.STVTObjectImportData) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		for index, row := range data {
+			stvt := row.STVT
+			if err := tx.Create(&stvt).Error; err != nil {
+				return err
+			}
 
-		for index := range objects {
-			objects[index].ObjectDetailedID = stvts[index].ID
-		}
+			object := row.Object
+			object.ObjectDetailedID = stvt.ID
+			data[index].Object.ObjectDetailedID = stvt.ID
+			if err := tx.Create(&object).Error; err != nil {
+				return err
+			}
 
-		if err := tx.CreateInBatches(&objects, 10).Error; err != nil {
-			return err
+			if row.ObjectSupervisors.SupervisorWorkerID != 0 {
+				data[index].ObjectSupervisors.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectSupervisors).Error; err != nil {
+					return err
+				}
+			}
+
+			if row.ObjectTeam.TeamID != 0 {
+				data[index].ObjectTeam.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectTeam).Error; err != nil {
+					return err
+				}
+			}
+
 		}
 
 		return nil
 	})
+}
 
-	return stvts, err
+func (repo *stvtObjectRepository) GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error) {
+  data := []dto.DataForSelect[string]{}
+  err := repo.db.Raw(`
+    SELECT 
+      objects.name as "label",
+      objects.name as "value"
+    FROM objects
+    INNER JOIN stvt_objects ON stvt_objects.id = objects.object_detailed_id
+    WHERE
+      objects.project_id = ? AND
+      objects.type = 'stvt_objects'
+    `, projectID).Scan(&data).Error
+
+  return data, err
 }

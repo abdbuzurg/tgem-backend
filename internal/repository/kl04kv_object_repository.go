@@ -39,7 +39,7 @@ func (repo *kl04kvObjectRepository) GetAll() ([]model.KL04KV_Object, error) {
 func (repo *kl04kvObjectRepository) GetPaginated(page, limit int, filter dto.KL04KVObjectSearchParameters) ([]dto.KL04KVObjectPaginatedQuery, error) {
 	data := []dto.KL04KVObjectPaginatedQuery{}
 	err := repo.db.Raw(`
-    SELECT 
+    SELECT DISTINCT 
       objects.id as object_id,
       kl04_kv_objects.id as object_detailed_id,
       objects.name as name,
@@ -208,7 +208,7 @@ func (repo *kl04kvObjectRepository) Delete(projectID, id uint) error {
 func (repo *kl04kvObjectRepository) Count(filter dto.KL04KVObjectSearchParameters) (int64, error) {
 	var count int64
 	err := repo.db.Raw(`
-    SELECT COUNT(*)
+    SELECT DISTINCT COUNT(*)
     FROM objects
     INNER JOIN kl04_kv_objects ON kl04_kv_objects.id = objects.object_detailed_id
     FULL JOIN object_teams ON object_teams.object_id = objects.id

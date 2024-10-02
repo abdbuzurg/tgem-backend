@@ -18,38 +18,18 @@ func InitTPObjectRepository(db *gorm.DB) ITPObjectRepository {
 }
 
 type ITPObjectRepository interface {
-  GetAll(projectID uint) ([]dto.TPObjectPaginatedQuery, error)
-	GetPaginated(page, limit int, projectID uint) ([]dto.TPObjectPaginatedQuery, error)
-	Count(projectID uint) (int64, error)
+	GetAll(projectID uint) ([]dto.TPObjectPaginatedQuery, error)
+	GetPaginated(page, limit int, filter dto.TPObjectSearchParameters) ([]dto.TPObjectPaginatedQuery, error)
+	Count(filter dto.TPObjectSearchParameters) (int64, error)
 	Create(data dto.TPObjectCreate) (model.TP_Object, error)
 	Update(data dto.TPObjectCreate) (model.TP_Object, error)
 	Delete(id, projectID uint) error
-	CreateInBatches(objects []model.Object, tps []model.TP_Object, supervisors []uint) ([]model.TP_Object, error)
+	CreateInBatches(data []dto.TPObjectImportData) error
+	GetTPNames(projectID uint) ([]string, error)
+	GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error)
 }
 
 func (repo *tpObjectRepository) GetAll(projectID uint) ([]dto.TPObjectPaginatedQuery, error) {
-  data := []dto.TPObjectPaginatedQuery{}
-  err := repo.db.Raw(`
-      SELECT 
-        objects.id as object_id,
-        objects.object_detailed_id as object_detailed_id,
-        objects.name as name,
-        objects.status as status,
-        tp_objects.model as model,
-        tp_objects.voltage_class as voltage_class,
-        tp_objects.nourashes as nourashes
-      FROM objects
-        INNER JOIN tp_objects ON objects.object_detailed_id = tp_objects.id
-      WHERE
-        objects.type = 'tp_objects' AND
-        objects.project_id = ?
-      ORDER BY tp_objects.id DESC
-    `, projectID).Scan(&data).Error
-
-  return data, err
-}
-
-func (repo *tpObjectRepository) GetPaginated(page, limit int, projectID uint) ([]dto.TPObjectPaginatedQuery, error) {
 	data := []dto.TPObjectPaginatedQuery{}
 	err := repo.db.Raw(`
       SELECT 
@@ -59,29 +39,68 @@ func (repo *tpObjectRepository) GetPaginated(page, limit int, projectID uint) ([
         objects.status as status,
         tp_objects.model as model,
         tp_objects.voltage_class as voltage_class,
-        tp_objects.nourashes as nourashes
       FROM objects
         INNER JOIN tp_objects ON objects.object_detailed_id = tp_objects.id
-     WHERE
+      WHERE
         objects.type = 'tp_objects' AND
         objects.project_id = ?
-      ORDER BY tp_objects.id DESC 
-      LIMIT ? 
-      OFFSET ?;
-    `, projectID, limit, (page-1)*limit).Scan(&data).Error
+      ORDER BY tp_objects.id DESC
+    `, projectID).Scan(&data).Error
 
 	return data, err
 }
 
-func (repo *tpObjectRepository) Count(projectID uint) (int64, error) {
-	var count int64
+func (repo *tpObjectRepository) GetPaginated(page, limit int, filter dto.TPObjectSearchParameters) ([]dto.TPObjectPaginatedQuery, error) {
+	data := []dto.TPObjectPaginatedQuery{}
 	err := repo.db.Raw(`
-    SELECT COUNT(*)
+    SELECT DISTINCT 
+      objects.id as object_id,
+      tp_objects.id as object_detailed_id,
+      objects.name as name,
+      objects.status as status,
+      tp_objects.model as model,
+      tp_objects.voltage_class as voltage_class
     FROM objects
+    INNER JOIN tp_objects ON objects.object_detailed_id = tp_objects.id
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
     WHERE
       objects.type = 'tp_objects' AND
-      objects.project_id = ?
-    `, projectID).Scan(&count).Error
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
+    ORDER BY tp_objects.id DESC 
+    LIMIT ? 
+    OFFSET ?;
+    `, filter.ProjectID,
+		filter.ObjectName, filter.ObjectName,
+		filter.TeamID, filter.TeamID,
+		filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+		limit, (page-1)*limit).Scan(&data).Error
+
+	return data, err
+}
+
+func (repo *tpObjectRepository) Count(filter dto.TPObjectSearchParameters) (int64, error) {
+	var count int64
+	err := repo.db.Raw(`
+    SELECT DISTINCT COUNT(*)
+    FROM objects
+    FULL JOIN object_teams ON object_teams.object_id = objects.id
+    FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
+    WHERE
+      objects.type = 'tp_objects' AND
+      objects.project_id = ? AND
+      (nullif(?, '') IS NULL OR objects.name = ?) AND
+      (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
+    `, filter.ProjectID,
+		filter.ObjectName, filter.ObjectName,
+		filter.TeamID, filter.TeamID,
+		filter.SupervisorWorkerID, filter.SupervisorWorkerID).Scan(&count).Error
 	return count, err
 }
 
@@ -89,7 +108,6 @@ func (repo *tpObjectRepository) Create(data dto.TPObjectCreate) (model.TP_Object
 	tp := model.TP_Object{
 		Model:        data.DetailedInfo.Model,
 		VoltageClass: data.DetailedInfo.VoltageClass,
-		Nourashes:    data.DetailedInfo.Nourashes,
 	}
 
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
@@ -150,7 +168,6 @@ func (repo *tpObjectRepository) Update(data dto.TPObjectCreate) (model.TP_Object
 		ID:           data.BaseInfo.ObjectDetailedID,
 		Model:        data.DetailedInfo.Model,
 		VoltageClass: data.DetailedInfo.VoltageClass,
-		Nourashes:    data.DetailedInfo.Nourashes,
 	}
 
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
@@ -193,7 +210,6 @@ func (repo *tpObjectRepository) Update(data dto.TPObjectCreate) (model.TP_Object
 		if err := tx.Delete(&model.ObjectTeams{}, "object_id = ?", object.ID).Error; err != nil {
 			return err
 		}
-
 
 		if len(data.Teams) != 0 {
 			object_teams := []model.ObjectTeams{}
@@ -263,22 +279,58 @@ func (repo *tpObjectRepository) Delete(id, projectID uint) error {
 	})
 }
 
-func (repo *tpObjectRepository) CreateInBatches(objects []model.Object, tps []model.TP_Object, supervisors []uint) ([]model.TP_Object, error) {
-	err := repo.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.CreateInBatches(&tps, 10).Error; err != nil {
-			return err
-		}
+func (repo *tpObjectRepository) CreateInBatches(data []dto.TPObjectImportData) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		for index, row := range data {
+			tp := row.TP
+			if err := tx.Create(&tp).Error; err != nil {
+				return err
+			}
 
-		for index := range objects {
-			objects[index].ObjectDetailedID = tps[index].ID
-		}
+			object := row.Object
+			object.ObjectDetailedID = tp.ID
+			data[index].Object.ObjectDetailedID = tp.ID
+			if err := tx.Create(&object).Error; err != nil {
+				return err
+			}
 
-		if err := tx.CreateInBatches(&objects, 10).Error; err != nil {
-			return err
+			if row.ObjectSupervisors.SupervisorWorkerID != 0 {
+				data[index].ObjectSupervisors.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectSupervisors).Error; err != nil {
+					return err
+				}
+			}
+
+			if row.ObjectTeam.TeamID != 0 {
+				data[index].ObjectTeam.ObjectID = object.ID
+				if err := tx.Create(&data[index].ObjectTeam).Error; err != nil {
+					return err
+				}
+			}
 		}
 
 		return nil
 	})
+}
 
-	return tps, err
+func (repo *tpObjectRepository) GetTPNames(projectID uint) ([]string, error) {
+	var result []string
+	err := repo.db.Raw(`SELECT name FROM objects WHERE project_id = ? AND type = 'tp_objects'`, projectID).Scan(&result).Error
+	return result, err
+}
+
+func (repo *tpObjectRepository) GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error) {
+	data := []dto.DataForSelect[string]{}
+	err := repo.db.Raw(`
+    SELECT 
+      objects.name as "label",
+      objects.name as "value"
+    FROM objects
+    INNER JOIN tp_objects ON tp_objects.id = objects.object_detailed_id
+    WHERE
+      objects.project_id = ? AND
+      objects.type = 'tp_objects'
+    `, projectID).Scan(&data).Error
+
+	return data, err
 }

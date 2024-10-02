@@ -31,7 +31,6 @@ type TP_Object struct {
 	ID           uint   `json:"id" gorm:"primaryKey"`
 	Model        string `json:"model" gorm:"tinyText"`
 	VoltageClass string `json:"voltageClass" gorm:"tinyText"`
-	Nourashes    string `json:"nourashes" gorm:"tinyText"`
 }
 
 type STVT_Object struct {

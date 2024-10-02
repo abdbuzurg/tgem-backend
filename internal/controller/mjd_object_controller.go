@@ -161,7 +161,10 @@ func (controller *mjdObjectController) GetTemplateFile(c *gin.Context) {
 	}
 
 	c.FileAttachment(tmpFilePath, "Шаблон для импорта МЖД.xlsx")
-	os.Remove(tmpFilePath)
+	if err := os.Remove(tmpFilePath); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
 }
 
 func (controller *mjdObjectController) Import(c *gin.Context) {
@@ -200,7 +203,10 @@ func (controller *mjdObjectController) Export(c *gin.Context) {
 
 	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
 	c.FileAttachment(exportFilePath, exportFileName)
-	os.Remove(exportFileName)
+	if err := os.Remove(exportFilePath); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
 }
 
 func (controller *mjdObjectController) GetObjectNamesForSearch(c *gin.Context) {

@@ -30,3 +30,17 @@ type STVTObjectCreate struct {
 	Supervisors  []uint            `json:"supervisors"`
 	Teams        []uint            `json:"teams"`
 }
+
+type STVTObjectSearchParameters struct {
+	ProjectID          uint
+	ObjectName         string
+	SupervisorWorkerID uint
+	TeamID             uint
+}
+
+type STVTObjectImportData struct {
+	Object            model.Object
+	STVT               model.STVT_Object
+	ObjectSupervisors model.ObjectSupervisors
+	ObjectTeam        model.ObjectTeams
+}

@@ -35,3 +35,10 @@ type SIPObjectImportData struct {
 	ObjectSupervisors model.ObjectSupervisors
 	ObjectTeam        model.ObjectTeams
 }
+
+type SIPObjectSearchParameters struct {
+	ProjectID          uint
+	ObjectName         string
+	SupervisorWorkerID uint
+	TeamID             uint
+}

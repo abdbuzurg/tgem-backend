@@ -31,7 +31,7 @@ type IMJDObjectRepository interface {
 func (repo *mjdObjectRepository) GetPaginated(page, limit int, filter dto.MJDObjectSearchParameters) ([]dto.MJDObjectPaginatedQuery, error) {
 	data := []dto.MJDObjectPaginatedQuery{}
 	err := repo.db.Raw(`
-    SELECT 
+    SELECT DISTINCT
       objects.id as object_id,
       mjd_objects.id as object_detailed_id,
       objects.name as name,
@@ -68,7 +68,7 @@ func (repo *mjdObjectRepository) GetPaginated(page, limit int, filter dto.MJDObj
 func (repo *mjdObjectRepository) Count(filter dto.MJDObjectSearchParameters) (int64, error) {
 	var count int64
 	err := repo.db.Raw(`
-    SELECT COUNT(*)
+    SELECT DISTINCT COUNT(*)
     FROM objects
     FULL JOIN object_teams ON object_teams.object_id = objects.id
     FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
