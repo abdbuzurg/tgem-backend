@@ -23,8 +23,22 @@ type SubstationObjectPaginated struct {
 }
 
 type SubstationObjectCreate struct {
-	BaseInfo     model.Object    `json:"baseInfo"`
+	BaseInfo     model.Object            `json:"baseInfo"`
 	DetailedInfo model.Substation_Object `json:"detailedInfo"`
-	Supervisors  []uint          `json:"supervisors"`
-	Teams        []uint          `json:"teams"`
+	Supervisors  []uint                  `json:"supervisors"`
+	Teams        []uint                  `json:"teams"`
+}
+
+type SubstationObjectImportData struct {
+	Object            model.Object
+	Substation        model.Substation_Object
+	ObjectSupervisors model.ObjectSupervisors
+	ObjectTeam        model.ObjectTeams
+}
+
+type SubstationObjectSearchParameters struct {
+	ProjectID          uint
+	ObjectName         string
+	SupervisorWorkerID uint
+	TeamID             uint
 }

@@ -206,7 +206,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		workerRepo,
 		objectSupervisorsRepo,
 		objectTeamsRepo,
-    teamRepo,
+		teamRepo,
 	)
 	teamService := service.InitTeamService(
 		teamRepo,
@@ -219,7 +219,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectSupervisorsRepo,
 		objectTeamsRepo,
 		objectRepo,
-    teamRepo,
+		teamRepo,
 	)
 	userService := service.InitUserService(
 		userRepo,
@@ -244,6 +244,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		workerRepo,
 		objectSupervisorsRepo,
 		objectTeamsRepo,
+		teamRepo,
 	)
 	invoiceWriteOffService := service.InitInvoiceWriteOffService(
 		invoiceWriteOffRepo,
@@ -588,7 +589,7 @@ func InitTPObjectRoutes(router *gin.RouterGroup, controller controller.ITPObject
 	tpObjectRoutes.GET("/document/template", controller.GetTemplateFile)
 	tpObjectRoutes.GET("/all", controller.GetAll)
 	tpObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
-  tpObjectRoutes.GET("/document/export", controller.Export)
+	tpObjectRoutes.GET("/document/export", controller.Export)
 	tpObjectRoutes.POST("/", controller.Create)
 	tpObjectRoutes.POST("/document/import", controller.Import)
 	tpObjectRoutes.PATCH("/", controller.Update)
@@ -602,7 +603,8 @@ func InitSubstationObjectRoutes(router *gin.RouterGroup, controller controller.I
 	)
 	substationObjectRoutes.GET("/paginated", controller.GetPaginated)
 	substationObjectRoutes.GET("/document/template", controller.GetTemplateFile)
-	substationObjectRoutes.POST("/", controller.Create)
+	substationObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
+	substationObjectRoutes.GET("/document/export", controller.Export)
 	substationObjectRoutes.POST("/document/import", controller.Import)
 	substationObjectRoutes.PATCH("/", controller.Update)
 	substationObjectRoutes.DELETE("/:id", controller.Delete)

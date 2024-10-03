@@ -159,7 +159,7 @@ func (service *mjdObjectService) TemplateFile(filePath string, projectID uint) (
 
 	currentTime := time.Now()
 	temporaryFileName := fmt.Sprintf(
-		"Шаблон импорта СИП - %s.xlsx",
+		"Шаблон импорта МЖД - %s.xlsx",
 		currentTime.Format("02-01-2006"),
 	)
 	temporaryFilePath := filepath.Join("./pkg/excels/temp/", temporaryFileName)

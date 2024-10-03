@@ -152,7 +152,7 @@ func (controller *mjdObjectController) Delete(c *gin.Context) {
 }
 
 func (controller *mjdObjectController) GetTemplateFile(c *gin.Context) {
-	templateFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта МЖД.xlsx")
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта Подстанции.xlsx")
 
 	tmpFilePath, err := controller.mjdObjectService.TemplateFile(templateFilePath, c.GetUint("projectID"))
 	if err != nil {
@@ -160,7 +160,7 @@ func (controller *mjdObjectController) GetTemplateFile(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment(tmpFilePath, "Шаблон для импорта МЖД.xlsx")
+	c.FileAttachment(tmpFilePath, "Шаблон для импорта Подстанции.xlsx")
 	if err := os.Remove(tmpFilePath); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
