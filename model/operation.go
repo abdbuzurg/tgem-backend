@@ -10,6 +10,6 @@ type Operation struct {
 	CostPrime        decimal.Decimal `json:"costPrime" gorm:"type:decimal(20,4)"`
 	CostWithCustomer decimal.Decimal `json:"costWithCustomer" gorm:"type:decimal(20,4)"`
 
-	ObjectOperations   []ObjectOperation   `json:"-" gorm:"foreignKey:OperationID"`
+	InvoiceOperations  []InvoiceOperations `json:"-" gorm:"foreignKey:OperationID"`
 	OperationMaterials []OperationMaterial `json:"-" gorm:"foreignKey:OperationID"`
 }

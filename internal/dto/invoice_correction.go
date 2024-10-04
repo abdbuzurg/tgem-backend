@@ -6,11 +6,10 @@ import (
 )
 
 type InvoiceCorrectionMaterialsData struct {
-	InvoiceMaterialID uint    `json:"invoiceMaterialID"`
-	MaterialName      string  `json:"materialName"`
-	MaterialID        uint    `json:"materialID"`
-	MaterialAmount    float64 `json:"materialAmount"`
-	Notes             string  `json:"notes"`
+	MaterialName   string  `json:"materialName"`
+	MaterialID     uint    `json:"materialID"`
+	MaterialAmount float64 `json:"materialAmount"`
+	Notes          string  `json:"notes"`
 }
 
 type InvoiceCorrectionPaginated struct {
@@ -26,7 +25,7 @@ type InvoiceCorrectionPaginated struct {
 }
 
 type InvoiceCorrectionCreateDetails struct {
-	ID               uint      `json:"id"`
+	InvoiceObjectID  uint      `json:"id"`
 	DateOfCorrection time.Time `json:"dateOfCorrection"`
 	OperatorWorkerID uint      `json:"operatorWorkerID"`
 }
@@ -38,12 +37,12 @@ type InvoiceCorrectionCreate struct {
 }
 
 type InvoiceCorrectionCreateQuery struct {
-	Details          model.InvoiceObject
-	OperatorDetails  model.InvoiceObjectOperator
-	Items            []model.InvoiceMaterials
-	TeamLocation     []model.MaterialLocation
-	ObjectLocation   []model.MaterialLocation
-	ObjectOperations []model.ObjectOperation
+	Details           model.InvoiceObject
+	OperatorDetails   model.InvoiceObjectOperator
+	InvoiceMaterials  []model.InvoiceMaterials
+	InvoiceOperations []model.InvoiceOperations
+	TeamLocation      []model.MaterialLocation
+	ObjectLocation    []model.MaterialLocation
 }
 
 type InvoiceCorrectionReportFilter struct {
@@ -67,8 +66,8 @@ type InvoiceCorrectionReportData struct {
 }
 
 type InvoiceCorrectionOperationsData struct {
-	OperationID   uint    `json:"operationID"`
 	OperationName string  `json:"operationName"`
+	OperationID   uint    `json:"operationID"`
 	Amount        float64 `json:"amount"`
 	MaterialName  string  `json:"materialName"`
 }

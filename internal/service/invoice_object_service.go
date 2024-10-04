@@ -5,9 +5,7 @@ import (
 	"backend-v2/internal/repository"
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
-	"errors"
 
-	"gorm.io/gorm"
 )
 
 type invoiceObjectService struct {
@@ -21,6 +19,8 @@ type invoiceObjectService struct {
 	invoiceMaterialRepo   repository.IInvoiceMaterialsRepository
 	objectTeamsRepo       repository.IObjectTeamsRepository
 	operationMaterialRepo repository.IOperationMaterialRepository
+  operationRepo repository.IOperationRepository
+  materialRepo repository.IMaterialRepository
 }
 
 func InitInvoiceObjectService(
@@ -34,6 +34,8 @@ func InitInvoiceObjectService(
 	invoiceMaterialRepo repository.IInvoiceMaterialsRepository,
 	objectTeamsRepo repository.IObjectTeamsRepository,
 	operationMaterialRepo repository.IOperationMaterialRepository,
+  operationRepo repository.IOperationRepository,
+  materialRepo repository.IMaterialRepository,
 ) IInvoiceObjectService {
 	return &invoiceObjectService{
 		invoiceObjectRepo:     invoiceObjectRepo,
@@ -46,6 +48,8 @@ func InitInvoiceObjectService(
 		invoiceMaterialRepo:   invoiceMaterialRepo,
 		objectTeamsRepo:       objectTeamsRepo,
 		operationMaterialRepo: operationMaterialRepo,
+    operationRepo: operationRepo,
+    materialRepo: materialRepo,
 	}
 }
 
@@ -60,6 +64,7 @@ type IInvoiceObjectService interface {
 	GetAvailableMaterialAmount(projectID, materialID, teamID uint) (float64, error)
 	Count(projectID uint) (int64, error)
 	GetTeamsFromObjectID(objectID uint) ([]dto.TeamDataForSelect, error)
+  GetOperationsBasedOnMaterialsInTeamID(projectID, teamID uint) ([]dto.InvoiceObjectOperationsBasedOnTeam, error)
 }
 
 func (service *invoiceObjectService) GetInvoiceObjectDescriptiveDataByID(id uint) (dto.InvoiceObjectWithMaterialsDescriptive, error) {
@@ -217,7 +222,7 @@ func (service *invoiceObjectService) Create(data dto.InvoiceObjectCreate) (model
 						ID:             0,
 						MaterialCostID: oneEntry.MaterialCostID,
 						InvoiceID:      data.Details.ID,
-						InvoiceType:    "output",
+						InvoiceType:    "object",
 						IsDefected:     false,
 						Amount:         0,
 						Notes:          invoiceMaterial.Notes,
@@ -229,33 +234,23 @@ func (service *invoiceObjectService) Create(data dto.InvoiceObjectCreate) (model
 		}
 	}
 
-	objectOperations := []model.ObjectOperation{}
-	for _, invoiceMaterial := range invoiceMaterialForCreate {
-		operationMaterial, err := service.operationMaterialRepo.GetByMaterialCostID(invoiceMaterial.MaterialCostID)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			continue
-		} else if err != nil {
-			return model.InvoiceObject{}, err
-		}
-
-		if operationMaterial.OperationID == 0 || operationMaterial.MaterialID == 0 {
-			continue
-		}
-
-		objectOperations = append(objectOperations, model.ObjectOperation{
-			ID:              0,
-			InvoiceObjectID: 0,
-			ProjectID:       data.Details.ProjectID,
-			OperationID:     operationMaterial.OperationID,
-			Amount:          invoiceMaterial.Amount,
-			Notes:           "",
-		})
-	}
+  invoiceOperationsForCreate := []model.InvoiceOperations{}
+  for _, invoiceOperation := range data.Operations{
+    invoiceOperationsForCreate = append(invoiceOperationsForCreate, model.InvoiceOperations{
+      ID: 0,
+      ProjectID: data.Details.ProjectID,
+      OperationID: invoiceOperation.OperationID,
+      InvoiceID: 0,
+      InvoiceType: "object",
+      Amount: invoiceOperation.Amount,
+      Notes: invoiceOperation.Notes,
+    })
+  }
 
 	invoiceObject, err := service.invoiceObjectRepo.Create(dto.InvoiceObjectCreateQueryData{
 		Invoice:               data.Details,
 		InvoiceMaterials:      invoiceMaterialForCreate,
-		ObjectOperations:      objectOperations,
+		InvoiceOperations:      invoiceOperationsForCreate,
 		SerialNumberMovements: serialNumberMovements,
 	})
 
@@ -311,4 +306,48 @@ func (service *invoiceObjectService) Count(projectID uint) (int64, error) {
 
 func (service *invoiceObjectService) GetTeamsFromObjectID(objectID uint) ([]dto.TeamDataForSelect, error) {
 	return service.objectTeamsRepo.GetTeamsByObjectID(objectID)
+}
+
+func (service *invoiceObjectService) GetOperationsBasedOnMaterialsInTeamID(projectID, teamID uint) ([]dto.InvoiceObjectOperationsBasedOnTeam, error) {
+  result := []dto.InvoiceObjectOperationsBasedOnTeam{}
+
+  operationsAvailableForTeam, err := service.invoiceObjectRepo.GetOperationsBasedOnMaterialsInTeam(teamID)
+  if err != nil {
+    return result, err
+  }
+
+  operationWithoutMaterials, err := service.operationRepo.GetWithoutMaterialOperations(projectID)
+  if err != nil {
+    return result, err
+  }
+
+  for _, operation := range operationsAvailableForTeam {
+    operationMaterial, err := service.operationMaterialRepo.GetByOperationID(operation.ID)
+    if err != nil {
+      return []dto.InvoiceObjectOperationsBasedOnTeam{}, err
+    }
+
+    material, err := service.materialRepo.GetByID(operationMaterial.MaterialID)
+    if err != nil {
+      return []dto.InvoiceObjectOperationsBasedOnTeam{}, err
+    }
+
+    result = append(result, dto.InvoiceObjectOperationsBasedOnTeam{
+      OperationID: operation.ID,
+      OperationName: operation.Name,
+      MaterialID: operationMaterial.MaterialID,
+      MaterialName: material.Name,
+    })
+  }
+
+  for _, operation := range operationWithoutMaterials {
+    result = append(result, dto.InvoiceObjectOperationsBasedOnTeam{
+      OperationID: operation.ID,
+      OperationName: operation.Name,
+      MaterialID: 0,
+      MaterialName: "",
+    })
+  }
+
+  return result, nil
 }

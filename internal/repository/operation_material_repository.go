@@ -18,6 +18,7 @@ func InitOperationMaterialRepository(db *gorm.DB) IOperationMaterialRepository {
 
 type IOperationMaterialRepository interface {
 	GetByMaterialCostID(materialCostID uint) (model.OperationMaterial, error)
+	GetByOperationID(operationID uint) (model.OperationMaterial, error)
 }
 
 func (repo *operationMaterialRepository) GetByMaterialCostID(materialCostID uint) (model.OperationMaterial, error) {
@@ -36,5 +37,11 @@ func (repo *operationMaterialRepository) GetByMaterialCostID(materialCostID uint
     )
     `, materialCostID).Scan(&result).Error
 
+	return result, err
+}
+
+func (repo *operationMaterialRepository) GetByOperationID(operationID uint) (model.OperationMaterial, error) {
+	var result model.OperationMaterial
+	err := repo.db.Find(&result, "operation_id = ?", operationID).Error
 	return result, err
 }

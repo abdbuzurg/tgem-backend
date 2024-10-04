@@ -27,7 +27,7 @@ type IInvoiceCorrectionRepository interface {
 	UniqueObject(projectID uint) ([]dto.ObjectDataForSelect, error)
 	ReportFilterData(filter dto.InvoiceCorrectionReportFilter) ([]dto.InvoiceCorrectionReportData, error)
 	Count(projectID uint) (int64, error)
-  GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error)
+	GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error)
 }
 
 func (repo *invoiceCorrectionRepository) GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error) {
@@ -110,21 +110,13 @@ func (repo *invoiceCorrectionRepository) Create(data dto.InvoiceCorrectionCreate
 			return err
 		}
 
-		for index := range data.Items {
-			data.Items[index].InvoiceID = result.ID
-		}
-
-		if err := tx.CreateInBatches(&data.Items, 15).Error; err != nil {
+		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
 			return err
 		}
 
-    if err := tx.Delete(&model.ObjectOperation{}, "invoice_object_id = ?", result.ID).Error; err != nil {
-      return err
-    }
-
-    if err := tx.CreateInBatches(&data.ObjectOperations, 15).Error; err != nil {
-      return err
-    }
+		if err := tx.CreateInBatches(&data.InvoiceOperations, 15).Error; err != nil {
+			return err
+		}
 
 		if err := tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "id"}},
@@ -240,21 +232,21 @@ func (repo *invoiceCorrectionRepository) Count(projectID uint) (int64, error) {
 }
 
 func (repo *invoiceCorrectionRepository) GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error) {
-  result := []dto.InvoiceCorrectionOperationsData{}
-  err := repo.db.Raw(`
+	result := []dto.InvoiceCorrectionOperationsData{}
+	err := repo.db.Raw(`
     SELECT 
       operations.id as operation_id,
       operations.name as operation_name,
-      object_operations.amount as amount,
+      invoice_operations.amount as amount,
       materials.name as material_name
-    FROM invoice_objects
-    INNER JOIN object_operations ON object_operations.invoice_object_id = invoice_objects.id
-    INNER JOIN operations ON operations.id = object_operations.operation_id
-    INNER JOIN operation_materials ON operation_materials.operation_id = operations.id
-    INNER JOIN materials ON operation_materials.material_id = materials.id
+    FROM invoice_operations
+    INNER JOIN operations ON operations.id = invoice_operations.operation_id
+    FULL JOIN operation_materials ON operation_materials.operation_id = operations.id 
+    FULL JOIN materials ON materials.id = operation_materials.material_id
     WHERE
-      invoice_objects.id = ?;
+      invoice_operations.invoice_id = ? AND
+      invoice_operations.invoice_type = 'object'
     `, id).Scan(&result).Error
 
-  return result, err
+	return result, err
 }

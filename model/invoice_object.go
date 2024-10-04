@@ -14,5 +14,4 @@ type InvoiceObject struct {
 	DateOfCorrection    time.Time `json:"dateOfCorrection"`
 
   InvoiceObjectOperators []InvoiceObjectOperator `json:"-" gorm:"foreignKey:InvoiceObjectID"`
-  ObjectOperations []ObjectOperation `json:"-" gorm:"foreignKey:InvoiceObjectID"`
 }

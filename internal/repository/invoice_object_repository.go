@@ -26,6 +26,7 @@ type IInvoiceObjectRepository interface {
 	GetByID(id uint) (model.InvoiceObject, error)
 	GetForCorrection(projectID uint) ([]dto.InvoiceCorrectionPaginated, error)
 	GetTeamsFromObjectID(objectID uint) ([]model.Team, error)
+	GetOperationsBasedOnMaterialsInTeam(teamID uint) ([]model.Operation, error)
 }
 
 func (repo *invoiceObjectRepository) GetInvoiceObjectDescriptiveDataByID(id uint) (dto.InvoiceObjectPaginated, error) {
@@ -66,21 +67,23 @@ func (repo *invoiceObjectRepository) Create(data dto.InvoiceObjectCreateQueryDat
 		if err := tx.CreateInBatches(&data.InvoiceMaterials, 15).Error; err != nil {
 			return err
 		}
-    
-    for index := range data.ObjectOperations {
-      data.ObjectOperations[index].InvoiceObjectID = invoice.ID
-    }
 
-    if err := tx.CreateInBatches(&data.ObjectOperations, 15).Error; err != nil {
-      return err
-    }
-
-		for index := range data.SerialNumberMovements {
-			data.SerialNumberMovements[index].InvoiceID = invoice.ID
+		for index := range data.InvoiceOperations {
+			data.InvoiceOperations[index].InvoiceID = invoice.ID
 		}
 
-		if err := tx.CreateInBatches(&data.SerialNumberMovements, 15).Error; err != nil {
+		if err := tx.CreateInBatches(&data.InvoiceOperations, 15).Error; err != nil {
 			return err
+		}
+
+		if len(data.SerialNumberMovements) != 0 {
+			for index := range data.SerialNumberMovements {
+				data.SerialNumberMovements[index].InvoiceID = invoice.ID
+			}
+
+			if err := tx.CreateInBatches(&data.SerialNumberMovements, 15).Error; err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -174,6 +177,33 @@ func (repo *invoiceObjectRepository) GetTeamsFromObjectID(objectID uint) ([]mode
     INNER JOIN teams ON teams.id = object_teams.team_id
     WHERE object_teams.object_id = ?;
     `, objectID).Scan(&data).Error
+
+	return data, err
+}
+
+func (repo *invoiceObjectRepository) GetOperationsBasedOnMaterialsInTeam(teamID uint) ([]model.Operation, error) {
+	var data []model.Operation
+	err := repo.db.Raw(`
+    SELECT 
+      operations.id,
+      operations.project_id,
+      operations.name,
+      operations.code,
+      operations.cost_prime,
+      operations.cost_with_customer
+    FROM operations
+    INNER JOIN operation_materials ON operation_materials.operation_id = operations.id
+    WHERE 
+      operation_materials.material_id IN (
+        SELECT materials.id
+        FROM material_locations
+        INNER JOIN material_costs ON material_locations.material_cost_id = material_costs.id
+        INNER JOIN materials ON material_costs.material_id = materials.id
+        WHERE
+          material_locations.location_type = 'team' AND
+          material_locations.location_id = ?
+      )
+    `, teamID).Scan(&data).Error
 
 	return data, err
 }

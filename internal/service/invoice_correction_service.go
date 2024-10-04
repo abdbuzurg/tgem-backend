@@ -34,7 +34,7 @@ func InitInvoiceCorrectionService(
 }
 
 type IInvoiceCorrectionService interface {
-  GetPaginated(page, limit int, projectID uint)([]dto.InvoiceCorrectionPaginated, error)
+	GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error)
 	GetAll(projectID uint) ([]dto.InvoiceCorrectionPaginated, error)
 	GetTotalAmounInLocationByTeamName(projectID, materialID uint, teamNumber string) (float64, error)
 	GetInvoiceMaterialsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionMaterialsData, error)
@@ -43,12 +43,12 @@ type IInvoiceCorrectionService interface {
 	UniqueObject(projectID uint) ([]dto.ObjectDataForSelect, error)
 	UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error)
 	Report(filter dto.InvoiceCorrectionReportFilter) (string, error)
-  Count(projectID uint) (int64, error)
-  GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error)
+	Count(projectID uint) (int64, error)
+	GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error)
 }
 
 func (service *invoiceCorrectionService) GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error) {
-  return service.invoiceCorrectionRepo.GetPaginated(page, limit, projectID)
+	return service.invoiceCorrectionRepo.GetPaginated(page, limit, projectID)
 }
 
 func (service *invoiceCorrectionService) GetAll(projectID uint) ([]dto.InvoiceCorrectionPaginated, error) {
@@ -68,12 +68,12 @@ func (service *invoiceCorrectionService) GetSerialNumberOfMaterialInTeam(project
 }
 
 func (service *invoiceCorrectionService) Count(projectID uint) (int64, error) {
-  return service.invoiceCorrectionRepo.Count(projectID)
+	return service.invoiceCorrectionRepo.Count(projectID)
 }
 
 func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate) (model.InvoiceObject, error) {
 
-	invoiceObject, err := service.invoiceObjectRepo.GetByID(data.Details.ID)
+	invoiceObject, err := service.invoiceObjectRepo.GetByID(data.Details.InvoiceObjectID)
 	if err != nil {
 		return model.InvoiceObject{}, err
 	}
@@ -82,26 +82,25 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 	invoiceObject.DateOfCorrection = data.Details.DateOfCorrection
 
 	invoiceMaterialForCreate := []model.InvoiceMaterials{}
-
 	for _, invoiceMaterial := range data.Items {
 		materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(invoiceObject.ProjectID, invoiceMaterial.MaterialID, "team", invoiceObject.TeamID)
 		if err != nil {
 			return model.InvoiceObject{}, err
 		}
 
-    fmt.Println(materialInfoSorted)
+		fmt.Println(materialInfoSorted)
 
 		index := 0
 		for invoiceMaterial.MaterialAmount > 0 {
-      if len(materialInfoSorted) == index {
-        return model.InvoiceObject{}, fmt.Errorf("Ошибка корректировки: количество материала внутри корректировки превышает количество материала у бригадира")
-      }
+			if len(materialInfoSorted) == index {
+				return model.InvoiceObject{}, fmt.Errorf("Ошибка корректировки: количество материала внутри корректировки превышает количество материала у бригады")
+			}
 			invoiceMaterialCreate := model.InvoiceMaterials{
 				ProjectID:      invoiceObject.ProjectID,
 				ID:             0,
 				MaterialCostID: materialInfoSorted[index].MaterialCostID,
-				InvoiceID:      0,
-				InvoiceType:    "correction",
+				InvoiceID:      invoiceObject.ID,
+				InvoiceType:    "object-correction",
 				IsDefected:     false,
 				Amount:         0,
 				Notes:          invoiceMaterial.Notes,
@@ -118,7 +117,19 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 			invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
 			index++
 		}
+	}
 
+	invoiceOperationsForCreate := []model.InvoiceOperations{}
+	for _, invoiceOperation := range data.Operations {
+		invoiceOperationsForCreate = append(invoiceOperationsForCreate, model.InvoiceOperations{
+			ID:          0,
+			ProjectID:   invoiceObject.ProjectID,
+			OperationID: invoiceOperation.OperationID,
+			InvoiceID:   invoiceObject.ID,
+			InvoiceType: "object-correction",
+			Amount:      invoiceOperation.Amount,
+			Notes:       "",
+		})
 	}
 
 	toBeUpdatedTeamLocations := []model.MaterialLocation{}
@@ -151,27 +162,16 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 		toBeUpdatedObjectLocations = append(toBeUpdatedObjectLocations, materialInObjectLocation)
 	}
 
-  objectOperations := []model.ObjectOperation{}
-  for _, operation := range data.Operations {
-    objectOperations = append(objectOperations, model.ObjectOperation{
-      InvoiceObjectID: invoiceObject.ID,
-      ProjectID: invoiceObject.ProjectID,
-      OperationID: operation.OperationID,
-      Amount: operation.Amount,
-      Notes: "",
-    })
-  }
-
 	result, err := service.invoiceCorrectionRepo.Create(dto.InvoiceCorrectionCreateQuery{
-		Details:        invoiceObject,
-		Items:          invoiceMaterialForCreate,
-		TeamLocation:   toBeUpdatedTeamLocations,
-		ObjectLocation: toBeUpdatedObjectLocations,
+		Details:           invoiceObject,
+		InvoiceMaterials:  invoiceMaterialForCreate,
+		InvoiceOperations: invoiceOperationsForCreate,
+		TeamLocation:      toBeUpdatedTeamLocations,
+		ObjectLocation:    toBeUpdatedObjectLocations,
 		OperatorDetails: model.InvoiceObjectOperator{
 			OperatorWorkerID: data.Details.OperatorWorkerID,
 			InvoiceObjectID:  invoiceObject.ID,
 		},
-    ObjectOperations: objectOperations,
 	})
 
 	return result, nil
@@ -219,10 +219,10 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 			dateOfCorrection = dateOfCorrection[:len(dateOfCorrection)-10]
 			f.SetCellStr(sheetName, "H"+fmt.Sprint(rowCount+index), dateOfCorrection)
 
-      f.SetCellStr(sheetName, "I"+fmt.Sprint(rowCount+index), invoiceMaterial.MaterialName)
-      f.SetCellStr(sheetName, "J"+fmt.Sprint(rowCount+index), invoiceMaterial.MaterialUnit)
-      f.SetCellFloat(sheetName, "K"+fmt.Sprint(rowCount+index), invoiceMaterial.InvoiceMaterialAmount, 2, 64)
-      f.SetCellStr(sheetName, "L"+fmt.Sprint(rowCount+index), invoiceMaterial.InvoiceMaterialNotes)
+			f.SetCellStr(sheetName, "I"+fmt.Sprint(rowCount+index), invoiceMaterial.MaterialName)
+			f.SetCellStr(sheetName, "J"+fmt.Sprint(rowCount+index), invoiceMaterial.MaterialUnit)
+			f.SetCellFloat(sheetName, "K"+fmt.Sprint(rowCount+index), invoiceMaterial.InvoiceMaterialAmount, 2, 64)
+			f.SetCellStr(sheetName, "L"+fmt.Sprint(rowCount+index), invoiceMaterial.InvoiceMaterialNotes)
 		}
 	}
 
@@ -243,6 +243,6 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 	return fileName, nil
 }
 
-func(service *invoiceCorrectionService) GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error) {
-  return service.invoiceCorrectionRepo.GetOperationsByInvoiceObjectID(id) 
+func (service *invoiceCorrectionService) GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error) {
+	return service.invoiceCorrectionRepo.GetOperationsByInvoiceObjectID(id)
 }

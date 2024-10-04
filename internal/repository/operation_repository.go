@@ -27,6 +27,7 @@ type IOperationRepository interface {
 	Update(data dto.Operation) (model.Operation, error)
 	Delete(id uint) error
 	Count(filter dto.OperationSearchParameters) (int64, error)
+	GetWithoutMaterialOperations(projectID uint) ([]model.Operation, error)
 }
 
 func (repo *operationRepository) GetPaginated(page, limit int, filter dto.OperationSearchParameters) ([]dto.OperationPaginated, error) {
@@ -193,3 +194,21 @@ func (repo *operationRepository) GetAll(projectID uint) ([]dto.OperationPaginate
 
 	return result, err
 }
+
+func (repo *operationRepository) GetWithoutMaterialOperations(projectID uint) ([]model.Operation, error) {
+  var result []model.Operation
+  err := repo.db.Raw(`
+    SELECT *
+    FROM operations
+    WHERE 
+      operations.project_id = ? AND
+      operations.id NOT IN (
+        SELECT operation_materials.operation_id
+        FROM operation_materials
+      )
+    `, projectID).Scan(&result).Error
+
+  return result, err
+}
+
+

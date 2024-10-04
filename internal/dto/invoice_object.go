@@ -23,15 +23,22 @@ type InvoiceObjectItem struct {
 	Notes         string   `json:"notes"`
 }
 
+type InvoiceObjectOperation struct {
+	OperationID uint    `json:"operationID"`
+	Amount      float64 `json:"amount"`
+	Notes       string  `json:"notes"`
+}
+
 type InvoiceObjectCreate struct {
-	Details model.InvoiceObject `json:"details"`
-	Items   []InvoiceObjectItem `json:"items"`
+	Details    model.InvoiceObject `json:"details"`
+	Items      []InvoiceObjectItem `json:"items"`
+	Operations []InvoiceObjectOperation     `json:"operations"`
 }
 
 type InvoiceObjectCreateQueryData struct {
 	Invoice               model.InvoiceObject
 	InvoiceMaterials      []model.InvoiceMaterials
-	ObjectOperations      []model.ObjectOperation
+	InvoiceOperations      []model.InvoiceOperations
 	SerialNumberMovements []model.SerialNumberMovement
 }
 
@@ -59,4 +66,11 @@ type InvoiceObjectTeamMaterials struct {
 	MaterialUnit    string  `json:"materialUnit"`
 	HasSerialNumber bool    `json:"hasSerialNumber"`
 	Amount          float64 `json:"amount"`
+}
+
+type InvoiceObjectOperationsBasedOnTeam struct {
+	OperationID   uint   `json:"operationID"`
+	OperationName string `json:"operationName"`
+	MaterialID    uint   `json:"materialID"`
+  MaterialName string `json:"materialName"`
 }

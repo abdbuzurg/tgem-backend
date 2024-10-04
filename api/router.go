@@ -135,6 +135,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		invoiceMaterialRepo,
 		objectTeamsRepo,
 		operationMaterialRepo,
+    operationRepo,
+    materialRepo,
 	)
 	invoiceCorrectionService := service.InitInvoiceCorrectionService(
 		invoiceCorrectionRepo,
@@ -400,7 +402,8 @@ func InitInvoiceObjectRoutes(router *gin.RouterGroup, controller controller.IInv
 
 	invoiceObjectRoutes.GET("/:id", controller.GetInvoiceObjectDescriptiveDataByID)
 	invoiceObjectRoutes.GET("/paginated", controller.GetPaginated)
-	invoiceObjectRoutes.GET("/team/:teamID", controller.GetTeamsMaterials)
+	invoiceObjectRoutes.GET("/team-materials/:teamID", controller.GetTeamsMaterials)
+  invoiceObjectRoutes.GET("/available-operations-for-team/:teamID", controller.GetOperationsBasedOnMaterialsInTeamID)
 	invoiceObjectRoutes.GET("/serial-number/material/:materialID/teams/:teamID", controller.GetSerialNumbersOfMaterial)
 	invoiceObjectRoutes.GET("/material/:materialID/team/:teamID", controller.GetMaterialAmountInTeam)
 	invoiceObjectRoutes.GET("/object/:objectID", controller.GetTeamsFromObjectID)

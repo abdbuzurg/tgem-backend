@@ -33,10 +33,10 @@ type Project struct {
 	InvoiceReturns             []InvoiceReturn             `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceObject              []InvoiceObject             `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceWriteOffs           []InvoiceWriteOff           `json:"-" gorm:"foreignKey:ProjectID"`
+	InvoiceOperations          []InvoiceOperations         `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceMaterials           []InvoiceMaterials          `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceOutputOutOfProjects []InvoiceOutputOutOfProject `json:"-" gorm:"foreignKey:ProjectID"`
 	InvoiceCounts              []InvoiceCount              `json:"-" gorm:"foreignKey:ProjectID"`
 	Operations                 []Operation                 `json:"-" gorm:"foreignKey:ProjectID"`
-	ObjectOperations           []ObjectOperation           `json:"-" gorm:"foreignKey:ProjectID"`
 	WorkerAttendances          []WorkerAttendance          `json:"-" gorm:"foreignKey:ProjectID"`
 }
