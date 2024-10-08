@@ -346,7 +346,7 @@ func InitInvoiceWriteOffRoutes(router *gin.RouterGroup, controller controller.II
 
 	invoiceWriteOffRoutes.GET("/paginated", controller.GetPaginated)
 	invoiceWriteOffRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumber)
-	invoiceWriteOffRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
+  invoiceWriteOffRoutes.GET("/invoice-materials/:id/:locationType/:locationID", controller.GetMaterialsForEdit)
 	invoiceWriteOffRoutes.GET("/document/:deliveryCode", controller.GetDocument)
 	invoiceWriteOffRoutes.GET("/material/:locationType/:locationID", controller.GetMaterialsInLocation)
 	invoiceWriteOffRoutes.POST("/", controller.Create)

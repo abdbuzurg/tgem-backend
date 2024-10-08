@@ -26,7 +26,7 @@ type IInvoiceWriteOffRepository interface {
 	Update(data dto.InvoiceWriteOffMutationData) (model.InvoiceWriteOff, error)
 	Delete(id uint) error
 	Count(filter dto.InvoiceWriteOffSearchParameters) (int64, error)
-	GetMaterialsForEdit(id uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error)
+	GetMaterialsForEdit(id uint, locationType string, locationID uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error)
 	Confirmation(data dto.InvoiceWriteOffConfirmationData) error
 	ReportFilterData(filter dto.InvoiceWriteOffReportParameters) ([]dto.InvoiceWriteOffReportData, error)
 }
@@ -171,10 +171,10 @@ func (repo *invoiceWriteOffRepository) Count(filter dto.InvoiceWriteOffSearchPar
 	return count, err
 }
 
-func (repo *invoiceWriteOffRepository) GetMaterialsForEdit(id uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error) {
+func (repo *invoiceWriteOffRepository) GetMaterialsForEdit(id uint, locationType string, locationID uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error) {
 	result := []dto.InvoiceWriteOffMaterialsForEdit{}
 	err := repo.db.Raw(`
-    SELECT 
+    SELECT
       materials.id as material_id,
       materials.name as material_name,
       materials.unit as unit,
@@ -182,14 +182,19 @@ func (repo *invoiceWriteOffRepository) GetMaterialsForEdit(id uint) ([]dto.Invoi
       material_costs.id  as material_cost_id,
       material_costs.cost_m19 as material_cost,
       invoice_materials.notes as  notes,
-      materials.has_serial_number as has_serial_number
+      materials.has_serial_number as has_serial_number,
+      material_locations.amount as location_amount
     FROM invoice_materials
     INNER JOIN material_costs ON invoice_materials.material_cost_id = material_costs.id
     INNER JOIN materials ON material_costs.material_id = materials.id
+    INNER JOIN material_locations ON material_locations.material_cost_id = invoice_materials.material_cost_id
     WHERE
       invoice_materials.invoice_type='writeoff' AND
-      invoice_materials.invoice_id = ?;
-    `, id).Scan(&result).Error
+      invoice_materials.invoice_id = ? AND
+      material_locations.location_type = ? AND 
+      material_locations.location_id = ?
+    ORDER BY materials.id
+    `, id, locationType, locationID).Scan(&result).Error
 
 	return result, err
 }

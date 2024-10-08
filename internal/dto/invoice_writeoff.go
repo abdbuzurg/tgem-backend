@@ -50,6 +50,7 @@ type InvoiceWriteOffMaterialsForEdit struct {
 	Notes           string   `json:"notes"`
 	HasSerialNumber bool     `json:"hasSerialNumber"`
 	SerialNumbers   []string `json:"serialNumbers"`
+	LocationAmount  float64  `json:"locationAmount"`
 }
 
 type InvoiceWriteOffConfirmationData struct {

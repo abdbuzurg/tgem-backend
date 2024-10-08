@@ -58,7 +58,7 @@ type IInvoiceWriteOffService interface {
 	Update(data dto.InvoiceWriteOff) (model.InvoiceWriteOff, error)
 	Delete(id uint) error
 	Count(filter dto.InvoiceWriteOffSearchParameters) (int64, error)
-	GetMaterialsForEdit(id uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error)
+	GetMaterialsForEdit(id uint, locationType string, locationID uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error)
 	Confirmation(id, projectID uint) error
 	Report(parameters dto.InvoiceWriteOffReportParameters) (string, error)
 	GetMaterialsInLocation(projectID, locationID uint, locationType string) ([]dto.InvoiceReturnMaterialForSelect, error)
@@ -129,9 +129,30 @@ func (service *invoiceWriteOffService) Create(data dto.InvoiceWriteOff) (model.I
 	data.Details.DeliveryCode = utils.UniqueCodeGeneration("С", int64(count+1), data.Details.ProjectID)
 
 	invoiceMaterialForCreate := []model.InvoiceMaterials{}
+
+	writeOffLocation := ""
+	switch data.Details.WriteOffType {
+	case "loss-warehouse":
+		writeOffLocation = "warehouse"
+		break
+	case "writeoff-warehouse":
+		writeOffLocation = "warehouse"
+		break
+	case "loss-team":
+		writeOffLocation = "team"
+		break
+	case "loss-object":
+		writeOffLocation = "object"
+		break
+	case "writeoff-object":
+		writeOffLocation = "object"
+		break
+	default:
+		return model.InvoiceWriteOff{}, fmt.Errorf("Неправильный вид списание обнаружен")
+	}
 	for _, invoiceMaterial := range data.Items {
 		if len(invoiceMaterial.SerialNumbers) == 0 {
-			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
+			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, writeOffLocation, data.Details.WriteOffLocationID)
 			if err != nil {
 				return model.InvoiceWriteOff{}, err
 			}
@@ -176,10 +197,30 @@ func (service *invoiceWriteOffService) Create(data dto.InvoiceWriteOff) (model.I
 }
 
 func (service *invoiceWriteOffService) Update(data dto.InvoiceWriteOff) (model.InvoiceWriteOff, error) {
+	writeOffLocation := ""
+	switch data.Details.WriteOffType {
+	case "loss-warehouse":
+		writeOffLocation = "warehouse"
+		break
+	case "writeoff-warehouse":
+		writeOffLocation = "warehouse"
+		break
+	case "loss-team":
+		writeOffLocation = "team"
+		break
+	case "loss-object":
+		writeOffLocation = "object"
+		break
+	case "writeoff-object":
+		writeOffLocation = "object"
+		break
+	default:
+		return model.InvoiceWriteOff{}, fmt.Errorf("Неправильный вид списание обнаружен")
+	}
 	invoiceMaterialForCreate := []model.InvoiceMaterials{}
 	for _, invoiceMaterial := range data.Items {
 		if len(invoiceMaterial.SerialNumbers) == 0 {
-			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, "warehouse", 0)
+			materialInfoSorted, err := service.materialLocationRepo.GetMaterialAmountSortedByCostM19InLocation(data.Details.ProjectID, invoiceMaterial.MaterialID, writeOffLocation, data.Details.WriteOffLocationID)
 			if err != nil {
 				return model.InvoiceWriteOff{}, err
 			}
@@ -235,8 +276,30 @@ func (service *invoiceWriteOffService) GetInvoiceMaterialsWithoutSerialNumbers(i
 	return service.invoiceMaterialsRepo.GetInvoiceMaterialsWithoutSerialNumbers(id, "writeoff")
 }
 
-func (service *invoiceWriteOffService) GetMaterialsForEdit(id uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error) {
-	return service.invoiceWriteOffRepo.GetMaterialsForEdit(id)
+func (service *invoiceWriteOffService) GetMaterialsForEdit(id uint, locationType string, locationID uint) ([]dto.InvoiceWriteOffMaterialsForEdit, error) {
+
+	data, err := service.invoiceWriteOffRepo.GetMaterialsForEdit(id, locationType, locationID)
+	if err != nil {
+		return []dto.InvoiceWriteOffMaterialsForEdit{}, nil
+	}
+
+	var result []dto.InvoiceWriteOffMaterialsForEdit
+	for index, entry := range data {
+		if index == 0 {
+			result = append(result, entry)
+			continue
+		}
+
+		lastItemIndex := len(result) - 1
+		if result[lastItemIndex].MaterialID == entry.MaterialID {
+			result[lastItemIndex].Amount += entry.Amount
+			result[lastItemIndex].LocationAmount += entry.LocationAmount
+		} else {
+			result = append(result, entry)
+		}
+	}
+
+	return result, nil
 }
 
 func (service *invoiceWriteOffService) Confirmation(id, projectID uint) error {

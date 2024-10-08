@@ -200,7 +200,7 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 
 	rowCount := 2
 	for _, invoice := range invoices {
-		invoiceMaterials, err := service.invoiceMaterialsRepo.GetDataForReport(invoice.ID, "correction")
+		invoiceMaterials, err := service.invoiceMaterialsRepo.GetDataForReport(invoice.ID, "object-correction")
 		if err != nil {
 			return "", err
 		}

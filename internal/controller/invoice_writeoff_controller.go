@@ -165,7 +165,16 @@ func (controller *invoiceWriteOffController) GetMaterialsForEdit(c *gin.Context)
 	idRaw := c.Param("id")
 	id, err := strconv.ParseUint(idRaw, 10, 64)
 
-	result, err := controller.invoiceWriteOffService.GetMaterialsForEdit(uint(id))
+	locationIDRaw := c.Param("locationID")
+	locationID, err := strconv.Atoi(locationIDRaw)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Invalid parameters in request: %v", err))
+		return
+	}
+
+	locationType := c.Param("locationType")
+
+	result, err := controller.invoiceWriteOffService.GetMaterialsForEdit(uint(id), locationType, uint(locationID))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -199,10 +208,10 @@ func (controller *invoiceWriteOffController) Confirmation(c *gin.Context) {
 
 	fileNameAndExtension := strings.Split(file.Filename, ".")
 	fileExtension := fileNameAndExtension[1]
-  if fileExtension != "pdf" {
-    response.ResponseError(c, fmt.Sprintf("Файл должен быть формата PDF"))
-    return
-  }
+	if fileExtension != "pdf" {
+		response.ResponseError(c, fmt.Sprintf("Файл должен быть формата PDF"))
+		return
+	}
 	file.Filename = invoiceWriteOff.DeliveryCode + "." + fileExtension
 	filePath := filepath.Join("./pkg/excels/writeoff/", file.Filename)
 
