@@ -40,6 +40,8 @@ func (repo *operationRepository) GetPaginated(page, limit int, filter dto.Operat
         operations.code as code,
         operations.cost_prime as cost_prime,
         operations.cost_with_customer as cost_with_customer,
+        operations.planned_amount_for_project as planned_amount_for_project,
+        operations.show_planned_amount_in_report as show_planned_amount_in_report,
         materials.id as material_id,
         materials.name as material_name
       FROM operations 

@@ -20,11 +20,13 @@ type OperationSearchParameters struct {
 }
 
 type OperationPaginated struct {
-	ID               uint            `json:"id"`
-	Name             string          `json:"name"`
-	Code             string          `json:"code"`
-	CostPrime        decimal.Decimal `json:"costPrime"`
-	CostWithCustomer decimal.Decimal `json:"costWithCustomer"`
-	MaterialName     string          `json:"materialName"`
-	MaterialID       uint            `json:"materialID"`
+	ID                        uint            `json:"id"`
+	Name                      string          `json:"name"`
+	Code                      string          `json:"code"`
+	CostPrime                 decimal.Decimal `json:"costPrime"`
+	CostWithCustomer          decimal.Decimal `json:"costWithCustomer"`
+	MaterialName              string          `json:"materialName"`
+	MaterialID                uint            `json:"materialID"`
+	ShowPlannedAmountInReport bool            `json:"showPlannedAmountInReport"`
+	PlannedAmountForProject   float64         `json:"plannedAmountForProject"`
 }
