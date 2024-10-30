@@ -38,7 +38,7 @@ func (repo *tpObjectRepository) GetAll(projectID uint) ([]dto.TPObjectPaginatedQ
         objects.name as name,
         objects.status as status,
         tp_objects.model as model,
-        tp_objects.voltage_class as voltage_class,
+        tp_objects.voltage_class as voltage_class
       FROM objects
         INNER JOIN tp_objects ON objects.object_detailed_id = tp_objects.id
       WHERE
