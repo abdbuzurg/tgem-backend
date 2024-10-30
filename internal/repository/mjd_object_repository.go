@@ -154,7 +154,7 @@ func (repo *mjdObjectRepository) Create(data dto.MJDObjectCreate) (model.MJD_Obj
 				tpNourashesObjects = append(tpNourashesObjects, model.TPNourashesObjects{
 					TP_ObjectID: tpObjectID,
 					TargetID:    object.ID,
-					TargetType:  "kl04kv_objects",
+					TargetType:  "mjd_objects",
 				})
 
 				if err := tx.CreateInBatches(&tpNourashesObjects, 5).Error; err != nil {

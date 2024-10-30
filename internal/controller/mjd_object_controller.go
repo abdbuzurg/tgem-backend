@@ -152,7 +152,7 @@ func (controller *mjdObjectController) Delete(c *gin.Context) {
 }
 
 func (controller *mjdObjectController) GetTemplateFile(c *gin.Context) {
-	templateFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта Подстанции.xlsx")
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта МЖД.xlsx")
 
 	tmpFilePath, err := controller.mjdObjectService.TemplateFile(templateFilePath, c.GetUint("projectID"))
 	if err != nil {

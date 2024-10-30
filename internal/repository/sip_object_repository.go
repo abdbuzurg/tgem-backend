@@ -41,6 +41,7 @@ func (repo *sipObjectRepository) GetPaginated(page, limit int, filter dto.SIPObj
     INNER JOIN s_ip_objects ON objects.object_detailed_id = s_ip_objects.id
     FULL JOIN object_teams ON object_teams.object_id = objects.id
     FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
+    FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
     WHERE
       objects.type = 'sip_objects' AND
       objects.project_id = ? AND
@@ -75,11 +76,11 @@ func (repo *sipObjectRepository) Count(filter dto.SIPObjectSearchParameters) (in
       (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
       (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
     `,
-    filter.ProjectID,
-    filter.ObjectName, filter.ObjectName,
-    filter.TeamID, filter.TeamID,
-    filter.SupervisorWorkerID, filter.SupervisorWorkerID,
-    ).Scan(&count).Error
+		filter.ProjectID,
+		filter.ObjectName, filter.ObjectName,
+		filter.TeamID, filter.TeamID,
+		filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+	).Scan(&count).Error
 	return count, err
 }
 
@@ -134,6 +135,21 @@ func (repo *sipObjectRepository) Create(data dto.SIPObjectCreate) (model.SIP_Obj
 				return err
 			}
 
+		}
+
+		if len(data.NourashedByTPObjectID) != 0 {
+			tpNourashesObjects := []model.TPNourashesObjects{}
+			for _, tpObjectID := range data.NourashedByTPObjectID {
+				tpNourashesObjects = append(tpNourashesObjects, model.TPNourashesObjects{
+					TP_ObjectID: tpObjectID,
+					TargetID:    object.ID,
+					TargetType:  "sip_objects",
+				})
+
+				if err := tx.CreateInBatches(&tpNourashesObjects, 5).Error; err != nil {
+					return err
+				}
+			}
 		}
 
 		return nil
@@ -303,6 +319,13 @@ func (repo *sipObjectRepository) Import(data []dto.SIPObjectImportData) error {
 			if row.ObjectTeam.TeamID != 0 {
 				data[index].ObjectTeam.ObjectID = object.ID
 				if err := tx.Create(&data[index].ObjectTeam).Error; err != nil {
+					return err
+				}
+			}
+
+			if row.NourashedByTP.TP_ObjectID != 0 {
+				data[index].NourashedByTP.TargetID = object.ID
+				if err := tx.Create(&data[index].NourashedByTP).Error; err != nil {
 					return err
 				}
 			}

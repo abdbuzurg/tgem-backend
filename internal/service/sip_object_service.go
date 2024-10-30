@@ -14,12 +14,14 @@ import (
 )
 
 type sipObjectService struct {
-	sipObjectRepo         repository.ISIPObjectRepository
-	workerRepo            repository.IWorkerRepository
-	objectSupervisorsRepo repository.IObjectSupervisorsRepository
-	objectTeamsRepo       repository.IObjectTeamsRepository
-	teamRepo              repository.ITeamRepository
-	tpObjectRepo          repository.ITPObjectRepository
+	sipObjectRepo          repository.ISIPObjectRepository
+	workerRepo             repository.IWorkerRepository
+	objectSupervisorsRepo  repository.IObjectSupervisorsRepository
+	objectTeamsRepo        repository.IObjectTeamsRepository
+	teamRepo               repository.ITeamRepository
+	tpObjectRepo           repository.ITPObjectRepository
+	tpNourashesObjectsRepo repository.ITPNourashesObjectsRepository
+	objectRepo             repository.IObjectRepository
 }
 
 func InitSIPObjectService(
@@ -29,14 +31,18 @@ func InitSIPObjectService(
 	objectTeamsRepo repository.IObjectTeamsRepository,
 	teamRepo repository.ITeamRepository,
 	tpObjectRepo repository.ITPObjectRepository,
+	tpNourashesObjectsRepo repository.ITPNourashesObjectsRepository,
+	objectRepo             repository.IObjectRepository,
 ) ISIPObjectService {
 	return &sipObjectService{
-		sipObjectRepo:         sipObjectRepo,
-		workerRepo:            workerRepo,
-		objectSupervisorsRepo: objectSupervisorsRepo,
-		objectTeamsRepo:       objectTeamsRepo,
-		teamRepo:              teamRepo,
-		tpObjectRepo:          tpObjectRepo,
+		sipObjectRepo:          sipObjectRepo,
+		workerRepo:             workerRepo,
+		objectSupervisorsRepo:  objectSupervisorsRepo,
+		objectTeamsRepo:        objectTeamsRepo,
+		teamRepo:               teamRepo,
+		tpObjectRepo:           tpObjectRepo,
+		tpNourashesObjectsRepo: tpNourashesObjectsRepo,
+    objectRepo: objectRepo,
 	}
 }
 
@@ -78,6 +84,11 @@ func (service *sipObjectService) GetPaginated(page, limit int, filter dto.SIPObj
 			return []dto.SIPObjectPaginated{}, err
 		}
 
+		tpNames, err := service.tpNourashesObjectsRepo.GetTPObjectNames(object.ObjectID, "sip_objects")
+		if err != nil {
+			return []dto.SIPObjectPaginated{}, err
+		}
+
 		result = append(result, dto.SIPObjectPaginated{
 			ObjectID:         object.ObjectID,
 			ObjectDetailedID: object.ObjectDetailedID,
@@ -86,6 +97,7 @@ func (service *sipObjectService) GetPaginated(page, limit int, filter dto.SIPObj
 			AmountFeeders:    object.AmountFeeders,
 			Supervisors:      supervisorNames,
 			Teams:            teamNumbers,
+			TPNames:          tpNames,
 		})
 	}
 
@@ -135,6 +147,17 @@ func (service *sipObjectService) TemplateFile(filePath string, projectID uint) (
 	teamSheetName := "Бригады"
 	for index, team := range allTeams {
 		f.SetCellStr(teamSheetName, "A"+fmt.Sprint(index+2), team.Number)
+	}
+
+	allTPObjects, err := service.tpObjectRepo.GetAll(projectID)
+	if err != nil {
+		f.Close()
+		return "", fmt.Errorf("Данны бригад не доступны: %v", err)
+	}
+
+	tpObjectSheetName := "ТП"
+	for index, tp := range allTPObjects {
+		f.SetCellStr(tpObjectSheetName, "A"+fmt.Sprint(index+2), tp.Name)
 	}
 
 	currentTime := time.Now()
@@ -250,6 +273,22 @@ func (service *sipObjectService) Import(projectID uint, filepath string) error {
 			}
 		}
 
+		tpName, err := f.GetCellValue(sheetName, "F"+fmt.Sprint(index+1))
+		if err != nil {
+			f.Close()
+			os.Remove(filepath)
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке I%d: %v", index+1, err)
+		}
+		tpObject := model.Object{}
+		if tpName != "" {
+			tpObject, err = service.objectRepo.GetByName(tpName)
+			if err != nil {
+				f.Close()
+				os.Remove(filepath)
+				return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке I%d: %v", index+1, err)
+			}
+		}
+
 		sips = append(sips, dto.SIPObjectImportData{
 			Object: object,
 			SIP:    sip,
@@ -258,6 +297,10 @@ func (service *sipObjectService) Import(projectID uint, filepath string) error {
 			},
 			ObjectTeam: model.ObjectTeams{
 				TeamID: team.ID,
+			},
+      NourashedByTP: model.TPNourashesObjects{
+				TP_ObjectID: tpObject.ID,
+				TargetType:  "sip_objects",
 			},
 		})
 		index++
@@ -346,8 +389,6 @@ func (service *sipObjectService) Export(projectID uint) (string, error) {
 		page++
 		sipCount -= int64(limit)
 	}
-
-	
 
 	currentTime := time.Now()
 	exportFileName := fmt.Sprintf(

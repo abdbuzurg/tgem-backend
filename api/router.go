@@ -202,6 +202,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectTeamsRepo,
 		teamRepo,
 		tpObjectRepo,
+    tpNourashesObjectsRepo,
+    objectRepo,
 	)
 	stvtObjectService := service.InitSTVTObjectService(
 		stvtObjectRepo,

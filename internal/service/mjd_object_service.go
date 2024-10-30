@@ -79,7 +79,7 @@ func (service *mjdObjectService) GetPaginated(page, limit int, filter dto.MJDObj
 			return []dto.MJDObjectPaginated{}, err
 		}
 
-		tpNames, err := service.tpNourashesObjects.GetTPObjectNames(oneEntry.ObjectID, "kl04kv_objects")
+		tpNames, err := service.tpNourashesObjects.GetTPObjectNames(oneEntry.ObjectID, "mjd_objects")
 		if err != nil {
 			return []dto.MJDObjectPaginated{}, err
 		}

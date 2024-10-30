@@ -20,13 +20,15 @@ type SIPObjectPaginated struct {
 	AmountFeeders    uint     `json:"amountFeeders"`
 	Supervisors      []string `json:"supervisors"`
 	Teams            []string `json:"teams"`
+	TPNames          []string `json:"tpNames"`
 }
 
 type SIPObjectCreate struct {
-	BaseInfo     model.Object     `json:"baseInfo"`
-	DetailedInfo model.SIP_Object `json:"detailedInfo"`
-	Supervisors  []uint           `json:"supervisors"`
-	Teams        []uint           `json:"teams"`
+	BaseInfo              model.Object     `json:"baseInfo"`
+	DetailedInfo          model.SIP_Object `json:"detailedInfo"`
+	Supervisors           []uint           `json:"supervisors"`
+	Teams                 []uint           `json:"teams"`
+	NourashedByTPObjectID []uint           `json:"nourashedByTP"`
 }
 
 type SIPObjectImportData struct {
@@ -34,6 +36,7 @@ type SIPObjectImportData struct {
 	SIP               model.SIP_Object
 	ObjectSupervisors model.ObjectSupervisors
 	ObjectTeam        model.ObjectTeams
+	NourashedByTP     model.TPNourashesObjects
 }
 
 type SIPObjectSearchParameters struct {
