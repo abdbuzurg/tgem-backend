@@ -74,7 +74,7 @@ func (repo *mjdObjectRepository) Count(filter dto.MJDObjectSearchParameters) (in
     FULL JOIN object_supervisors ON object_supervisors.object_id = objects.id
     FULL JOIN tp_nourashes_objects ON tp_nourashes_objects.target_id = objects.id
     WHERE
-      objects.type = 'kl04kv_objects' AND
+      objects.type = 'mjd_objects' AND
       objects.project_id = ? AND
       (nullif(?, '') IS NULL OR objects.name = ?) AND
       (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND

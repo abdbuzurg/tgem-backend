@@ -128,37 +128,6 @@ func (service *teamService) TemplateFile(projectID uint, filepath string) error 
 		f.SetCellValue(teamLeaderSheetName, "A"+fmt.Sprint(index+2), teamLeader.Name)
 	}
 
-	objectSheetName := "Объекты"
-	allObjects, err := service.objectRepo.GetAll(projectID)
-	if err != nil {
-		f.Close()
-		return fmt.Errorf("Данные объектов недоступны: %v", err)
-	}
-
-	for index, object := range allObjects {
-		f.SetCellValue(objectSheetName, "A"+fmt.Sprint(index+2), object.Name)
-
-		objectType := ""
-		switch object.Type {
-		case "tp_objects":
-			objectType = "ТП"
-			break
-		case "kl04kv_objects":
-			objectType = "КЛ 04 КВ"
-			break
-		case "mjd_objects":
-			objectType = "МЖД"
-			break
-		case "sip_objects":
-			objectType = "СИП"
-			break
-		case "stvt_objects":
-			objectType = "СТВТ"
-			break
-		}
-		f.SetCellValue(objectSheetName, "B"+fmt.Sprint(index+2), objectType)
-	}
-
 	if err := f.Save(); err != nil {
 		return fmt.Errorf("Не удалось обновить шаблон с новыми данными: %v", err)
 	}
