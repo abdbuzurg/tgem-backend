@@ -62,8 +62,8 @@ func (repo *objectSupervisorsRepository) GetSupervisorAndObjectNamesByObjectID(p
       objects.type as object_type,
       workers.name as supervisor_name
     FROM object_supervisors
-    INNER JOIN objects ON objects.id = object_supervisors.object_id
-    INNER JOIN workers ON workers.id = object_supervisors.supervisor_worker_id
+    RIGHT JOIN objects ON objects.id = object_supervisors.object_id
+    LEFT JOIN workers ON workers.id = object_supervisors.supervisor_worker_id
     WHERE 
       objects.project_id = ? AND
       objects.id = ?

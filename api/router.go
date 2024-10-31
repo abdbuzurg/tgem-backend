@@ -71,6 +71,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	operationMaterialRepo := repository.InitOperationMaterialRepository(db)
 	invoiceWriteOffRepo := repository.InitInvoiceWriteOffRepository(db)
 	workerAttendanceRepo := repository.InitWorkerAttendanceRepository(db)
+	mainReportRepository := repository.InitMainReportRepository(db)
 
 	//Initialization of Services
 	invoiceInputService := service.InitInvoiceInputService(
@@ -135,8 +136,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		invoiceMaterialRepo,
 		objectTeamsRepo,
 		operationMaterialRepo,
-    operationRepo,
-    materialRepo,
+		operationRepo,
+		materialRepo,
 	)
 	invoiceCorrectionService := service.InitInvoiceCorrectionService(
 		invoiceCorrectionRepo,
@@ -202,8 +203,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		objectTeamsRepo,
 		teamRepo,
 		tpObjectRepo,
-    tpNourashesObjectsRepo,
-    objectRepo,
+		tpNourashesObjectsRepo,
+		objectRepo,
 	)
 	stvtObjectService := service.InitSTVTObjectService(
 		stvtObjectRepo,
@@ -265,6 +266,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		workerAttendanceRepo,
 		workerRepo,
 	)
+	mainReportService := service.InitMainReportService(mainReportRepository)
 
 	//Initialization of Controllers
 	invoiceInputController := controller.InitInvoiceInputController(invoiceInputService, userActionService)
@@ -297,6 +299,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	invoiceOutputOutOfProjectController := controller.InitInvoiceOutputOutOfProjectController(invoiceOutputOutOfProjectService)
 	invoiceWriteOffController := controller.InitInvoiceWriteOffController(invoiceWriteOffService)
 	workerAttendanceController := controller.InitWorkerAttendanceController(workerAttendanceService)
+	mainReportController := controller.InitMainReportController(mainReportService)
 
 	//Initialization of Routes
 	InitInvoiceInputRoutes(router, invoiceInputController, db)
@@ -326,8 +329,18 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitOperationRoutes(router, operationController)
 	InitInvoiceWriteOffRoutes(router, invoiceWriteOffController)
 	InitWorkerAttendanceRoutes(router, workerAttendanceController)
+	InitMainReports(router, mainReportController)
 
 	return mainRouter
+}
+
+func InitMainReports(router *gin.RouterGroup, controller controller.IMainReportController) {
+	mainReportRoutes := router.Group("/main-reports")
+	mainReportRoutes.Use(
+		middleware.Authentication(),
+	)
+	mainReportRoutes.GET("/project-progress", controller.ProjectProgress)
+	mainReportRoutes.GET("/analysis-of-remaining-materials", controller.MaterialAnalysis)
 }
 
 func InitWorkerAttendanceRoutes(router *gin.RouterGroup, controller controller.IWorkerAttendanceController) {
@@ -348,7 +361,7 @@ func InitInvoiceWriteOffRoutes(router *gin.RouterGroup, controller controller.II
 
 	invoiceWriteOffRoutes.GET("/paginated", controller.GetPaginated)
 	invoiceWriteOffRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumber)
-  invoiceWriteOffRoutes.GET("/invoice-materials/:id/:locationType/:locationID", controller.GetMaterialsForEdit)
+	invoiceWriteOffRoutes.GET("/invoice-materials/:id/:locationType/:locationID", controller.GetMaterialsForEdit)
 	invoiceWriteOffRoutes.GET("/document/:deliveryCode", controller.GetDocument)
 	invoiceWriteOffRoutes.GET("/material/:locationType/:locationID", controller.GetMaterialsInLocation)
 	invoiceWriteOffRoutes.POST("/", controller.Create)
@@ -405,7 +418,7 @@ func InitInvoiceObjectRoutes(router *gin.RouterGroup, controller controller.IInv
 	invoiceObjectRoutes.GET("/:id", controller.GetInvoiceObjectDescriptiveDataByID)
 	invoiceObjectRoutes.GET("/paginated", controller.GetPaginated)
 	invoiceObjectRoutes.GET("/team-materials/:teamID", controller.GetTeamsMaterials)
-  invoiceObjectRoutes.GET("/available-operations-for-team/:teamID", controller.GetOperationsBasedOnMaterialsInTeamID)
+	invoiceObjectRoutes.GET("/available-operations-for-team/:teamID", controller.GetOperationsBasedOnMaterialsInTeamID)
 	invoiceObjectRoutes.GET("/serial-number/material/:materialID/teams/:teamID", controller.GetSerialNumbersOfMaterial)
 	invoiceObjectRoutes.GET("/material/:materialID/team/:teamID", controller.GetMaterialAmountInTeam)
 	invoiceObjectRoutes.GET("/object/:objectID", controller.GetTeamsFromObjectID)

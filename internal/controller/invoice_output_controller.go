@@ -188,7 +188,7 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 	}
 
 	fileNameAndExtension := strings.Split(file.Filename, ".")
-	fileExtension := fileNameAndExtension[1]
+	fileExtension := fileNameAndExtension[len(fileNameAndExtension)-1]
 	if fileExtension != "pdf" {
 		response.ResponseError(c, fmt.Sprintf("Файл должен быть формата PDF"))
 		return
@@ -216,7 +216,7 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 
 func (controller *invoiceOutputController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
-	filePath := filepath.Join("./pkg/excels/output/", deliveryCode + ".xlsx")
+	filePath := filepath.Join("./pkg/excels/output/", deliveryCode+".xlsx")
 	c.FileAttachment(filePath, deliveryCode+".xlsx")
 }
 

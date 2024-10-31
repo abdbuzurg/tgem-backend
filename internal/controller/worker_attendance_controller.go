@@ -17,6 +17,8 @@ type workerAttendanceController struct {
 type IWorkerAttendanceController interface {
 	Import(c *gin.Context)
 	GetPaginated(c *gin.Context)
+	Progress(c *gin.Context)
+  Analysis(c *gin.Context)
 }
 
 func InitWorkerAttendanceController(workerAttendanceService service.IWorkerAttendanceService) IWorkerAttendanceController {
@@ -67,4 +69,14 @@ func (controller *workerAttendanceController) GetPaginated(c *gin.Context) {
 	}
 
 	response.ResponsePaginatedData(c, data, dataCount)
+}
+
+func (controlelr *workerAttendanceController) Progress(c *gin.Context) {
+	filepath := "./pkg/excels/templates/Прогресс.xlsx"
+	c.FileAttachment(filepath, "Прогресс.xlsx")
+}
+
+func (controlelr *workerAttendanceController) Analysis(c *gin.Context) {
+	filepath := "./pkg/excels/templates/Анализ.xlsx"
+	c.FileAttachment(filepath, "Анализ.xlsx")
 }

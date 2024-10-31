@@ -123,8 +123,8 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 
 	switch data.Type {
 	case "team":
-		f.SetCellValue(sheetName, "I1", "№ Бригады")
-		f.SetCellValue(sheetName, "J1", "Бригадир")
+		f.SetCellValue(sheetName, "J1", "№ Бригады")
+		f.SetCellValue(sheetName, "I1", "Бригадир")
 		if data.TeamID != 0 {
 			filter.LocationID = data.TeamID
 			break
@@ -206,6 +206,7 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 				if err != nil {
 					return "", fmt.Errorf("Ошибка базы: %v", err)
 				}
+
 				locationInformation.LocationName = objectData[0].ObjectName
 				locationInformation.LocationType = utils.ObjectTypeConverter(objectData[0].ObjectType)
 

@@ -74,11 +74,13 @@ func (repo *operationRepository) GetByID(id uint) (model.Operation, error) {
 
 func (repo *operationRepository) Create(data dto.Operation) (model.Operation, error) {
 	result := model.Operation{
-		Code:             data.Code,
-		Name:             data.Name,
-		ProjectID:        data.ProjectID,
-		CostPrime:        data.CostPrime,
-		CostWithCustomer: data.CostWithCustomer,
+		Code:                      data.Code,
+		Name:                      data.Name,
+		ProjectID:                 data.ProjectID,
+		CostPrime:                 data.CostPrime,
+		CostWithCustomer:          data.CostWithCustomer,
+		PlannedAmountForProject:   data.PlannedAmountForProject,
+		ShowPlannedAmountInReport: data.ShowPlannedAmountInReport,
 	}
 
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
@@ -107,6 +109,8 @@ func (repo *operationRepository) Update(data dto.Operation) (model.Operation, er
 		ProjectID:        data.ProjectID,
 		CostPrime:        data.CostPrime,
 		CostWithCustomer: data.CostWithCustomer,
+    ShowPlannedAmountInReport: data.ShowPlannedAmountInReport,
+    PlannedAmountForProject: data.PlannedAmountForProject,
 	}
 
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
@@ -198,8 +202,8 @@ func (repo *operationRepository) GetAll(projectID uint) ([]dto.OperationPaginate
 }
 
 func (repo *operationRepository) GetWithoutMaterialOperations(projectID uint) ([]model.Operation, error) {
-  var result []model.Operation
-  err := repo.db.Raw(`
+	var result []model.Operation
+	err := repo.db.Raw(`
     SELECT *
     FROM operations
     WHERE 
@@ -210,7 +214,5 @@ func (repo *operationRepository) GetWithoutMaterialOperations(projectID uint) ([
       )
     `, projectID).Scan(&result).Error
 
-  return result, err
+	return result, err
 }
-
-

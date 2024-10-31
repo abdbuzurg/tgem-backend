@@ -222,3 +222,5 @@ func (controller *teamController) GetAllForSelect(c *gin.Context) {
 
 	response.ResponseSuccess(c, data)
 }
+
+
