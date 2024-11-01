@@ -1,6 +1,7 @@
 package service
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/repository"
 	"fmt"
 	"path/filepath"
@@ -54,7 +55,7 @@ func (service *mainReportService) ProjectProgress(projectID uint) (string, error
 		BudgetOfMaterialsWaitingToBeInstalled float64
 	}
 
-	data := []ProgressReportData{}
+	dataForMaterials := []ProgressReportData{}
 	dataIndex := 0
 	for index, material := range materialData {
 		oneEntry := ProgressReportData{
@@ -78,24 +79,24 @@ func (service *mainReportService) ProjectProgress(projectID uint) (string, error
 		}
 
 		if index == 0 {
-			data = append(data, oneEntry)
+			dataForMaterials = append(dataForMaterials, oneEntry)
 			continue
 		}
 
-		if data[dataIndex].MaterialID == material.ID {
-			data[dataIndex].MaterialAmountInWarehouse += oneEntry.MaterialAmountInWarehouse
-			data[dataIndex].MaterialAmountInTeams += oneEntry.MaterialAmountInTeams
-			data[dataIndex].MaterialAmountInObjects += oneEntry.MaterialAmountInObjects
+		if dataForMaterials[dataIndex].MaterialID == material.ID {
+			dataForMaterials[dataIndex].MaterialAmountInWarehouse += oneEntry.MaterialAmountInWarehouse
+			dataForMaterials[dataIndex].MaterialAmountInTeams += oneEntry.MaterialAmountInTeams
+			dataForMaterials[dataIndex].MaterialAmountInObjects += oneEntry.MaterialAmountInObjects
 		} else {
 			dataIndex++
-			data = append(data, oneEntry)
+			dataForMaterials = append(dataForMaterials, oneEntry)
 		}
 	}
 
 	for _, invoiceMaterial := range invoiceMaterialData {
-		if data[dataIndex].MaterialID != invoiceMaterial.MaterialID {
+		if dataForMaterials[dataIndex].MaterialID != invoiceMaterial.MaterialID {
 			dataIndex = -1
-			for index, oneEntry := range data {
+			for index, oneEntry := range dataForMaterials {
 				if oneEntry.MaterialID == invoiceMaterial.MaterialID {
 					dataIndex = index
 					break
@@ -109,20 +110,41 @@ func (service *mainReportService) ProjectProgress(projectID uint) (string, error
 
 		switch invoiceMaterial.InvoiceType {
 		case "input":
-			data[dataIndex].MaterialAmountRecieved += invoiceMaterial.Amount
-			data[dataIndex].BudgetOfRecievedMaterials += invoiceMaterial.SumInInvoice
+			dataForMaterials[dataIndex].MaterialAmountRecieved += invoiceMaterial.Amount
+			dataForMaterials[dataIndex].BudgetOfRecievedMaterials += invoiceMaterial.SumInInvoice
 			break
 		case "object-correction":
-			data[dataIndex].MaterialAmountInstalled += invoiceMaterial.Amount
-			data[dataIndex].BudgetOfInstalledMaterials += invoiceMaterial.SumInInvoice
+			dataForMaterials[dataIndex].MaterialAmountInstalled += invoiceMaterial.Amount
+			dataForMaterials[dataIndex].BudgetOfInstalledMaterials += invoiceMaterial.SumInInvoice
 			break
 		}
 	}
 
-	for index := range data {
-		data[index].MaterialAmountWaitingToBeRecieved = data[index].MaterialAmountPlannedForProject - data[index].MaterialAmountRecieved
-		data[index].MaterialAmountWaitingToBeInstalled = data[index].MaterialAmountRecieved - data[index].MaterialAmountInstalled
-		data[index].BudgetOfMaterialsWaitingToBeInstalled = data[index].BudgetOfRecievedMaterials - data[index].BudgetOfInstalledMaterials
+	for index := range dataForMaterials {
+		dataForMaterials[index].MaterialAmountWaitingToBeRecieved = dataForMaterials[index].MaterialAmountPlannedForProject - dataForMaterials[index].MaterialAmountRecieved
+		dataForMaterials[index].MaterialAmountWaitingToBeInstalled = dataForMaterials[index].MaterialAmountRecieved - dataForMaterials[index].MaterialAmountInstalled
+		dataForMaterials[index].BudgetOfMaterialsWaitingToBeInstalled = dataForMaterials[index].BudgetOfRecievedMaterials - dataForMaterials[index].BudgetOfInstalledMaterials
+	}
+
+	invoiceOperationData, err := service.mainReportRepository.InvoiceOperationDataForProgressReport(projectID)
+	if err != nil {
+		return "", err
+	}
+
+	dataForOperation := []dto.InvoiceOperationDataForProgressReportQueryResult{}
+	dataForOperationIndex := 0
+	for index, invoiceOperation := range invoiceOperationData {
+		if index == 0 {
+			dataForOperation = append(dataForOperation, invoiceOperation)
+			continue
+		}
+
+		if dataForOperation[dataForOperationIndex].ID == invoiceOperation.ID {
+			dataForOperation[dataForOperationIndex].AmountInInvoice += invoiceOperation.AmountInInvoice
+		} else {
+      dataForOperation = append(dataForOperation, invoiceOperation)
+      dataForOperationIndex++
+    }
 	}
 
 	progressReportFilePath := filepath.Join("./pkg/excels/templates", "Прогресс Проекта.xlsx")
@@ -132,54 +154,80 @@ func (service *mainReportService) ProjectProgress(projectID uint) (string, error
 		return "", fmt.Errorf("Не смог открыть файл: %v", err)
 	}
 
-	sheetName := "Материалы"
+	sheetNameForMaterials := "Материалы"
 	startingRow := 2
 
-	for index, entry := range data {
-		if err := f.SetCellStr(sheetName, "A"+fmt.Sprint(startingRow+index), entry.MaterialCode); err != nil {
+	for index, entry := range dataForMaterials {
+		if err := f.SetCellStr(sheetNameForMaterials, "A"+fmt.Sprint(startingRow+index), entry.MaterialCode); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "A", startingRow+index, err)
 		}
-		if err := f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), entry.MaterialName); err != nil {
+		if err := f.SetCellStr(sheetNameForMaterials, "B"+fmt.Sprint(startingRow+index), entry.MaterialName); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "B", startingRow+index, err)
 		}
-		if err := f.SetCellStr(sheetName, "C"+fmt.Sprint(startingRow+index), entry.MaterialUnit); err != nil {
+		if err := f.SetCellStr(sheetNameForMaterials, "C"+fmt.Sprint(startingRow+index), entry.MaterialUnit); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "C", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "D"+fmt.Sprint(startingRow+index), entry.MaterialAmountPlannedForProject, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "D"+fmt.Sprint(startingRow+index), entry.MaterialAmountPlannedForProject, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "D", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "E"+fmt.Sprint(startingRow+index), entry.MaterialAmountRecieved, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "E"+fmt.Sprint(startingRow+index), entry.MaterialAmountRecieved, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "E", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "F"+fmt.Sprint(startingRow+index), entry.MaterialAmountWaitingToBeRecieved, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "F"+fmt.Sprint(startingRow+index), entry.MaterialAmountWaitingToBeRecieved, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "F", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "G"+fmt.Sprint(startingRow+index), entry.MaterialAmountInstalled, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "G"+fmt.Sprint(startingRow+index), entry.MaterialAmountInstalled, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "G", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "H"+fmt.Sprint(startingRow+index), entry.MaterialAmountWaitingToBeInstalled, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "H"+fmt.Sprint(startingRow+index), entry.MaterialAmountWaitingToBeInstalled, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "H", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "I"+fmt.Sprint(startingRow+index), entry.MaterialAmountInWarehouse, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "I"+fmt.Sprint(startingRow+index), entry.MaterialAmountInWarehouse, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "I", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "J"+fmt.Sprint(startingRow+index), entry.MaterialAmountInTeams, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "J"+fmt.Sprint(startingRow+index), entry.MaterialAmountInTeams, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "J", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "K"+fmt.Sprint(startingRow+index), entry.MaterialAmountInObjects, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "K"+fmt.Sprint(startingRow+index), entry.MaterialAmountInObjects, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "K", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "L"+fmt.Sprint(startingRow+index), 0, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "L"+fmt.Sprint(startingRow+index), 0, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "L", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "M"+fmt.Sprint(startingRow+index), entry.BudgetOfRecievedMaterials, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "M"+fmt.Sprint(startingRow+index), entry.BudgetOfRecievedMaterials, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "M", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "N"+fmt.Sprint(startingRow+index), entry.BudgetOfInstalledMaterials, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "N"+fmt.Sprint(startingRow+index), entry.BudgetOfInstalledMaterials, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "N", startingRow+index, err)
 		}
-		if err := f.SetCellFloat(sheetName, "O"+fmt.Sprint(startingRow+index), entry.BudgetOfMaterialsWaitingToBeInstalled, 2, 64); err != nil {
+		if err := f.SetCellFloat(sheetNameForMaterials, "O"+fmt.Sprint(startingRow+index), entry.BudgetOfMaterialsWaitingToBeInstalled, 2, 64); err != nil {
 			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "O", startingRow+index, err)
+		}
+	}
+
+	sheetNameForOperations := "Услуги"
+
+	for index, entry := range dataForOperation {
+		if err := f.SetCellStr(sheetNameForOperations, "A"+fmt.Sprint(startingRow+index), entry.Code); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "A", startingRow+index, err)
+		}
+		if err := f.SetCellStr(sheetNameForOperations, "B"+fmt.Sprint(startingRow+index), entry.Name); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "B", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetNameForOperations, "C"+fmt.Sprint(startingRow+index), entry.PlannedAmountForProject, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "C", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetNameForOperations, "D"+fmt.Sprint(startingRow+index), entry.AmountInInvoice, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "D", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetNameForOperations, "E"+fmt.Sprint(startingRow+index), entry.PlannedAmountForProject - entry.AmountInInvoice, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "E", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetNameForOperations, "F"+fmt.Sprint(startingRow+index), entry.AmountInInvoice * entry.CostWithCustomer, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "F", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetNameForOperations, "G"+fmt.Sprint(startingRow+index), entry.PlannedAmountForProject * entry.CostWithCustomer, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "G", startingRow+index, err)
 		}
 	}
 
@@ -270,9 +318,9 @@ func (service *mainReportService) RemainingMaterialAnalysis(projectID uint) (str
 		}
 
 		data[dataIndex].MaterialsAmountInObject += material.Amount
-    if material.DateOfCorrection.In(loc).After(date10DaysAgo) && material.DateOfCorrection.In(loc).Before(dateNow) {
-      data[dataIndex].MaterialTotalAmountInstalledIn10Days += material.Amount
-    }
+		if material.DateOfCorrection.In(loc).After(date10DaysAgo) && material.DateOfCorrection.In(loc).Before(dateNow) {
+			data[dataIndex].MaterialTotalAmountInstalledIn10Days += material.Amount
+		}
 	}
 
 	for index := range data {
@@ -280,8 +328,8 @@ func (service *mainReportService) RemainingMaterialAnalysis(projectID uint) (str
 		if data[index].AverageMaterialAmountInstalledIn10Days != 0 {
 			data[index].DaysRemainingForMaterialToBeSufficient = data[index].MaterialAmountInBothWarehouseAndTeam / data[index].AverageMaterialAmountInstalledIn10Days
 		} else {
-      data[index].DaysRemainingForMaterialToBeSufficient = 99999
-    }
+			data[index].DaysRemainingForMaterialToBeSufficient = 99999
+		}
 		data[index].MaterialAmountWaitingToBeInstalled = data[index].MaterialAmountPlannedForProject - data[index].MaterialsAmountInObject
 		data[index].MaterialAmountWaitingToBeBought = data[index].MaterialAmountPlannedForProject - data[index].MaterialAmountInBothWarehouseAndTeam - data[index].MaterialsAmountInObject
 	}

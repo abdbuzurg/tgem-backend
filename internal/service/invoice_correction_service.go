@@ -60,7 +60,28 @@ func (service *invoiceCorrectionService) GetTotalAmounInLocationByTeamName(proje
 }
 
 func (service *invoiceCorrectionService) GetInvoiceMaterialsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionMaterialsData, error) {
-	return service.invoiceCorrectionRepo.GetInvoiceMaterialsDataByInvoiceObjectID(id)
+	data, err := service.invoiceCorrectionRepo.GetInvoiceMaterialsDataByInvoiceObjectID(id)
+	if err != nil {
+		return []dto.InvoiceCorrectionMaterialsData{}, err
+	}
+
+  result := []dto.InvoiceCorrectionMaterialsData{}
+  resultIndex := 0
+	for index, entry := range data {
+		if index == 0 {
+      result = append(result, entry)
+      continue
+		}
+
+    if entry.MaterialID == result[resultIndex].MaterialID {
+      result[resultIndex].MaterialAmount += entry.MaterialAmount
+    } else {
+      result = append(result, entry)
+      resultIndex++
+    }
+	}
+
+	return result, nil
 }
 
 func (service *invoiceCorrectionService) GetSerialNumberOfMaterialInTeam(projectID uint, materialID uint, teamID uint) ([]string, error) {
@@ -92,7 +113,7 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 
 		index := 0
 		for invoiceMaterial.MaterialAmount > 0 {
-			if len(materialInfoSorted) == index {
+			if len(materialInfoSorted) == 0 {
 				return model.InvoiceObject{}, fmt.Errorf("Ошибка корректировки: количество материала внутри корректировки превышает количество материала у бригады")
 			}
 			invoiceMaterialCreate := model.InvoiceMaterials{

@@ -73,6 +73,7 @@ func (repo *invoiceCorrectionRepository) GetInvoiceMaterialsDataByInvoiceObjectI
     WHERE 
       invoice_materials.invoice_type = 'object' AND
       invoice_materials.invoice_id = ?
+    ORDER BY materials.id
     `, id).Scan(&data).Error
 
 	return data, err

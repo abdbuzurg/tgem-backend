@@ -13,6 +13,7 @@ type mainReportRepository struct {
 type IMainReportRepository interface {
 	MaterialDataForProgressReportInProject(projectID uint) ([]dto.MaterialDataForProgressReportQueryResult, error)
 	InvoiceMaterialDataForProgressReport(projectID uint) ([]dto.InvoiceMaterialDataForProgressReportQueryResult, error)
+	InvoiceOperationDataForProgressReport(projectID uint) ([]dto.InvoiceOperationDataForProgressReportQueryResult, error)
 	MaterialDataForRemainingMaterialAnalysis(projectID uint) ([]dto.MaterialDataForRemainingMaterialAnalysisQueryResult, error)
 	MaterialsInstalledOnObjectForRemainingMaterialAnalysis(projectID uint) ([]dto.MaterialsInstalledOnObjectForRemainingMaterialAnalysisQueryResult, error)
 }
@@ -64,6 +65,30 @@ func (repo *mainReportRepository) InvoiceMaterialDataForProgressReport(projectID
       materials.show_planned_amount_in_report = true AND
       (invoice_materials.invoice_type = 'input' OR invoice_materials.invoice_type = 'object-correction')
     ORDER BY materials.id
+    `, projectID).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *mainReportRepository) InvoiceOperationDataForProgressReport(projectID uint) ([]dto.InvoiceOperationDataForProgressReportQueryResult, error) {
+	result := []dto.InvoiceOperationDataForProgressReportQueryResult{}
+	err := repo.db.Raw(`
+    SELECT 
+      operations.id as id,
+      operations.code as code,
+      operations.name as name,
+      operations.cost_with_customer as cost_with_customer,
+      operations.planned_amount_for_project as planned_amount_for_project,
+      invoice_operations.amount as amount_in_invoice
+    FROM invoice_objects
+    INNER JOIN invoice_operations ON invoice_operations.invoice_id = invoice_objects.id
+    INNER JOIN operations ON operations.id = invoice_operations.operation_id
+    WHERE
+      invoice_objects.confirmed_by_operator = true AND
+      invoice_operations.invoice_type = 'object-correction' AND
+      operations.project_id = ? AND
+      operations.show_planned_amount_in_report = true
+    ORDER BY operations.id
     `, projectID).Scan(&result).Error
 
 	return result, err

@@ -20,6 +20,15 @@ type InvoiceMaterialDataForProgressReportQueryResult struct {
 	SumInInvoice float64
 }
 
+type InvoiceOperationDataForProgressReportQueryResult struct {
+	ID                      uint
+	Code                    string
+	Name                    string
+	CostWithCustomer        float64
+	PlannedAmountForProject float64
+	AmountInInvoice         float64
+}
+
 type MaterialDataForRemainingMaterialAnalysisQueryResult struct {
 	ID                      uint
 	Code                    string
