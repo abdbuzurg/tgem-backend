@@ -340,7 +340,7 @@ func InitMainReports(router *gin.RouterGroup, controller controller.IMainReportC
 		middleware.Authentication(),
 	)
 	mainReportRoutes.GET("/project-progress", controller.ProjectProgress)
-	mainReportRoutes.GET("/analysis-of-remaining-materials", controller.MaterialAnalysis)
+	mainReportRoutes.GET("/analysis-of-remaining-materials", controller.RemainingMaterialAnalysis)
 }
 
 func InitWorkerAttendanceRoutes(router *gin.RouterGroup, controller controller.IWorkerAttendanceController) {

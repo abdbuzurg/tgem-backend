@@ -15,6 +15,7 @@ type mainReportService struct {
 
 type IMainReportService interface {
 	ProjectProgress(projectID uint) (string, error)
+	RemainingMaterialAnalysis(projectID uint) (string, error)
 }
 
 func InitMainReportService(mainReportRepository repository.IMainReportRepository) IMainReportService {
@@ -194,4 +195,150 @@ func (service *mainReportService) ProjectProgress(projectID uint) (string, error
 	}
 
 	return progressReportTmpFilePath, nil
+}
+
+func (service *mainReportService) RemainingMaterialAnalysis(projectID uint) (string, error) {
+	materialLocationData, err := service.mainReportRepository.MaterialDataForRemainingMaterialAnalysis(projectID)
+	if err != nil {
+		return "", err
+	}
+
+	materialInstalledOnObject, err := service.mainReportRepository.MaterialsInstalledOnObjectForRemainingMaterialAnalysis(projectID)
+	if err != nil {
+		return "", err
+	}
+
+	type RemainingMaterialForAnalysis struct {
+		MaterialID                             uint
+		MaterialCode                           string
+		MaterialName                           string
+		MaterialUnit                           string
+		MaterialAmountPlannedForProject        float64
+		MaterialAmountInBothWarehouseAndTeam   float64
+		MaterialTotalAmountInstalledIn10Days   float64
+		AverageMaterialAmountInstalledIn10Days float64
+		DaysRemainingForMaterialToBeSufficient float64
+		MaterialsAmountInObject                float64
+		MaterialAmountWaitingToBeInstalled     float64
+		MaterialAmountWaitingToBeBought        float64
+	}
+
+	data := []RemainingMaterialForAnalysis{}
+	dataIndex := 0
+	for index, material := range materialLocationData {
+		entry := RemainingMaterialForAnalysis{
+			MaterialID:                      material.ID,
+			MaterialCode:                    material.Code,
+			MaterialName:                    material.Name,
+			MaterialUnit:                    material.Unit,
+			MaterialAmountPlannedForProject: material.PlannedAmountForProject,
+		}
+
+		entry.MaterialAmountInBothWarehouseAndTeam = material.LocationAmount
+
+		if index == 0 {
+			data = append(data, entry)
+			continue
+		}
+
+		if data[dataIndex].MaterialID == entry.MaterialID {
+			data[dataIndex].MaterialAmountInBothWarehouseAndTeam += entry.MaterialAmountInBothWarehouseAndTeam
+			data[dataIndex].MaterialsAmountInObject += entry.MaterialsAmountInObject
+		} else {
+			data = append(data, entry)
+			dataIndex++
+		}
+	}
+
+	loc, _ := time.LoadLocation("UTC")
+	dateNow := time.Now().In(loc)
+	date10DaysAgo := dateNow.AddDate(0, 0, -10)
+
+	for _, material := range materialInstalledOnObject {
+		if data[dataIndex].MaterialID != material.ID {
+			dataIndex = -1
+			for index, oneEntry := range data {
+				if oneEntry.MaterialID == material.ID {
+					dataIndex = index
+					break
+				}
+			}
+
+			if dataIndex == -1 {
+				return "", fmt.Errorf("Обнаружен не существующий материал который был использован в накладной")
+			}
+		}
+
+		data[dataIndex].MaterialsAmountInObject += material.Amount
+    if material.DateOfCorrection.In(loc).After(date10DaysAgo) && material.DateOfCorrection.In(loc).Before(dateNow) {
+      data[dataIndex].MaterialTotalAmountInstalledIn10Days += material.Amount
+    }
+	}
+
+	for index := range data {
+		data[index].AverageMaterialAmountInstalledIn10Days = data[index].MaterialTotalAmountInstalledIn10Days / 10
+		if data[index].AverageMaterialAmountInstalledIn10Days != 0 {
+			data[index].DaysRemainingForMaterialToBeSufficient = data[index].MaterialAmountInBothWarehouseAndTeam / data[index].AverageMaterialAmountInstalledIn10Days
+		} else {
+      data[index].DaysRemainingForMaterialToBeSufficient = 99999
+    }
+		data[index].MaterialAmountWaitingToBeInstalled = data[index].MaterialAmountPlannedForProject - data[index].MaterialsAmountInObject
+		data[index].MaterialAmountWaitingToBeBought = data[index].MaterialAmountPlannedForProject - data[index].MaterialAmountInBothWarehouseAndTeam - data[index].MaterialsAmountInObject
+	}
+
+	remainingMaterialAnalysisPath := filepath.Join("./pkg/excels/templates", "Анализ Остатка Материалов.xlsx")
+	f, err := excelize.OpenFile(remainingMaterialAnalysisPath)
+	if err != nil {
+		f.Close()
+		return "", fmt.Errorf("Не смог открыть файл: %v", err)
+	}
+
+	sheetName := "Анализ"
+	startingRow := 2
+
+	for index, entry := range data {
+		if err := f.SetCellStr(sheetName, "A"+fmt.Sprint(startingRow+index), entry.MaterialCode); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "A", startingRow+index, err)
+		}
+		if err := f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), entry.MaterialName); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "B", startingRow+index, err)
+		}
+		if err := f.SetCellStr(sheetName, "C"+fmt.Sprint(startingRow+index), entry.MaterialUnit); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "C", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetName, "D"+fmt.Sprint(startingRow+index), entry.MaterialAmountPlannedForProject, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "D", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetName, "E"+fmt.Sprint(startingRow+index), entry.MaterialAmountInBothWarehouseAndTeam, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "E", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetName, "F"+fmt.Sprint(startingRow+index), entry.AverageMaterialAmountInstalledIn10Days, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "F", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetName, "G"+fmt.Sprint(startingRow+index), entry.DaysRemainingForMaterialToBeSufficient, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "G", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetName, "H"+fmt.Sprint(startingRow+index), entry.MaterialsAmountInObject, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "H", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetName, "I"+fmt.Sprint(startingRow+index), entry.MaterialAmountWaitingToBeInstalled, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "I", startingRow+index, err)
+		}
+		if err := f.SetCellFloat(sheetName, "J"+fmt.Sprint(startingRow+index), entry.MaterialAmountWaitingToBeBought, 2, 64); err != nil {
+			return "", fmt.Errorf("Ошибка при добавление данных в ячейцку %s%d: %v", "J", startingRow+index, err)
+		}
+	}
+
+	currentTime := time.Now()
+	remainingMaterialAnalysisTmpFileName := fmt.Sprintf(
+		"Анализ Остатка Материалов - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+
+	remainingMaterialAnalysisTmpFilePath := filepath.Join("./pkg/excels/temp/", remainingMaterialAnalysisTmpFileName)
+	if err := f.SaveAs(remainingMaterialAnalysisTmpFilePath); err != nil {
+		return "", err
+	}
+
+	return remainingMaterialAnalysisTmpFilePath, err
 }
