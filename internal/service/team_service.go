@@ -7,6 +7,7 @@ import (
 	"backend-v2/pkg/utils"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -31,25 +32,29 @@ func InitTeamService(
 
 type ITeamService interface {
 	GetAll(projectID uint) ([]model.Team, error)
-	GetPaginated(page, limit int, projectID uint) ([]dto.TeamPaginated, error)
+	GetPaginated(page, limit int, searchParameters dto.TeamSearchParameters) ([]dto.TeamPaginated, error)
 	GetByID(id uint) (model.Team, error)
 	Create(data dto.TeamMutation) (model.Team, error)
 	Update(data dto.TeamMutation) (model.Team, error)
 	Delete(id uint) error
-	Count(projectID uint) (int64, error)
+	Count(searchParameters dto.TeamSearchParameters) (int64, error)
 	TemplateFile(projectID uint, filepath string) error
 	Import(projectID uint, filepath string) error
 	DoesTeamNumberAlreadyExistForCreate(teamNumber string, projectID uint) (bool, error)
 	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error)
 	GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error)
+	GetAllUniqueTeamNumbers(projectID uint) ([]string, error)
+	GetAllUniqueMobileNumber(projectID uint) ([]string, error)
+	GetAllUniqueCompanies(projectID uint) ([]string, error)
+	Export(projectID uint) (string, error)
 }
 
 func (service *teamService) GetAll(projectID uint) ([]model.Team, error) {
 	return service.teamRepo.GetAll(projectID)
 }
 
-func (service *teamService) GetPaginated(page, limit int, projectID uint) ([]dto.TeamPaginated, error) {
-	teamPaginatedQueryData, err := service.teamRepo.GetPaginated(page, limit, projectID)
+func (service *teamService) GetPaginated(page, limit int, searchParameters dto.TeamSearchParameters) ([]dto.TeamPaginated, error) {
+	teamPaginatedQueryData, err := service.teamRepo.GetPaginated(page, limit, searchParameters)
 	if err != nil {
 		return []dto.TeamPaginated{}, err
 	}
@@ -105,8 +110,8 @@ func (service *teamService) Delete(id uint) error {
 	return service.teamRepo.Delete(id)
 }
 
-func (service *teamService) Count(projectID uint) (int64, error) {
-	return service.teamRepo.Count(projectID)
+func (service *teamService) Count(searchParameters dto.TeamSearchParameters) (int64, error) {
+	return service.teamRepo.Count(searchParameters)
 }
 
 func (service *teamService) TemplateFile(projectID uint, filepath string) error {
@@ -227,9 +232,88 @@ func (service *teamService) DoesTeamNumberAlreadyExistForCreate(teamNumber strin
 }
 
 func (service *teamService) DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error) {
-	return service.teamRepo.DoesTeamNumberAlreadyExistForUpdate(teamNumber, id,projectID)
+	return service.teamRepo.DoesTeamNumberAlreadyExistForUpdate(teamNumber, id, projectID)
 }
 
 func (service *teamService) GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error) {
-  return service.teamRepo.GetAllForSelect(projectID)
+	return service.teamRepo.GetAllForSelect(projectID)
+}
+
+func (service *teamService) GetAllUniqueTeamNumbers(projectID uint) ([]string, error) {
+	return service.teamRepo.GetAllUniqueTeamNumbers(projectID)
+}
+
+func (service *teamService) GetAllUniqueMobileNumber(projectID uint) ([]string, error) {
+	return service.teamRepo.GetAllUniqueMobileNumber(projectID)
+}
+
+func (service *teamService) GetAllUniqueCompanies(projectID uint) ([]string, error) {
+	return service.teamRepo.GetAllUniqueCompanies(projectID)
+}
+
+func (service *teamService) Export(projectID uint) (string, error) {
+
+	teamCount, err := service.teamRepo.Count(dto.TeamSearchParameters{ProjectID: projectID})
+	if err != nil {
+		return "", err
+	}
+
+	limit := 100
+	page := 1
+	teamDataForExport := []dto.TeamPaginated{}
+	for teamCount > 0 {
+		teams, err := service.teamRepo.GetPaginated(page, limit, dto.TeamSearchParameters{ProjectID: projectID})
+		if err != nil {
+			return "", err
+		}
+
+		latestEntry := dto.TeamPaginated{}
+		for index, team := range teams {
+			if latestEntry.ID == team.ID {
+				if !utils.DoesExist(latestEntry.LeaderNames, team.LeaderName) {
+					latestEntry.LeaderNames = append(latestEntry.LeaderNames, team.LeaderName)
+				}
+			} else {
+				if index != 0 {
+					teamDataForExport = append(teamDataForExport, latestEntry)
+				}
+				latestEntry = dto.TeamPaginated{
+					ID:           team.ID,
+					Number:       team.TeamNumber,
+					MobileNumber: team.TeamMobileNumber,
+					Company:      team.TeamCompany,
+					LeaderNames: []string{
+						team.LeaderName,
+					},
+				}
+			}
+		}
+
+		page++
+		teamCount -= int64(limit)
+	}
+
+	materialTempalteFilePath := filepath.Join("./pkg/excels/templates", "Шаблон для импорта Бригады.xlsx")
+	f, err := excelize.OpenFile(materialTempalteFilePath)
+	if err != nil {
+		f.Close()
+		return "", fmt.Errorf("Не смог открыть файл: %v", err)
+	}
+	sheetName := "Импорт"
+	startingRow := 2
+
+	for index, team := range teamDataForExport {
+		f.SetCellStr(sheetName, "A"+fmt.Sprint(startingRow+index), team.Number)
+		f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), team.LeaderNames[0])
+		f.SetCellStr(sheetName, "C"+fmt.Sprint(startingRow+index), team.MobileNumber)
+		f.SetCellStr(sheetName, "D"+fmt.Sprint(startingRow+index), team.Company)
+	}
+
+	exportFileName := "Экспорт Бригад.xlsx"
+	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
+	if err := f.SaveAs(exportFilePath); err != nil {
+		return "", err
+	}
+
+	return exportFileName, nil
 }

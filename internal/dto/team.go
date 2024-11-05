@@ -30,3 +30,11 @@ type TeamNumberAndTeamLeaderNameQueryResult struct {
 	TeamNumber     string
 	TeamLeaderName string
 }
+
+type TeamSearchParameters struct {
+  ProjectID uint
+  Number string
+  MobileNumber string
+  Company string
+  TeamLeaderID uint
+}

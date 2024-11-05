@@ -19,7 +19,7 @@ func InitTeamRepostory(db *gorm.DB) ITeamRepository {
 
 type ITeamRepository interface {
 	GetAll(projectID uint) ([]model.Team, error)
-	GetPaginated(page, limit int, projectID uint) ([]dto.TeamPaginatedQuery, error)
+	GetPaginated(page, limit int, searchParameters dto.TeamSearchParameters) ([]dto.TeamPaginatedQuery, error)
 	GetByID(id uint) (model.Team, error)
 	GetByRangeOfIDs(ids []uint) ([]model.Team, error)
 	GetByNumber(number string) (model.Team, error)
@@ -27,11 +27,14 @@ type ITeamRepository interface {
 	CreateInBatches(data []dto.TeamMutation) ([]model.Team, error)
 	Update(data dto.TeamMutation) (model.Team, error)
 	Delete(id uint) error
-	Count(projectID uint) (int64, error)
+	Count(searchParameters dto.TeamSearchParameters) (int64, error)
 	GetTeamNumberAndTeamLeadersByID(projectID, teamId uint) ([]dto.TeamNumberAndTeamLeaderNameQueryResult, error)
 	DoesTeamNumberAlreadyExistForCreate(teamNumber string, projectID uint) (bool, error)
 	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error)
 	GetAllForSelect(projectID uint) ([]dto.TeamDataForSelect, error)
+	GetAllUniqueTeamNumbers(projectID uint) ([]string, error)
+	GetAllUniqueMobileNumber(projectID uint) ([]string, error)
+	GetAllUniqueCompanies(projectID uint) ([]string, error)
 }
 
 func (repo *teamRepository) GetAll(projectID uint) ([]model.Team, error) {
@@ -40,7 +43,7 @@ func (repo *teamRepository) GetAll(projectID uint) ([]model.Team, error) {
 	return data, err
 }
 
-func (repo *teamRepository) GetPaginated(page, limit int, projectID uint) ([]dto.TeamPaginatedQuery, error) {
+func (repo *teamRepository) GetPaginated(page, limit int, searchParameters dto.TeamSearchParameters) ([]dto.TeamPaginatedQuery, error) {
 	data := []dto.TeamPaginatedQuery{}
 	err := repo.db.
 		Raw(`SELECT 
@@ -54,9 +57,18 @@ func (repo *teamRepository) GetPaginated(page, limit int, projectID uint) ([]dto
         INNER JOIN team_leaders ON team_leaders.team_id = teams.id
         INNER JOIN workers ON team_leaders.leader_worker_id = workers.id
         WHERE
-          teams.project_id = ?
+          teams.project_id = ? AND
+          (nullif(?, '') IS NULL OR teams.number = ?) AND
+          (nullif(?, '') IS NULL OR teams.mobile_number = ?) AND
+          (nullif(?, '') IS NULL OR teams.company = ?) AND
+          (nullif(?, 0) IS NULL OR team_leaders.leader_worker_id = ?) 
         ORDER BY teams.id DESC LIMIT ? OFFSET ?`,
-			projectID, limit, (page-1)*limit,
+			searchParameters.ProjectID,
+			searchParameters.Number, searchParameters.Number,
+			searchParameters.MobileNumber, searchParameters.MobileNumber,
+			searchParameters.Company, searchParameters.Company,
+			searchParameters.TeamLeaderID, searchParameters.TeamLeaderID,
+			limit, (page-1)*limit,
 		).
 		Scan(&data).Error
 
@@ -153,9 +165,24 @@ func (repo *teamRepository) Delete(id uint) error {
 	})
 }
 
-func (repo *teamRepository) Count(projectID uint) (int64, error) {
+func (repo *teamRepository) Count(searchParameters dto.TeamSearchParameters) (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.Team{}).Where("project_id = ?", projectID).Count(&count).Error
+	err := repo.db.Raw(`
+    SELECT COUNT(*)
+    FROM teams
+    INNER JOIN team_leaders ON team_leaders.team_id = teams.id
+    INNER JOIN workers ON team_leaders.leader_worker_id = workers.id
+    WHERE
+      teams.project_id = ? AND
+      (nullif(?, '') IS NULL OR teams.number = ?) AND
+      (nullif(?, '') IS NULL OR teams.mobile_number = ?) AND
+      (nullif(?, '') IS NULL OR teams.company = ?) AND
+      (nullif(?, 0) IS NULL OR team_leaders.leader_worker_id = ?)
+    `, searchParameters.ProjectID,
+		searchParameters.Number, searchParameters.Number,
+		searchParameters.MobileNumber, searchParameters.MobileNumber,
+		searchParameters.Company, searchParameters.Company,
+		searchParameters.TeamLeaderID, searchParameters.TeamLeaderID).Scan(&count).Error
 	return count, err
 }
 
@@ -163,7 +190,7 @@ func (repo *teamRepository) GetByNumber(number string) (model.Team, error) {
 	data := model.Team{}
 	err := repo.db.
 		Raw(`SELECT * FROM teams WHERE number = ?`, number).
-    Scan(&data).
+		Scan(&data).
 		Error
 	return data, err
 }
@@ -265,5 +292,23 @@ func (repo *teamRepository) GetAllForSelect(projectID uint) ([]dto.TeamDataForSe
     WHERE teams.project_id = ?
     `, projectID).Scan(&result).Error
 
+	return result, err
+}
+
+func (repo *teamRepository) GetAllUniqueTeamNumbers(projectID uint) ([]string, error) {
+	result := []string{}
+	err := repo.db.Raw(`SELECT DISTINCT number FROM teams WHERE project_id = ?`, projectID).Scan(&result).Error
+	return result, err
+}
+
+func (repo *teamRepository) GetAllUniqueMobileNumber(projectID uint) ([]string, error) {
+	result := []string{}
+	err := repo.db.Raw(`SELECT DISTINCT mobile_number FROM teams WHERE project_id = ?`, projectID).Scan(&result).Error
+	return result, err
+}
+
+func (repo *teamRepository) GetAllUniqueCompanies(projectID uint) ([]string, error) {
+	result := []string{}
+	err := repo.db.Raw(`SELECT DISTINCT company FROM teams WHERE project_id = ?`, projectID).Scan(&result).Error
 	return result, err
 }

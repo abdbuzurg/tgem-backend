@@ -5,6 +5,8 @@ import (
 	"backend-v2/internal/service"
 	"backend-v2/pkg/response"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -30,7 +32,11 @@ type ITeamController interface {
 	Delete(c *gin.Context)
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
-  GetAllForSelect(c *gin.Context)
+	GetAllForSelect(c *gin.Context)
+	GetAllUniqueTeamNumbers(c *gin.Context)
+	GetAllUniqueMobileNumber(c *gin.Context)
+	GetAllUniqueCompanies(c *gin.Context)
+	Export(c *gin.Context)
 }
 
 func (controller *teamController) GetAll(c *gin.Context) {
@@ -60,15 +66,28 @@ func (controller *teamController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	projectID := c.GetUint("projectID")
+	teamLeaderIDStr := c.DefaultQuery("leaderID", "")
+	teamLeaderID, err := strconv.Atoi(teamLeaderIDStr)
+	if err != nil || teamLeaderID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query parameter provided for limit: %v", err))
+		return
+	}
 
-	data, err := controller.teamService.GetPaginated(page, limit, projectID)
+	searchParameters := dto.TeamSearchParameters{
+		ProjectID:    c.GetUint("projectID"),
+		Number:       c.DefaultQuery("number", ""),
+		MobileNumber: c.DefaultQuery("mobileNumber", ""),
+		Company:      c.DefaultQuery("company", ""),
+		TeamLeaderID: uint(teamLeaderID),
+	}
+
+	data, err := controller.teamService.GetPaginated(page, limit, searchParameters)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the paginated data of Team: %v", err))
 		return
 	}
 
-	dataCount, err := controller.teamService.Count(projectID)
+	dataCount, err := controller.teamService.Count(searchParameters)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the total amount of Team: %v", err))
 		return
@@ -223,4 +242,46 @@ func (controller *teamController) GetAllForSelect(c *gin.Context) {
 	response.ResponseSuccess(c, data)
 }
 
+func (controller *teamController) GetAllUniqueTeamNumbers(c *gin.Context) {
+	data, err := controller.teamService.GetAllUniqueTeamNumbers(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера при получении номера бригад: %v", err))
+		return
+	}
 
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *teamController) GetAllUniqueMobileNumber(c *gin.Context) {
+	data, err := controller.teamService.GetAllUniqueMobileNumber(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера при получении телефона бригад: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *teamController) GetAllUniqueCompanies(c *gin.Context) {
+	data, err := controller.teamService.GetAllUniqueCompanies(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера при получении компании бригад: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *teamController) Export(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+
+	exportFileName, err := controller.teamService.Export(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
+	c.FileAttachment(exportFilePath, exportFileName)
+	os.Remove(exportFileName)
+}
