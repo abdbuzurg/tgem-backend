@@ -339,7 +339,7 @@ func InitMainReports(router *gin.RouterGroup, controller controller.IMainReportC
 	mainReportRoutes.Use(
 		middleware.Authentication(),
 	)
-	mainReportRoutes.GET("/project-progress", controller.ProjectProgress)
+	mainReportRoutes.POST("/project-progress", controller.ProjectProgress)
 	mainReportRoutes.GET("/analysis-of-remaining-materials", controller.RemainingMaterialAnalysis)
 }
 

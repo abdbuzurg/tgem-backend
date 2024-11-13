@@ -39,4 +39,6 @@ type Project struct {
 	InvoiceCounts              []InvoiceCount              `json:"-" gorm:"foreignKey:ProjectID"`
 	Operations                 []Operation                 `json:"-" gorm:"foreignKey:ProjectID"`
 	WorkerAttendances          []WorkerAttendance          `json:"-" gorm:"foreignKey:ProjectID"`
+	ProjectProgressMaterials   []ProjectProgressMaterials  `json:"-" gorm:"foreignKey:ProjectID"`
+	ProjectProgressOperations  []ProjectProgressOperations `json:"-" gorm:"foreignKey:ProjectID"`
 }

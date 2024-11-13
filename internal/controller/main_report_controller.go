@@ -5,6 +5,7 @@ import (
 	"backend-v2/pkg/response"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,10 +26,37 @@ func InitMainReportController(mainReportService service.IMainReportService) IMai
 }
 
 func (controller *mainReportController) ProjectProgress(c *gin.Context) {
-	progressReportFilePath, err := controller.mainReportService.ProjectProgress(c.GetUint("projectID"))
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("%v", err))
+	type projectProgressRequestData struct {
+		Date time.Time `json:"date"`
+	}
+	var data projectProgressRequestData
+	if err := c.ShouldBindJSON(&data); err != nil {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
 		return
+	}
+
+	loc, _ := time.LoadLocation("Asia/Dushanbe")
+	dateGiven := data.Date.In(loc)
+	dateNow := time.Now().In(loc)
+	var progressReportFilePath string
+	var err error
+	if dateGiven.Day() == dateNow.Day() && dateGiven.Month() == dateNow.Month() && dateGiven.Year() == dateNow.Year() {
+		progressReportFilePath, err = controller.mainReportService.ProjectProgress(c.GetUint("projectID"))
+		if err != nil {
+			response.ResponseError(c, fmt.Sprintf("%v", err))
+			return
+		}
+	} else {
+		if dateGiven.After(dateNow) {
+			response.ResponseError(c, fmt.Sprint("Невозможно получить прогресс проекта в будущем"))
+			return
+		}
+
+		progressReportFilePath, err = controller.mainReportService.ProjectProgressByGivenDay(c.GetUint("projectID"), dateGiven)
+		if err != nil {
+			response.ResponseError(c, fmt.Sprintf("%v", err))
+			return
+		}
 	}
 
 	c.FileAttachment(progressReportFilePath, "Прогресс Проекта.xlsx")

@@ -12,6 +12,7 @@ type Operation struct {
 	PlannedAmountForProject   float64         `json:"plannedAmountForProject"`
 	ShowPlannedAmountInReport bool            `json:"showPlannedAmountInReport"`
 
-	InvoiceOperations  []InvoiceOperations `json:"-" gorm:"foreignKey:OperationID"`
-	OperationMaterials []OperationMaterial `json:"-" gorm:"foreignKey:OperationID"`
+	InvoiceOperations         []InvoiceOperations         `json:"-" gorm:"foreignKey:OperationID"`
+	OperationMaterials        []OperationMaterial         `json:"-" gorm:"foreignKey:OperationID"`
+	ProjectProgressOperations []ProjectProgressOperations `json:"-" gorm:"foreignKey:OperationID"`
 }

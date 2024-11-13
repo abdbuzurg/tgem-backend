@@ -2,6 +2,7 @@ package main
 
 import (
 	"backend-v2/api"
+	"backend-v2/internal/jobs"
 	"backend-v2/pkg/config"
 	"backend-v2/pkg/database"
 	"fmt"
@@ -21,8 +22,9 @@ func main() {
 		return
 	}
 
-	port := fmt.Sprintf("127.0.0.1:%d", viper.GetInt("App.Port"))
+  go jobs.Run()
 
+	port := fmt.Sprintf("127.0.0.1:%d", viper.GetInt("App.Port"))
 	app := api.SetupRouter(db)
 	if err := app.Run(port); err != nil {
 		panic(err)

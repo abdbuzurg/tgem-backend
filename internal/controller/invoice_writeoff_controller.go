@@ -207,7 +207,7 @@ func (controller *invoiceWriteOffController) Confirmation(c *gin.Context) {
 	}
 
 	fileNameAndExtension := strings.Split(file.Filename, ".")
-	fileExtension := fileNameAndExtension[1]
+	fileExtension := fileNameAndExtension[len(fileNameAndExtension) - 1]
 	if fileExtension != "pdf" {
 		response.ResponseError(c, fmt.Sprintf("Файл должен быть формата PDF"))
 		return
