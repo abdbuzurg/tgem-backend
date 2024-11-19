@@ -47,6 +47,11 @@ type ISubstationObjectService interface {
 	Import(projectID uint, filepath string) error
 	GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error)
 	Export(projectID uint) (string, error)
+  GetAll(projectID uint) ([]model.Object, error)
+}
+
+func (service *substationObjectService) GetAll(projectID uint) ([]model.Object, error) {
+  return service.substationObjectRepo.GetAll(projectID)
 }
 
 func (service *substationObjectService) GetPaginated(page, limit int, filter dto.SubstationObjectSearchParameters) ([]dto.SubstationObjectPaginated, error) {

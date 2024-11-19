@@ -13,28 +13,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type stvtObjectController struct {
-	stvtObjectService service.ISTVTObjectService
+type substationCellObjectController struct {
+	substationCellObjectService service.ISubstationCellObjectService
 }
 
-func InitSTVTObjectController(stvtObjectService service.ISTVTObjectService) ISTVTObjectController {
-	return &stvtObjectController{
-		stvtObjectService: stvtObjectService,
+func InitSubstationCellObjectController(
+	substationCellObjectService service.ISubstationCellObjectService,
+) ISubstationCellObjectController {
+	return &substationCellObjectController{
+		substationCellObjectService: substationCellObjectService,
 	}
 }
 
-type ISTVTObjectController interface {
+type ISubstationCellObjectController interface {
 	GetPaginated(c *gin.Context)
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
-	GetObjectNamesForSearch(c *gin.Context)
 	Export(c *gin.Context)
+	GetObjectNamesForSearch(c *gin.Context)
 }
 
-func (controller *stvtObjectController) GetPaginated(c *gin.Context) {
+func (controller *substationCellObjectController) GetPaginated(c *gin.Context) {
 	pageStr := c.DefaultQuery("page", "1")
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page <= 0 {
@@ -63,20 +65,20 @@ func (controller *stvtObjectController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	filter := dto.STVTObjectSearchParameters{
+	filter := dto.SubstationCellObjectSearchParameters{
 		ProjectID:          c.GetUint("projectID"),
 		TeamID:             uint(teamID),
 		SupervisorWorkerID: uint(supervisorWorkerID),
 		ObjectName:         c.DefaultQuery("objectName", ""),
 	}
 
-	data, err := controller.stvtObjectService.GetPaginated(page, limit, filter)
+	data, err := controller.substationCellObjectService.GetPaginated(page, limit, filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	dataCount, err := controller.stvtObjectService.Count(filter)
+	dataCount, err := controller.substationCellObjectService.Count(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -85,8 +87,8 @@ func (controller *stvtObjectController) GetPaginated(c *gin.Context) {
 	response.ResponsePaginatedData(c, data, dataCount)
 }
 
-func (controller *stvtObjectController) Create(c *gin.Context) {
-	var createData dto.STVTObjectCreate
+func (controller *substationCellObjectController) Create(c *gin.Context) {
+	var createData dto.SubstationCellObjectCreate
 	if err := c.ShouldBindJSON(&createData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
 		return
@@ -95,7 +97,7 @@ func (controller *stvtObjectController) Create(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	createData.BaseInfo.ProjectID = projectID
 
-	data, err := controller.stvtObjectService.Create(createData)
+	data, err := controller.substationCellObjectService.Create(createData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -105,8 +107,8 @@ func (controller *stvtObjectController) Create(c *gin.Context) {
 
 }
 
-func (controller *stvtObjectController) Update(c *gin.Context) {
-	var updateData dto.STVTObjectCreate
+func (controller *substationCellObjectController) Update(c *gin.Context) {
+	var updateData dto.SubstationCellObjectCreate
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
 		return
@@ -115,7 +117,7 @@ func (controller *stvtObjectController) Update(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	updateData.BaseInfo.ProjectID = projectID
 
-	data, err := controller.stvtObjectService.Update(updateData)
+	data, err := controller.substationCellObjectService.Update(updateData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -124,7 +126,7 @@ func (controller *stvtObjectController) Update(c *gin.Context) {
 	response.ResponseSuccess(c, data)
 }
 
-func (controller *stvtObjectController) Delete(c *gin.Context) {
+func (controller *substationCellObjectController) Delete(c *gin.Context) {
 	idRaw := c.Param("id")
 	id, err := strconv.ParseUint(idRaw, 10, 64)
 	if err != nil {
@@ -134,33 +136,32 @@ func (controller *stvtObjectController) Delete(c *gin.Context) {
 
 	projectID := c.GetUint("projectID")
 
-	err = controller.stvtObjectService.Delete(uint(id), projectID)
+	err = controller.substationCellObjectService.Delete(uint(id), projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
 	response.ResponseSuccess(c, true)
-
 }
 
-func (controller *stvtObjectController) GetTemplateFile(c *gin.Context) {
-	filepath := "./pkg/excels/templates/Шаблон для импорта СТВТ.xlsx"
+func (controller *substationCellObjectController) GetTemplateFile(c *gin.Context) {
+	filepath := "./pkg/excels/templates/Шаблон для импорт Ячеек Подстанции.xlsx"
 
-	tmpFilePath, err := controller.stvtObjectService.TemplateFile(filepath, c.GetUint("projectID"))
+	tmpFilePath, err := controller.substationCellObjectService.TemplateFile(filepath, c.GetUint("projectID"))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	c.FileAttachment(tmpFilePath, "Шаблон для импорта СТВТ.xlsx")
+	c.FileAttachment(tmpFilePath, "Шаблон для импорт Ячеек Подстанции.xlsx")
 	if err := os.Remove(tmpFilePath); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 }
 
-func (controller *stvtObjectController) Import(c *gin.Context) {
+func (controller *substationCellObjectController) Import(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Файл не может быть сформирован, проверьте файл: %v", err))
@@ -176,7 +177,7 @@ func (controller *stvtObjectController) Import(c *gin.Context) {
 	}
 
 	projectID := c.GetUint("projectID")
-	err = controller.stvtObjectService.Import(projectID, filePath)
+	err = controller.substationCellObjectService.Import(projectID, filePath)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -185,20 +186,10 @@ func (controller *stvtObjectController) Import(c *gin.Context) {
 	response.ResponseSuccess(c, true)
 }
 
-func (controller *stvtObjectController) GetObjectNamesForSearch(c *gin.Context) {
-	data, err := controller.stvtObjectService.GetObjectNamesForSearch(c.GetUint("projectID"))
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
-		return
-	}
-
-	response.ResponseSuccess(c, data)
-}
-
-func (controller *stvtObjectController) Export(c *gin.Context) {
+func (controller *substationCellObjectController) Export(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 
-	exportFileName, err := controller.stvtObjectService.Export(projectID)
+	exportFileName, err := controller.substationCellObjectService.Export(projectID)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -206,8 +197,18 @@ func (controller *stvtObjectController) Export(c *gin.Context) {
 
 	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
 	c.FileAttachment(exportFilePath, exportFileName)
-  if err := os.Remove(exportFilePath); err != nil {
+	if err := os.Remove(exportFilePath); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
-  }
+	}
+}
+
+func (controller *substationCellObjectController) GetObjectNamesForSearch(c *gin.Context) {
+	data, err := controller.substationCellObjectService.GetObjectNamesForSearch(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

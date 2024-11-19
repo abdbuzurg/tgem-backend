@@ -20,12 +20,12 @@ type substationObjectController struct {
 func InitSubstationObjectController(
 	substationObjectService service.ISubstationObjectService,
 ) ISubstationObjectController {
-  return &substationObjectController{
-    substationObjectService: substationObjectService,
-  }
+	return &substationObjectController{
+		substationObjectService: substationObjectService,
+	}
 }
 
-type ISubstationObjectController interface{
+type ISubstationObjectController interface {
 	GetPaginated(c *gin.Context)
 	Create(c *gin.Context)
 	Update(c *gin.Context)
@@ -33,7 +33,18 @@ type ISubstationObjectController interface{
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
 	GetObjectNamesForSearch(c *gin.Context)
-  Export(c *gin.Context)
+	Export(c *gin.Context)
+	GetAll(c *gin.Context)
+}
+
+func (controller *substationObjectController) GetAll(c *gin.Context) {
+	data, err := controller.substationObjectService.GetAll(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+  response.ResponseSuccess(c, data)
 }
 
 func (controller *substationObjectController) GetPaginated(c *gin.Context) {

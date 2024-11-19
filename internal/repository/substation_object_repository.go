@@ -26,6 +26,15 @@ type ISubstationObjectRepository interface {
 	CreateInBatches(objects []model.Object, tps []model.Substation_Object, supervisors []uint) ([]model.Substation_Object, error)
 	GetObjectNamesForSearch(projectID uint) ([]dto.DataForSelect[string], error)
 	Import(data []dto.SubstationObjectImportData) error
+	GetAllNames(projectID uint) ([]string, error)
+	GetByName(name string) (model.Object, error)
+	GetAll(projectID uint) ([]model.Object, error)
+}
+
+func (repo *substationObjectRepository) GetAll(projectID uint) ([]model.Object, error) {
+  result := []model.Object{}
+  err := repo.db.Find(&result, "type = 'substation_objects' AND project_id = ?", projectID).Error
+  return result, err
 }
 
 func (repo *substationObjectRepository) GetPaginated(page, limit int, filter dto.SubstationObjectSearchParameters) ([]dto.SubstationObjectPaginatedQuery, error) {
@@ -323,4 +332,16 @@ func (repo *substationObjectRepository) Import(data []dto.SubstationObjectImport
 
 		return nil
 	})
+}
+
+func (repo *substationObjectRepository) GetAllNames(projectID uint) ([]string, error) {
+	result := []string{}
+	err := repo.db.Raw(`SELECT name FROM objects WHERE objects.type='substation_objects' AND objects.project_id = ?`, projectID).Scan(&result).Error
+	return result, err
+}
+
+func (repo *substationObjectRepository) GetByName(name string) (model.Object, error) {
+	result := model.Object{}
+	err := repo.db.First(&result, "name = ?", name).Error
+	return result, err
 }

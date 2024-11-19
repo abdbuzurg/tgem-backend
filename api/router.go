@@ -72,6 +72,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	invoiceWriteOffRepo := repository.InitInvoiceWriteOffRepository(db)
 	workerAttendanceRepo := repository.InitWorkerAttendanceRepository(db)
 	mainReportRepository := repository.InitMainReportRepository(db)
+	substationCellRepository := repository.NewSubstationCellObjectRepository(db)
 
 	//Initialization of Services
 	invoiceInputService := service.InitInvoiceInputService(
@@ -267,6 +268,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		workerRepo,
 	)
 	mainReportService := service.InitMainReportService(mainReportRepository)
+	substationCellObjectService := service.InitSubstationCellObjectService(
+		substationCellRepository,
+		objectSupervisorsRepo,
+		objectTeamsRepo,
+		workerRepo,
+		teamRepo,
+		substationObjectRepo,
+	)
 
 	//Initialization of Controllers
 	invoiceInputController := controller.InitInvoiceInputController(invoiceInputService, userActionService)
@@ -300,6 +309,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	invoiceWriteOffController := controller.InitInvoiceWriteOffController(invoiceWriteOffService)
 	workerAttendanceController := controller.InitWorkerAttendanceController(workerAttendanceService)
 	mainReportController := controller.InitMainReportController(mainReportService)
+	substationCellController := controller.InitSubstationCellObjectController(substationCellObjectService)
 
 	//Initialization of Routes
 	InitInvoiceInputRoutes(router, invoiceInputController, db)
@@ -330,6 +340,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitInvoiceWriteOffRoutes(router, invoiceWriteOffController)
 	InitWorkerAttendanceRoutes(router, workerAttendanceController)
 	InitMainReports(router, mainReportController)
+  InitSubstationCellRoutes(router, substationCellController)
 
 	return mainRouter
 }
@@ -578,9 +589,9 @@ func InitTeamRoutes(router *gin.RouterGroup, controller controller.ITeamControll
 	teamRoutes.GET("/paginated", controller.GetPaginated)
 	teamRoutes.GET("/:id", controller.GetByID)
 	teamRoutes.GET("/document/template", controller.GetTemplateFile)
-  teamRoutes.GET("/unique/team-number", controller.GetAllUniqueTeamNumbers)
-  teamRoutes.GET("/unique/mobile-number", controller.GetAllUniqueMobileNumber)
-  teamRoutes.GET("/unique/team-company", controller.GetAllUniqueCompanies)
+	teamRoutes.GET("/unique/team-number", controller.GetAllUniqueTeamNumbers)
+	teamRoutes.GET("/unique/mobile-number", controller.GetAllUniqueMobileNumber)
+	teamRoutes.GET("/unique/team-company", controller.GetAllUniqueCompanies)
 	teamRoutes.GET("/document/export", controller.Export)
 	teamRoutes.POST("/", controller.Create)
 	teamRoutes.POST("/document/import", controller.Import)
@@ -618,15 +629,33 @@ func InitTPObjectRoutes(router *gin.RouterGroup, controller controller.ITPObject
 	tpObjectRoutes.DELETE("/:id", controller.Delete)
 }
 
+func InitSubstationCellRoutes(router *gin.RouterGroup, controller controller.ISubstationCellObjectController) {
+	substationCellObjectRoutes := router.Group("/cell-substation")
+	substationCellObjectRoutes.Use(
+		middleware.Authentication(),
+	)
+	substationCellObjectRoutes.GET("/paginated", controller.GetPaginated)
+	substationCellObjectRoutes.GET("/document/template", controller.GetTemplateFile)
+	substationCellObjectRoutes.GET("/document/export", controller.Export)
+	substationCellObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
+	substationCellObjectRoutes.POST("/document/import", controller.Import)
+	substationCellObjectRoutes.POST("/", controller.Create)
+	substationCellObjectRoutes.PATCH("/", controller.Update)
+	substationCellObjectRoutes.DELETE("/:id", controller.Delete)
+
+}
+
 func InitSubstationObjectRoutes(router *gin.RouterGroup, controller controller.ISubstationObjectController) {
 	substationObjectRoutes := router.Group("/substation")
 	substationObjectRoutes.Use(
 		middleware.Authentication(),
 	)
+  substationObjectRoutes.GET("/all", controller.GetAll)
 	substationObjectRoutes.GET("/paginated", controller.GetPaginated)
 	substationObjectRoutes.GET("/document/template", controller.GetTemplateFile)
 	substationObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
 	substationObjectRoutes.GET("/document/export", controller.Export)
+  substationObjectRoutes.POST("/", controller.Create)
 	substationObjectRoutes.POST("/document/import", controller.Import)
 	substationObjectRoutes.PATCH("/", controller.Update)
 	substationObjectRoutes.DELETE("/:id", controller.Delete)

@@ -2,6 +2,7 @@ package database
 
 import (
 	"backend-v2/model"
+	"errors"
 	"fmt"
 	"os"
 
@@ -45,6 +46,16 @@ func execSeedFile(db *gorm.DB, filepath string) error {
 
 func initialSuperadminMigration(db *gorm.DB) error {
 
+  role := model.Role{}
+  err := db.First(&role, "name = 'Суперадмин'").Error 
+  if errors.Is(err, gorm.ErrRecordNotFound) {
+    role = model.Role{Name: "Суперадмин", Description: "Суперадмин", }
+    if err := db.Create(&role).Error; err != nil {
+      return err
+    }
+  }
+
+
 	resources := []model.Resource{}
 	if err := db.Find(&resources).Error; err != nil {
 		return err
@@ -53,7 +64,7 @@ func initialSuperadminMigration(db *gorm.DB) error {
 	permissionBasedOnAllResources := []model.Permission{}
 	for _, resource := range resources {
 		permissionBasedOnAllResources = append(permissionBasedOnAllResources, model.Permission{
-			RoleID:     1,
+			RoleID:     role.ID,
 			ResourceID: resource.ID,
 			R:          true,
 			U:          true,
@@ -63,7 +74,7 @@ func initialSuperadminMigration(db *gorm.DB) error {
 	}
 
 	alreadyInDBPermissions := []model.Permission{}
-	if err := db.Find(&alreadyInDBPermissions, "role_id = 1").Error; err != nil {
+	if err := db.Find(&alreadyInDBPermissions, "role_id = ?", role.ID).Error; err != nil {
 		return err
 	}
 

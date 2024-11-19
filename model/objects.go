@@ -14,9 +14,12 @@ type Object struct {
 	ObjectTeams       []ObjectTeams       `json:"-" gorm:"foreignKey:ObjectID"`
 	ObjectSupervisors []ObjectSupervisors `json:"-" gorm:"foreignKey:ObjectID"`
 
-	InvoiceObject    []InvoiceObject   `json:"-" gorm:"foreignKey:ObjectID"`
+	InvoiceObject []InvoiceObject `json:"-" gorm:"foreignKey:ObjectID"`
 
 	TPNourashesObjects []TPNourashesObjects `json:"-" gorm:"foreignKey:TP_ObjectID"`
+
+  SubstationObjects     []SubstationCellNourashesSubstationObject `json:"-" gorm:"foreignKey:SubstationObjectID"`
+	SubstationCellObjects []SubstationCellNourashesSubstationObject `json:"-" gorm:"foreignKey:SubstationCellObjectID"`
 }
 
 type MJD_Object struct {
@@ -31,6 +34,13 @@ type TP_Object struct {
 	ID           uint   `json:"id" gorm:"primaryKey"`
 	Model        string `json:"model" gorm:"tinyText"`
 	VoltageClass string `json:"voltageClass" gorm:"tinyText"`
+}
+
+type TPNourashesObjects struct {
+	ID          uint   `json:"id" gorm:"primaryKey"`
+	TP_ObjectID uint   `json:"tpObjectID"`
+	TargetID    uint   `json:"targetID"`
+	TargetType  string `json:"targetType"`
 }
 
 type STVT_Object struct {
@@ -56,9 +66,12 @@ type Substation_Object struct {
 	NumberOfTransformers uint   `json:"numberOfTransformers"`
 }
 
-type TPNourashesObjects struct {
-	ID          uint   `json:"id" gorm:"primaryKey"`
-	TP_ObjectID uint   `json:"tpObjectID"`
-	TargetID    uint   `json:"targetID"`
-	TargetType  string `json:"targetType"`
+type SubstationCellObject struct {
+	ID uint `gorm:"primaryKey"`
+}
+
+type SubstationCellNourashesSubstationObject struct {
+	ID                     uint `gorm:"primaryKey"`
+	SubstationObjectID     uint
+	SubstationCellObjectID uint
 }
