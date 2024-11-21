@@ -65,11 +65,20 @@ func (controller *substationCellObjectController) GetPaginated(c *gin.Context) {
 		return
 	}
 
+  substationObjectIDStr := c.DefaultQuery("substationObjectID", "0")
+	substationObjectID, err := strconv.Atoi(substationObjectIDStr)
+	if err != nil || substationObjectID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса substationObjectID: %v", err))
+		return
+	}
+
+
 	filter := dto.SubstationCellObjectSearchParameters{
 		ProjectID:          c.GetUint("projectID"),
 		TeamID:             uint(teamID),
 		SupervisorWorkerID: uint(supervisorWorkerID),
 		ObjectName:         c.DefaultQuery("objectName", ""),
+    SubstationObjectID: uint(substationObjectID),
 	}
 
 	data, err := controller.substationCellObjectService.GetPaginated(page, limit, filter)

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/repository"
 	"backend-v2/model"
 	"fmt"
@@ -29,6 +30,7 @@ type IWorkerService interface {
 	Delete(id uint) error
 	Count() (int64, error)
 	Import(filepath string, projectID uint) error
+	GetWorkerInformationForSearch(projectID uint) (dto.WorkerInformationForSearch, error)
 }
 
 func (service *workerService) GetAll(projectID uint) ([]model.Worker, error) {
@@ -94,8 +96,8 @@ func (service *workerService) Import(filepath string, projectID uint) error {
 	index := 1
 	for len(rows) > index {
 		worker := model.Worker{
-      ProjectID: projectID,
-    }
+			ProjectID: projectID,
+		}
 
 		worker.Name, err = f.GetCellValue(sheetName, "A"+fmt.Sprint(index+1))
 		if err != nil {
@@ -149,4 +151,8 @@ func (service *workerService) Import(filepath string, projectID uint) error {
 	}
 
 	return nil
+}
+
+func (service *workerService) GetWorkerInformationForSearch(projectID uint) (dto.WorkerInformationForSearch, error) {
+  return service.workerRepo.GetFullWorkerInformationForSearch(projectID)
 }

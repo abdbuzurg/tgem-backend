@@ -31,6 +31,7 @@ type IWorkerController interface {
 	Delete(c *gin.Context)
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
+	GetWorkerInformationForSearch(c *gin.Context)
 }
 
 func (controller *workerController) GetAll(c *gin.Context) {
@@ -59,7 +60,7 @@ func (controller *workerController) GetPaginated(c *gin.Context) {
 	}
 
 	filter := model.Worker{
-    ProjectID: c.GetUint("projectID"),
+		ProjectID: c.GetUint("projectID"),
 	}
 
 	data, err := controller.workerService.GetPaginated(page, limit, filter)
@@ -113,7 +114,7 @@ func (controller *workerController) Create(c *gin.Context) {
 		return
 	}
 
-  createData.ProjectID = c.GetUint("projectID")
+	createData.ProjectID = c.GetUint("projectID")
 
 	data, err := controller.workerService.Create(createData)
 	if err != nil {
@@ -131,7 +132,7 @@ func (controller *workerController) Update(c *gin.Context) {
 		return
 	}
 
-  updateData.ProjectID = c.GetUint("projectID")
+	updateData.ProjectID = c.GetUint("projectID")
 
 	data, err := controller.workerService.Update(updateData)
 	if err != nil {
@@ -179,7 +180,7 @@ func (controller *workerController) Import(c *gin.Context) {
 		return
 	}
 
-  projectID := c.GetUint("projectID")
+	projectID := c.GetUint("projectID")
 
 	err = controller.workerService.Import(filePath, projectID)
 	if err != nil {
@@ -188,4 +189,14 @@ func (controller *workerController) Import(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, true)
+}
+
+func (controller *workerController) GetWorkerInformationForSearch(c *gin.Context) {
+	data, err := controller.workerService.GetWorkerInformationForSearch(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Could not perform the updation of Worker: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

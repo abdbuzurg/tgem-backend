@@ -732,6 +732,7 @@ func InitWorkerRoutes(router *gin.RouterGroup, controller controller.IWorkerCont
 	workerRoutes.GET("/:id", controller.GetByID)
 	workerRoutes.GET("/job-title/:jobTitleInProject", controller.GetByJobTitleInProject)
 	workerRoutes.GET("/document/template", controller.GetTemplateFile)
+  workerRoutes.GET("/unique/worker-information", controller.GetWorkerInformationForSearch)
 	workerRoutes.POST("/", controller.Create)
 	workerRoutes.POST("/document/import", controller.Import)
 	workerRoutes.PATCH("/", controller.Update)

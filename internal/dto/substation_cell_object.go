@@ -15,6 +15,7 @@ type SubstationCellObjectSearchParameters struct {
 	ObjectName         string
 	SupervisorWorkerID uint
 	TeamID             uint
+  SubstationObjectID uint
 }
 
 type SubstationCellObjectPaginated struct {

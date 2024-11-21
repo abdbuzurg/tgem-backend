@@ -46,7 +46,8 @@ func (repo *substationCellObjectRepository) GetPaginated(page, limit int, filter
       objects.project_id = ? AND
       (nullif(?, '') IS NULL OR objects.name = ?) AND
       (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
-      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?) AND
+      (nullif(?, 0) IS NULL OR substation_cell_nourashes_substation_objects.substation_cell_object_id = ?)
     ORDER BY substation_cell_objects.id DESC 
     LIMIT ? 
     OFFSET ?;
@@ -54,6 +55,7 @@ func (repo *substationCellObjectRepository) GetPaginated(page, limit int, filter
 		filter.ObjectName, filter.ObjectName,
 		filter.TeamID, filter.TeamID,
 		filter.SupervisorWorkerID, filter.SupervisorWorkerID,
+		filter.SubstationObjectID, filter.SubstationObjectID,
 		limit, (page-1)*limit).Scan(&data).Error
 
 	return data, err
@@ -73,10 +75,12 @@ func (repo *substationCellObjectRepository) Count(filter dto.SubstationCellObjec
       objects.project_id = ? AND
       (nullif(?, '') IS NULL OR objects.name = ?) AND
       (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
-      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?)
+      (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?) AND
+      (nullif(?, 0) IS NULL OR substation_cell_nourashes_substation_objects.substation_cell_object_id = ?)
     `, filter.ProjectID,
 		filter.ObjectName, filter.ObjectName,
 		filter.TeamID, filter.TeamID,
+    filter.SubstationObjectID, filter.SubstationObjectID,
 		filter.SupervisorWorkerID, filter.SupervisorWorkerID).Scan(&count).Error
 	return count, err
 }
