@@ -293,8 +293,8 @@ func (service *substationCellObjectService) Import(projectID uint, filepath stri
 }
 
 func (service *substationCellObjectService) Export(projectID uint) (string, error) {
-	stvtTempalteFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта СТВТ.xlsx")
-	f, err := excelize.OpenFile(stvtTempalteFilePath)
+	substationCellTempalteFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорт Ячеек Подстанции.xlsx")
+	f, err := excelize.OpenFile(substationCellTempalteFilePath)
 	if err != nil {
 		f.Close()
 		return "", fmt.Errorf("Не смог открыть файл: %v", err)

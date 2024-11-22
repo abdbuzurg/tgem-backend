@@ -81,6 +81,8 @@ func (controller *substationCellObjectController) GetPaginated(c *gin.Context) {
     SubstationObjectID: uint(substationObjectID),
 	}
 
+  fmt.Println(filter)
+
 	data, err := controller.substationCellObjectService.GetPaginated(page, limit, filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
@@ -94,6 +96,7 @@ func (controller *substationCellObjectController) GetPaginated(c *gin.Context) {
 	}
 
 	response.ResponsePaginatedData(c, data, dataCount)
+
 }
 
 func (controller *substationCellObjectController) Create(c *gin.Context) {

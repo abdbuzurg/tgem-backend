@@ -47,7 +47,7 @@ func (repo *substationCellObjectRepository) GetPaginated(page, limit int, filter
       (nullif(?, '') IS NULL OR objects.name = ?) AND
       (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
       (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?) AND
-      (nullif(?, 0) IS NULL OR substation_cell_nourashes_substation_objects.substation_cell_object_id = ?)
+      (nullif(?, 0) IS NULL OR substation_cell_nourashes_substation_objects.substation_object_id = ?)
     ORDER BY substation_cell_objects.id DESC 
     LIMIT ? 
     OFFSET ?;
@@ -76,12 +76,13 @@ func (repo *substationCellObjectRepository) Count(filter dto.SubstationCellObjec
       (nullif(?, '') IS NULL OR objects.name = ?) AND
       (nullif(?, 0) IS NULL OR object_teams.team_id = ?) AND
       (nullif(?, 0) IS NULL OR object_supervisors.supervisor_worker_id = ?) AND
-      (nullif(?, 0) IS NULL OR substation_cell_nourashes_substation_objects.substation_cell_object_id = ?)
+      (nullif(?, 0) IS NULL OR substation_cell_nourashes_substation_objects.substation_object_id = ?)
     `, filter.ProjectID,
 		filter.ObjectName, filter.ObjectName,
 		filter.TeamID, filter.TeamID,
+		filter.SupervisorWorkerID, filter.SupervisorWorkerID,
     filter.SubstationObjectID, filter.SubstationObjectID,
-		filter.SupervisorWorkerID, filter.SupervisorWorkerID).Scan(&count).Error
+    ).Scan(&count).Error
 	return count, err
 }
 
@@ -137,7 +138,7 @@ func (repo *substationCellObjectRepository) Create(data dto.SubstationCellObject
 		if data.SubstationObjectID != 0 {
 			nourashes := model.SubstationCellNourashesSubstationObject{
 				SubstationObjectID:     data.SubstationObjectID,
-				SubstationCellObjectID: substationCell.ID,
+				SubstationCellObjectID: object.ID,
 			}
 			if err := tx.Create(&nourashes).Error; err != nil {
 				return err
