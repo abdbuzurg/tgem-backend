@@ -558,7 +558,6 @@ func InitMaterialRoutes(router *gin.RouterGroup, controller controller.IMaterial
 	)
 	materialRoutes.GET("/all", controller.GetAll)
 	materialRoutes.GET("/paginated", controller.GetPaginated)
-	materialRoutes.GET("/:id", controller.GetByID)
 	materialRoutes.GET("/document/template", controller.GetTemplateFile)
 	materialRoutes.GET("/document/export", controller.Export)
 	materialRoutes.POST("/", controller.Create)

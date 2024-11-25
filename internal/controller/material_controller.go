@@ -4,6 +4,7 @@ import (
 	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -188,7 +189,14 @@ func (controller *materialController) Delete(c *gin.Context) {
 }
 
 func (controller *materialController) GetTemplateFile(c *gin.Context) {
-	c.FileAttachment("./pkg/excels/templates/Шаблон для импорта материалов.xlsx", "Шаблон для импорта материалов.xlsx")
+	filePath := filepath.Join("./pkg/excels/templates/", "Шаблон для импорта Материалов.xlsx")
+	if _, err := os.Stat(filePath); err == nil {
+		c.FileAttachment(filePath, "Шаблон для импорта Материалов.xlsx")
+	} else if errors.Is(err, os.ErrNotExist) {
+		response.ResponseError(c, fmt.Sprintf("Файл Шаблон импорта материала не существует или был удалён: %v", err))
+	} else {
+		response.ResponseError(c, fmt.Sprintf("Неизвестная ошибка при проверке существования файла: %v", err))
+	}
 }
 
 func (controller *materialController) Import(c *gin.Context) {
@@ -199,7 +207,7 @@ func (controller *materialController) Import(c *gin.Context) {
 	}
 
 	date := time.Now()
-  importFileName := date.Format("2006-01-02 15-04-05") + file.Filename
+	importFileName := date.Format("2006-01-02 15-04-05") + file.Filename
 	importFilePath := filepath.Join("./pkg/excels/temp/", importFileName)
 	err = c.SaveUploadedFile(file, importFilePath)
 	if err != nil {
@@ -226,7 +234,7 @@ func (controller *materialController) Export(c *gin.Context) {
 		return
 	}
 
-  exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
-  c.FileAttachment(exportFilePath, exportFileName)
-  os.Remove(exportFileName)
+	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
+	c.FileAttachment(exportFilePath, exportFileName)
+	os.Remove(exportFileName)
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/xuri/excelize/v2"
@@ -73,17 +74,18 @@ func (service *materialService) Import(projectID uint, filepath string) error {
 		return fmt.Errorf("Не смог открыть файл: %v", err)
 	}
 
+  defer func(){
+    f.Close()
+    os.Remove(filepath)
+  }()
+
 	sheetName := "Материалы"
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
-		f.Close()
-		os.Remove(filepath)
 		return fmt.Errorf("Не смог найти таблицу 'Импорт': %v", err)
 	}
 
 	if len(rows) == 1 {
-		f.Close()
-		os.Remove(filepath)
 		return fmt.Errorf("Файл не имеет данных")
 	}
 
@@ -96,43 +98,31 @@ func (service *materialService) Import(projectID uint, filepath string) error {
 
 		material.Name, err = f.GetCellValue(sheetName, "A"+fmt.Sprint(index+1))
 		if err != nil {
-			f.Close()
-			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке А%d: %v", index+1, err)
 		}
 
 		material.Code, err = f.GetCellValue(sheetName, "B"+fmt.Sprint(index+1))
 		if err != nil {
-			f.Close()
-			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке B%d: %v", index+1, err)
 		}
 
 		material.Category, err = f.GetCellValue(sheetName, "C"+fmt.Sprint(index+1))
 		if err != nil {
-			f.Close()
-			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке C%d: %v", index+1, err)
 		}
 
 		material.Unit, err = f.GetCellValue(sheetName, "D"+fmt.Sprint(index+1))
 		if err != nil {
-			f.Close()
-			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке D%d: %v", index+1, err)
 		}
 
 		material.Article, err = f.GetCellValue(sheetName, "E"+fmt.Sprint(index+1))
 		if err != nil {
-			f.Close()
-			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке E%d: %v", index+1, err)
 		}
 
 		serialNumberStatus, err := f.GetCellValue(sheetName, "F"+fmt.Sprint(index+1))
 		if err != nil {
-			f.Close()
-			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке F%d: %v", index+1, err)
 		}
 
@@ -143,11 +133,30 @@ func (service *materialService) Import(projectID uint, filepath string) error {
 			material.HasSerialNumber = false
 		}
 
-		material.Notes, err = f.GetCellValue(sheetName, "G"+fmt.Sprint(index+1))
+		showInReport, err := f.GetCellValue(sheetName, "G"+fmt.Sprint(index+1))
 		if err != nil {
-			f.Close()
-			os.Remove(filepath)
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке G%d: %v", index+1, err)
+		}
+
+		showInReport = strings.ToLower(showInReport)
+		if showInReport == "да" {
+			material.ShowPlannedAmountInReport = true
+		} else {
+			material.ShowPlannedAmountInReport = false
+		}
+
+    plannedAmountForProject, err := f.GetCellValue(sheetName, "H"+fmt.Sprint(index + 1))
+    if err != nil {
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке H%d: %v", index+1, err)
+    }
+
+    if material.PlannedAmountForProject, err = strconv.ParseFloat(plannedAmountForProject, 64); err != nil {
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке H%d: %v", index+1, err)
+    } 
+
+		material.Notes, err = f.GetCellValue(sheetName, "I"+fmt.Sprint(index+1))
+		if err != nil {
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке I%d: %v", index+1, err)
 		}
 
 		materials = append(materials, material)
@@ -181,7 +190,7 @@ func (service *materialService) Export(projectID uint) (string, error) {
 	sheetName := "Материалы"
 	startingRow := 2
 
-  materialCount, err := service.materialRepo.Count(model.Material{ProjectID: projectID})
+	materialCount, err := service.materialRepo.Count(model.Material{ProjectID: projectID})
 	if err != nil {
 		return "", err
 	}
@@ -210,7 +219,7 @@ func (service *materialService) Export(projectID uint) (string, error) {
 			f.SetCellStr(sheetName, "G"+fmt.Sprint(startingRow+index), material.Notes)
 		}
 
-    startingRow = page * limit + 2 
+		startingRow = page*limit + 2
 		page++
 		materialCount -= int64(limit)
 	}
