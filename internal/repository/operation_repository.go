@@ -28,6 +28,7 @@ type IOperationRepository interface {
 	Delete(id uint) error
 	Count(filter dto.OperationSearchParameters) (int64, error)
 	GetWithoutMaterialOperations(projectID uint) ([]model.Operation, error)
+  CreateInBatches(data []dto.OperationImportDataForInsert) error
 }
 
 func (repo *operationRepository) GetPaginated(page, limit int, filter dto.OperationSearchParameters) ([]dto.OperationPaginated, error) {
@@ -215,4 +216,37 @@ func (repo *operationRepository) GetWithoutMaterialOperations(projectID uint) ([
     `, projectID).Scan(&result).Error
 
 	return result, err
+}
+
+func(repo *operationRepository) CreateInBatches(data []dto.OperationImportDataForInsert) error {
+  return repo.db.Transaction(func(tx *gorm.DB) error {
+    for _, operationData := range data {
+      operation := model.Operation{
+        ProjectID: operationData.ProjectID,
+        Code: operationData.Code,
+        Name: operationData.Name,
+        CostPrime: operationData.CostPrime,
+        CostWithCustomer: operationData.CostWithCustomer,
+        PlannedAmountForProject: operationData.PlannedAmountForProject,
+        ShowPlannedAmountInReport: operationData.ShowPlannedAmountInReport,
+      }
+
+      if err := tx.Create(&operation).Error; err != nil {
+        return err
+      }
+
+      if operationData.MaterialID != 0 {
+        operationMaterial := model.OperationMaterial{
+          MaterialID: operationData.MaterialID,
+          OperationID: operation.ID,
+        }
+
+        if err := tx.Create(&operationMaterial).Error; err != nil {
+          return err
+        }
+      }
+    }
+
+    return nil
+  })
 }

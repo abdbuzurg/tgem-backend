@@ -195,7 +195,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		tpObjectRepo,
 		objectTeamsRepo,
 	)
-	operationService := service.InitOperationService(operationRepo)
+	operationService := service.InitOperationService(
+		operationRepo,
+		materialRepo,
+	)
 	projectService := service.InitProjectService(projectRepo)
 	sipObjectService := service.InitSIPObjectService(
 		sipObjectRepo,
@@ -340,7 +343,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitInvoiceWriteOffRoutes(router, invoiceWriteOffController)
 	InitWorkerAttendanceRoutes(router, workerAttendanceController)
 	InitMainReports(router, mainReportController)
-  InitSubstationCellRoutes(router, substationCellController)
+	InitSubstationCellRoutes(router, substationCellController)
 
 	return mainRouter
 }
@@ -649,12 +652,12 @@ func InitSubstationObjectRoutes(router *gin.RouterGroup, controller controller.I
 	substationObjectRoutes.Use(
 		middleware.Authentication(),
 	)
-  substationObjectRoutes.GET("/all", controller.GetAll)
+	substationObjectRoutes.GET("/all", controller.GetAll)
 	substationObjectRoutes.GET("/paginated", controller.GetPaginated)
 	substationObjectRoutes.GET("/document/template", controller.GetTemplateFile)
 	substationObjectRoutes.GET("/search/object-names", controller.GetObjectNamesForSearch)
 	substationObjectRoutes.GET("/document/export", controller.Export)
-  substationObjectRoutes.POST("/", controller.Create)
+	substationObjectRoutes.POST("/", controller.Create)
 	substationObjectRoutes.POST("/document/import", controller.Import)
 	substationObjectRoutes.PATCH("/", controller.Update)
 	substationObjectRoutes.DELETE("/:id", controller.Delete)
@@ -731,7 +734,7 @@ func InitWorkerRoutes(router *gin.RouterGroup, controller controller.IWorkerCont
 	workerRoutes.GET("/:id", controller.GetByID)
 	workerRoutes.GET("/job-title/:jobTitleInProject", controller.GetByJobTitleInProject)
 	workerRoutes.GET("/document/template", controller.GetTemplateFile)
-  workerRoutes.GET("/unique/worker-information", controller.GetWorkerInformationForSearch)
+	workerRoutes.GET("/unique/worker-information", controller.GetWorkerInformationForSearch)
 	workerRoutes.POST("/", controller.Create)
 	workerRoutes.POST("/document/import", controller.Import)
 	workerRoutes.PATCH("/", controller.Update)
@@ -788,7 +791,9 @@ func InitOperationRoutes(router *gin.RouterGroup, controller controller.IOperati
 	)
 	operationRoutes.GET("/paginated", controller.GetPaginated)
 	operationRoutes.GET("/all", controller.GetAll)
+	operationRoutes.GET("/document/template", controller.GetTemplateFile)
 	operationRoutes.POST("/", controller.Create)
+	operationRoutes.POST("/document/import", controller.Import)
 	operationRoutes.PATCH("/", controller.Update)
 	operationRoutes.DELETE("/:id", controller.Delete)
 }

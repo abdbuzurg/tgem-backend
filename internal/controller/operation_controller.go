@@ -6,7 +6,10 @@ import (
 	"backend-v2/pkg/response"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +31,8 @@ type IOperationController interface {
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
+	Import(c *gin.Context)
+	GetTemplateFile(c *gin.Context)
 }
 
 func (controller *operationController) GetAll(c *gin.Context) {
@@ -188,4 +193,43 @@ func (controller *operationController) Delete(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, "deleted")
+}
+
+func (controller *operationController) Import(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сформирован, проверьте файл: %v", err))
+		return
+	}
+
+	date := time.Now()
+	importFileName := date.Format("2006-01-02 15-04-05") + file.Filename
+	importFilePath := filepath.Join("./pkg/excels/temp/", importFileName)
+	err = c.SaveUploadedFile(file, importFilePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Файл не может быть сохранен на сервере: %v", err))
+		return
+	}
+
+	projectID := c.GetUint("projectID")
+	err = controller.operationService.Import(projectID, importFilePath)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, true)
+}
+
+func (controller *operationController) GetTemplateFile(c *gin.Context) {
+	templateFilePath := filepath.Join("./pkg/excels/templates/Шаблон для импорта Услуг.xlsx")
+
+	tmpFilePath, err := controller.operationService.TemplateFile(templateFilePath, c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	c.FileAttachment(tmpFilePath, "Шаблон для импорта КЛ 04 КВ.xlsx")
+	os.Remove(tmpFilePath)
 }

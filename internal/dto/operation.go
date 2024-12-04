@@ -32,3 +32,15 @@ type OperationPaginated struct {
 	ShowPlannedAmountInReport bool            `json:"showPlannedAmountInReport"`
 	PlannedAmountForProject   float64         `json:"plannedAmountForProject"`
 }
+
+type OperationImportDataForInsert struct {
+	ID                        uint `json:"id"`
+	ProjectID                 uint
+	Name                      string          `json:"name"`
+	Code                      string          `json:"code"`
+	CostPrime                 decimal.Decimal `json:"costPrime"`
+	CostWithCustomer          decimal.Decimal `json:"costWithCustomer"`
+	PlannedAmountForProject   float64         `json:"plannedAmountForProject"`
+	ShowPlannedAmountInReport bool            `json:"showPlannedAmountInReport"`
+	MaterialID                uint
+}
