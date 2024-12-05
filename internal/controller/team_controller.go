@@ -195,13 +195,14 @@ func (controller *teamController) Delete(c *gin.Context) {
 func (controller *teamController) GetTemplateFile(c *gin.Context) {
 	filepath := "./pkg/excels/templates/Шаблон для импорта Бригады.xlsx"
 	projectID := c.GetUint("projectID")
-
-	if err := controller.teamService.TemplateFile(projectID, filepath); err != nil {
+	tmpFilePath, err := controller.teamService.TemplateFile(projectID, filepath)
+	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	c.FileAttachment(filepath, "Шаблон для импорта Бригады.xlsx")
+	c.FileAttachment(tmpFilePath, "Шаблон для импорта Бригады.xlsx")
+  os.Remove(tmpFilePath)
 }
 
 func (controller *teamController) Import(c *gin.Context) {

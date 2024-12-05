@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/xuri/excelize/v2"
@@ -37,7 +38,7 @@ type IMaterialCostService interface {
 	Count(filter dto.MaterialCostSearchFilter) (int64, error)
 	GetByMaterialID(materialID uint) ([]model.MaterialCost, error)
 	Import(projectID uint, filePath string) error
-	ImportTemplateFile(projectID uint) error
+	ImportTemplateFile(projectID uint) (string, error)
 	Export(projectID uint) (string, error)
 }
 
@@ -73,19 +74,19 @@ func (service *materialCostService) GetByMaterialID(materialID uint) ([]model.Ma
 	return service.materialCostRepo.GetByMaterialIDSorted(materialID)
 }
 
-func (service *materialCostService) ImportTemplateFile(projectID uint) error {
+func (service *materialCostService) ImportTemplateFile(projectID uint) (string, error) {
 	materialCostTemplateFilePath := filepath.Join("./pkg/excels/templates/", "Шаблон импорта ценников для материалов.xlsx")
 	f, err := excelize.OpenFile(materialCostTemplateFilePath)
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("Не смог открыть файл: %v", err)
+		return "", fmt.Errorf("Не смог открыть файл: %v", err)
 	}
 
 	sheetName := "Материалы"
 	materials, err := service.materialRepo.GetAll(projectID)
 	if err != nil {
 		f.Close()
-		return err
+		return "", err
 	}
 
 	startingRow := 2
@@ -94,11 +95,19 @@ func (service *materialCostService) ImportTemplateFile(projectID uint) error {
 		f.SetCellStr(sheetName, "A"+fmt.Sprint(startingRow+index), material.Name)
 	}
 
-	os.Remove(materialCostTemplateFilePath)
-	f.SaveAs(materialCostTemplateFilePath)
+  currentTime := time.Now()
+	temporaryFileName := fmt.Sprintf(
+		"Шаблон импорта Ценник Материал - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+	temporaryFilePath := filepath.Join("./pkg/excels/temp/", temporaryFileName)
+	if err := f.SaveAs(temporaryFilePath); err != nil {
+		return "", fmt.Errorf("Не удалось обновить шаблон с новыми данными: %v", err)
+	}	
+
 	f.Close()
 
-	return nil
+	return temporaryFilePath, nil
 }
 
 func (service *materialCostService) Import(projectID uint, filepath string) error {

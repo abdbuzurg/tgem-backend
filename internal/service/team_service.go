@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -38,7 +39,7 @@ type ITeamService interface {
 	Update(data dto.TeamMutation) (model.Team, error)
 	Delete(id uint) error
 	Count(searchParameters dto.TeamSearchParameters) (int64, error)
-	TemplateFile(projectID uint, filepath string) error
+	TemplateFile(projectID uint, filepath string) (string, error)
 	Import(projectID uint, filepath string) error
 	DoesTeamNumberAlreadyExistForCreate(teamNumber string, projectID uint) (bool, error)
 	DoesTeamNumberAlreadyExistForUpdate(teamNumber string, id uint, projectID uint) (bool, error)
@@ -114,32 +115,38 @@ func (service *teamService) Count(searchParameters dto.TeamSearchParameters) (in
 	return service.teamRepo.Count(searchParameters)
 }
 
-func (service *teamService) TemplateFile(projectID uint, filepath string) error {
+func (service *teamService) TemplateFile(projectID uint, filePath string) (string, error) {
 
-	f, err := excelize.OpenFile(filepath)
+	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("Не смог открыть шаблонный файл: %v", err)
+		return "", fmt.Errorf("Не смог открыть шаблонный файл: %v", err)
 	}
 
 	teamLeaderSheetName := "Бригадиры"
 	teamLeaders, err := service.workerRepo.GetAll(projectID)
 	if err != nil {
 		f.Close()
-		return fmt.Errorf("Данные бригадиров недоступны: %v", err)
+		return "", fmt.Errorf("Данные бригадиров недоступны: %v", err)
 	}
 
 	for index, teamLeader := range teamLeaders {
 		f.SetCellValue(teamLeaderSheetName, "A"+fmt.Sprint(index+2), teamLeader.Name)
 	}
 
-	if err := f.Save(); err != nil {
-		return fmt.Errorf("Не удалось обновить шаблон с новыми данными: %v", err)
+	currentTime := time.Now()
+	temporaryFileName := fmt.Sprintf(
+		"Шаблон для импорта Бригад - %s.xlsx",
+		currentTime.Format("02-01-2006"),
+	)
+	temporaryFilePath := filepath.Join("./pkg/excels/temp/", temporaryFileName)
+	if err := f.SaveAs(temporaryFilePath); err != nil {
+		return "", fmt.Errorf("Не удалось обновить шаблон с новыми данными: %v", err)
 	}
 
 	f.Close()
 
-	return nil
+	return temporaryFilePath, nil
 }
 
 func (service *teamService) Import(projectID uint, filepath string) error {

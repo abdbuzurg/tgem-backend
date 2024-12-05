@@ -167,14 +167,15 @@ func (controller *materialCostController) Delete(c *gin.Context) {
 
 func (controller *materialCostController) ImportTemplate(c *gin.Context) {
 	projectID := c.GetUint("projectID")
-	if err := controller.materialCostService.ImportTemplateFile(projectID); err != nil {
+	tmpFilePath, err := controller.materialCostService.ImportTemplateFile(projectID)
+	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
 	importTemplateFileName := "Шаблон импорта ценников для материалов.xlsx"
-	importTemplateFilePath := filepath.Join("./pkg/excels/templates/", importTemplateFileName)
-	c.FileAttachment(importTemplateFilePath, importTemplateFileName)
+	c.FileAttachment(tmpFilePath, importTemplateFileName)
+  os.Remove(tmpFilePath)
 }
 
 func (controller *materialCostController) Import(c *gin.Context) {
