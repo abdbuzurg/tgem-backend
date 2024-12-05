@@ -20,7 +20,7 @@ func InitWorkerRepository(db *gorm.DB) IWorkerRepository {
 type IWorkerRepository interface {
 	GetAll(projectID uint) ([]model.Worker, error)
 	GetPaginated(page, limit int) ([]model.Worker, error)
-	GetPaginatedFiltered(page, limit int, filter model.Worker) ([]model.Worker, error)
+	GetPaginatedFiltered(page, limit int, filter dto.WorkerSearchParameters) ([]model.Worker, error)
 	GetByJobTitleInProject(jobTitleInProject string, projectID uint) ([]model.Worker, error)
 	GetByName(name string) (model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
@@ -29,7 +29,7 @@ type IWorkerRepository interface {
 	CreateInBatches(data []model.Worker) ([]model.Worker, error)
 	Update(data model.Worker) (model.Worker, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(fitler dto.WorkerSearchParameters) (int64, error)
 	GetFullWorkerInformationForSearch(projectID uint) (dto.WorkerInformationForSearch, error)
 }
 
@@ -45,15 +45,26 @@ func (repo *workerRepository) GetPaginated(page, limit int) ([]model.Worker, err
 	return data, err
 }
 
-func (repo *workerRepository) GetPaginatedFiltered(page, limit int, filter model.Worker) ([]model.Worker, error) {
+func (repo *workerRepository) GetPaginatedFiltered(page, limit int, filter dto.WorkerSearchParameters) ([]model.Worker, error) {
 	data := []model.Worker{}
 	err := repo.db.
 		Raw(`
     SELECT * 
     FROM workers 
-    WHERE project_id = ?
+    WHERE
+      project_id = ? AND
+      (nullif(?, '') IS NULL OR name = ?) AND
+			(nullif(?, '') IS NULL OR mobile_number = ?) AND
+			(nullif(?, '') IS NULL OR job_title_in_company = ?) AND
+			(nullif(?, '') IS NULL OR job_title_in_project = ?) AND 
+			(nullif(?, '') IS NULL OR company_worker_id = ?) 
     ORDER BY id DESC LIMIT ? OFFSET ?`,
 			filter.ProjectID,
+			filter.Name, filter.Name,
+			filter.MobileNumber, filter.MobileNumber,
+			filter.JobTitleInCompany, filter.JobTitleInCompany,
+			filter.JobTitleInProject, filter.JobTitleInProject,
+      filter.CompanyWorkerID, filter.CompanyWorkerID,
 			limit, (page-1)*limit,
 		).Scan(&data).Error
 
@@ -97,9 +108,27 @@ func (repo *workerRepository) Delete(id uint) error {
 	return repo.db.Delete(&model.Worker{}, "id = ?", id).Error
 }
 
-func (repo *workerRepository) Count() (int64, error) {
+func (repo *workerRepository) Count(filter dto.WorkerSearchParameters) (int64, error) {
 	var count int64
-	err := repo.db.Model(&model.Worker{}).Count(&count).Error
+	err := repo.db.
+		Raw(`
+      SELECT COUNT(*)
+      FROM workers
+      WHERE
+        project_id = ? AND
+        (nullif(?, '') IS NULL OR name = ?) AND
+        (nullif(?, '') IS NULL OR mobile_number = ?) AND
+        (nullif(?, '') IS NULL OR job_title_in_company = ?) AND
+        (nullif(?, '') IS NULL OR job_title_in_project = ?)
+    `,
+			filter.ProjectID,
+			filter.Name, filter.Name,
+			filter.MobileNumber, filter.MobileNumber,
+			filter.JobTitleInCompany, filter.JobTitleInCompany,
+			filter.JobTitleInProject, filter.JobTitleInProject,
+		).
+		Scan(&count).
+		Error
 	return count, err
 }
 

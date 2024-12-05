@@ -22,13 +22,13 @@ func InitWorkerService(workerRepo repository.IWorkerRepository) IWorkerService {
 
 type IWorkerService interface {
 	GetAll(projectID uint) ([]model.Worker, error)
-	GetPaginated(page, limit int, data model.Worker) ([]model.Worker, error)
+	GetPaginated(page, limit int, filter dto.WorkerSearchParameters) ([]model.Worker, error)
 	GetByID(id uint) (model.Worker, error)
 	GetByJobTitleInProject(jobTitleInProject string, projectID uint) ([]model.Worker, error)
 	Create(data model.Worker) (model.Worker, error)
 	Update(data model.Worker) (model.Worker, error)
 	Delete(id uint) error
-	Count() (int64, error)
+	Count(filter dto.WorkerSearchParameters) (int64, error)
 	Import(filepath string, projectID uint) error
 	GetWorkerInformationForSearch(projectID uint) (dto.WorkerInformationForSearch, error)
 }
@@ -37,9 +37,9 @@ func (service *workerService) GetAll(projectID uint) ([]model.Worker, error) {
 	return service.workerRepo.GetAll(projectID)
 }
 
-func (service *workerService) GetPaginated(page, limit int, data model.Worker) ([]model.Worker, error) {
+func (service *workerService) GetPaginated(page, limit int, filter dto.WorkerSearchParameters) ([]model.Worker, error) {
 	// if !(utils.IsEmptyFields(data)) {
-	return service.workerRepo.GetPaginatedFiltered(page, limit, data)
+	return service.workerRepo.GetPaginatedFiltered(page, limit, filter)
 	// }
 
 	// return service.workerRepo.GetPaginated(page, limit)
@@ -65,8 +65,8 @@ func (service *workerService) Delete(id uint) error {
 	return service.workerRepo.Delete(id)
 }
 
-func (service *workerService) Count() (int64, error) {
-	return service.workerRepo.Count()
+func (service *workerService) Count(filter dto.WorkerSearchParameters) (int64, error) {
+	return service.workerRepo.Count(filter)
 }
 
 func (service *workerService) Import(filepath string, projectID uint) error {

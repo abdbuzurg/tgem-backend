@@ -141,12 +141,12 @@ func (service *invoiceInputService) GetInvoiceMaterialsWithSerialNumbers(id uint
 
 func (service *invoiceInputService) Create(data dto.InvoiceInput) (model.InvoiceInput, error) {
 
-	count, err := service.invoiceInputRepo.Count(data.Details.ProjectID)
+	count, err := service.invoiceCountRepo.CountInvoice("input", data.Details.ProjectID)
 	if err != nil {
 		return model.InvoiceInput{}, err
 	}
 
-	code := utils.UniqueCodeGeneration("П", count+1, data.Details.ProjectID)
+	code := utils.UniqueCodeGeneration("П", int64(count+1), data.Details.ProjectID)
 	data.Details.DeliveryCode = code
 
 	var invoiceMaterials []model.InvoiceMaterials

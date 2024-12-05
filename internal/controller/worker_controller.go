@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"backend-v2/internal/dto"
 	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
@@ -59,8 +60,13 @@ func (controller *workerController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	filter := model.Worker{
+	filter := dto.WorkerSearchParameters{
 		ProjectID: c.GetUint("projectID"),
+    Name: c.DefaultQuery("name", ""),
+    JobTitleInProject: c.DefaultQuery("jobTitleInProject", ""),
+    JobTitleInCompany: c.DefaultQuery("jobTitleInCompany", ""),
+    MobileNumber: c.DefaultQuery("mobileNumber", ""),
+    CompanyWorkerID: c.DefaultQuery("companyWorkerID", ""),
 	}
 
 	data, err := controller.workerService.GetPaginated(page, limit, filter)
@@ -69,7 +75,7 @@ func (controller *workerController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	dataCount, err := controller.workerService.Count()
+	dataCount, err := controller.workerService.Count(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not get the total amount of Worker: %v", err))
 		return
