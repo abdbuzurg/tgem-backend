@@ -34,7 +34,7 @@ type IInovoiceInputRepository interface {
 	Confirmation(data dto.InvoiceInputConfirmationQueryData) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
 	GetSerialNumbersForEdit(invoiceID uint, materialCostID uint) ([]string, error)
-  Import(data []dto.InvoiceInputImportData) error
+	Import(data []dto.InvoiceInputImportData) error
 }
 
 func (repo *invoiceInputRespository) GetAll() ([]model.InvoiceInput, error) {
@@ -112,6 +112,17 @@ func (repo *invoiceInputRespository) Create(data dto.InvoiceInputCreateQueryData
 		}
 
 		if err := tx.CreateInBatches(&data.SerialNumberMovement, 15).Error; err != nil {
+			return err
+		}
+
+		err := tx.Exec(`
+      UPDATE invoice_counts
+      SET count = count + 1
+      WHERE
+        invoice_type = 'input' AND
+        project_id = ?
+      `, result.ProjectID).Error
+		if err != nil {
 			return err
 		}
 
@@ -358,24 +369,24 @@ func (repo *invoiceInputRespository) GetSerialNumbersForEdit(invoiceID uint, mat
 	return result, err
 }
 
-func(repo *invoiceInputRespository) Import(data []dto.InvoiceInputImportData) error {
-  return repo.db.Transaction(func(tx *gorm.DB) error {
-    for index, invoice := range data {
-      invoiceInput := invoice.Details
-      if err := tx.Create(&invoiceInput).Error; err != nil {
-        return err
-      }
+func (repo *invoiceInputRespository) Import(data []dto.InvoiceInputImportData) error {
+	return repo.db.Transaction(func(tx *gorm.DB) error {
+		for index, invoice := range data {
+			invoiceInput := invoice.Details
+			if err := tx.Create(&invoiceInput).Error; err != nil {
+				return err
+			}
 
-      for subIndex := range invoice.Items {
-        data[index].Items[subIndex].InvoiceID = invoiceInput.ID
-      }
+			for subIndex := range invoice.Items {
+				data[index].Items[subIndex].InvoiceID = invoiceInput.ID
+			}
 
-      if err := tx.CreateInBatches(&data[index].Items, 15).Error; err != nil {
-        return err
-      }
-    }
+			if err := tx.CreateInBatches(&data[index].Items, 15).Error; err != nil {
+				return err
+			}
+		}
 
-    err := tx.Exec(`
+		err := tx.Exec(`
       UPDATE invoice_counts
       SET count = count + ?
       WHERE
@@ -386,6 +397,6 @@ func(repo *invoiceInputRespository) Import(data []dto.InvoiceInputImportData) er
 			return err
 		}
 
-    return nil
-  })
+		return nil
+	})
 }
