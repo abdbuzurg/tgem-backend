@@ -5,6 +5,7 @@ import (
 	"backend-v2/internal/service"
 	"backend-v2/model"
 	"backend-v2/pkg/response"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -229,7 +230,7 @@ func (controller *invoiceInputController) Confirmation(c *gin.Context) {
 	}
 
 	fileNameAndExtension := strings.Split(file.Filename, ".")
-	fileExtension := fileNameAndExtension[len(fileNameAndExtension) - 1]
+	fileExtension := fileNameAndExtension[len(fileNameAndExtension)-1]
 	if fileExtension != "pdf" {
 		response.ResponseError(c, fmt.Sprintf("Файл должен быть формата PDF"))
 		return
@@ -255,6 +256,10 @@ func (controller *invoiceInputController) Confirmation(c *gin.Context) {
 func (controller *invoiceInputController) GetDocument(c *gin.Context) {
 	fileName := c.Param("deliveryCode") + ".pdf"
 	filePath := filepath.Join("./pkg/excels/input/", fileName)
+	if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
+		response.ResponseError(c, fmt.Sprint("Внутренняя ошибка сервера: Файл не существует"))
+		return
+	}
 	c.FileAttachment(filePath, fileName)
 }
 
