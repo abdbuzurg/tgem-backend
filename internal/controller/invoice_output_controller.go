@@ -208,6 +208,7 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 	err = controller.invoiceOutputService.Confirmation(uint(id))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("cannot confirm invoice input with id %v: %v", id, err))
+    os.Remove(filePath)
 		return
 	}
 

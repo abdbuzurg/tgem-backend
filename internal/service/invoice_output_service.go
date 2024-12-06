@@ -363,7 +363,7 @@ func (service *invoiceOutputService) Update(data dto.InvoiceOutput) (model.Invoi
 	}
 
 	excelFilePath := filepath.Join("./pkg/excels/output/", data.Details.DeliveryCode+".xlsx")
-  if err := os.Remove(excelFilePath); err != nil {
+	if err := os.Remove(excelFilePath); err != nil {
 		return model.InvoiceOutput{}, err
 	}
 
@@ -384,16 +384,16 @@ func (service *invoiceOutputService) Update(data dto.InvoiceOutput) (model.Invoi
 }
 
 func (service *invoiceOutputService) Delete(id uint) error {
-  
-  invoiceOutput, err := service.invoiceOutputRepo.GetByID(id)
-  if err != nil {
-    return err
-  }
 
-  excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode+".xlsx")
-  if err := os.Remove(excelFilePath); err != nil {
-    return err
-  }
+	invoiceOutput, err := service.invoiceOutputRepo.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	excelFilePath := filepath.Join("./pkg/excels/output/", invoiceOutput.DeliveryCode+".xlsx")
+	if err := os.Remove(excelFilePath); err != nil {
+		return err
+	}
 
 	return service.invoiceOutputRepo.Delete(id)
 }
@@ -850,7 +850,7 @@ func (service *invoiceOutputService) GenerateExcelFile(data dto.InvoiceOutput) e
 
 	workerNamingStyle, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{
-			Size:      8,
+			Size:      9,
 			VertAlign: "center",
 		},
 		Alignment: &excelize.Alignment{
@@ -870,6 +870,8 @@ func (service *invoiceOutputService) GenerateExcelFile(data dto.InvoiceOutput) e
 	if err != nil {
 		return err
 	}
+
+	f.SetCellValue(sheetName, "C3", fmt.Sprintf("Отпуск разрешил: %s", project.ProjectManager))
 
 	district, err := service.districtRepo.GetByID(data.Details.DistrictID)
 	if err != nil {
@@ -895,6 +897,13 @@ func (service *invoiceOutputService) GenerateExcelFile(data dto.InvoiceOutput) e
 		f.SetCellStr(sheetName, "F"+fmt.Sprint(startingRow+index), oneEntry.Notes)
 	}
 
+	warehouseManager, err := service.workerRepo.GetByID(data.Details.WarehouseManagerWorkerID)
+	if err != nil {
+		return err
+	}
+	f.SetCellStyle(sheetName, "C"+fmt.Sprint(6+len(data.Items)), "C"+fmt.Sprint(6+len(data.Items)), workerNamingStyle)
+	f.SetCellStr(sheetName, "C"+fmt.Sprint(6+len(data.Items)), warehouseManager.Name)
+
 	released, err := service.workerRepo.GetByID(data.Details.ReleasedWorkerID)
 	if err != nil {
 		return err
@@ -917,9 +926,9 @@ func (service *invoiceOutputService) GenerateExcelFile(data dto.InvoiceOutput) e
 	f.SetCellStr(sheetName, "C"+fmt.Sprint(12+len(data.Items)), recipient.Name)
 
 	excelFilePath := filepath.Join("./pkg/excels/output/", data.Details.DeliveryCode+".xlsx")
-  if err := f.SaveAs(excelFilePath); err != nil {
-    return err
-  }
+	if err := f.SaveAs(excelFilePath); err != nil {
+		return err
+	}
 
 	return nil
 }
