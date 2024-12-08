@@ -208,7 +208,7 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 	err = controller.invoiceOutputService.Confirmation(uint(id))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("cannot confirm invoice input with id %v: %v", id, err))
-    os.Remove(filePath)
+		os.Remove(filePath)
 		return
 	}
 
@@ -217,8 +217,13 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 
 func (controller *invoiceOutputController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
-	filePath := filepath.Join("./pkg/excels/output/", deliveryCode+".pdf")
-	c.FileAttachment(filePath, deliveryCode+".pdf")
+	extension, err := controller.invoiceOutputService.GetDocument(deliveryCode)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+	filePath := filepath.Join("./pkg/excels/output/", deliveryCode+extension)
+	c.FileAttachment(filePath, deliveryCode+extension)
 }
 
 func (controller *invoiceOutputController) UniqueCode(c *gin.Context) {

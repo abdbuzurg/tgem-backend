@@ -65,6 +65,7 @@ type IInvoiceOutputService interface {
 	GetAll() ([]model.InvoiceOutput, error)
 	GetPaginated(page, limit int, data model.InvoiceOutput) ([]dto.InvoiceOutputPaginated, error)
 	GetByID(id uint) (model.InvoiceOutput, error)
+	GetDocument(deliveryCode string) (string, error)
 	GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error)
 	GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error)
 	Create(data dto.InvoiceOutput) (model.InvoiceOutput, error)
@@ -931,4 +932,17 @@ func (service *invoiceOutputService) GenerateExcelFile(data dto.InvoiceOutput) e
 	}
 
 	return nil
+}
+
+func (service *invoiceOutputService) GetDocument(deliveryCode string) (string, error) {
+	invoiceOutput, err := service.invoiceOutputRepo.GetByDeliveryCode(deliveryCode)
+	if err != nil {
+		return "", err
+	}
+
+	if invoiceOutput.Confirmation {
+		return ".pdf", nil
+	} else {
+		return ".xlsx", nil
+	}
 }

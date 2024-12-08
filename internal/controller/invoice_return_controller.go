@@ -205,8 +205,13 @@ func (controller *invoiceReturnController) Confirmation(c *gin.Context) {
 
 func (controller *invoiceReturnController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
-	filePath := filepath.Join("./pkg/excels/return/", deliveryCode+".pdf")
-	c.FileAttachment(filePath, deliveryCode+".pdf")
+	extension, err := controller.invoiceReturnService.GetDocument(deliveryCode)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+	filePath := filepath.Join("./pkg/excels/return/", deliveryCode+extension)
+	c.FileAttachment(filePath, deliveryCode+extension)
 }
 
 func (controller *invoiceReturnController) UniqueCode(c *gin.Context) {

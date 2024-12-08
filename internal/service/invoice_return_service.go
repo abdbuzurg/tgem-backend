@@ -69,6 +69,7 @@ type IInvoiceReturnService interface {
 	GetByID(id uint) (model.InvoiceReturn, error)
 	GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginatedQueryData, error)
 	GetPaginatedObject(page, limit int, projectID uint) ([]dto.InvoiceReturnObjectPaginated, error)
+	GetDocument(deliveryCode string) (string, error)
 	Create(data dto.InvoiceReturn) (model.InvoiceReturn, error)
 	Update(data dto.InvoiceReturn) (model.InvoiceReturn, error)
 	Delete(id uint) error
@@ -848,4 +849,17 @@ func (service *invoiceReturnService) GenerateExcel(data dto.InvoiceReturn) error
 	}
 
 	return nil
+}
+
+func (service *invoiceReturnService) GetDocument(deliveryCode string) (string, error) {
+	invoiceReturn, err := service.invoiceReturnRepo.GetByDeliveryCode(deliveryCode)
+	if err != nil {
+		return "", err
+	}
+
+	if invoiceReturn.Confirmation {
+		return ".pdf", nil
+	} else {
+		return ".xlsx", nil
+	}
 }

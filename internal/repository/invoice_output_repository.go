@@ -25,6 +25,7 @@ type IInvoiceOutputRepository interface {
 	GetByID(id uint) (model.InvoiceOutput, error)
 	GetUnconfirmedByObjectInvoices() ([]model.InvoiceOutput, error)
 	GetAvailableMaterialsInWarehouse(projectID uint) ([]dto.AvailableMaterialsInWarehouse, error)
+  GetByDeliveryCode(deliveryCode string) (model.InvoiceOutput, error)
 	GetDataForExcel(id uint) (dto.InvoiceOutputDataForExcelQueryResult, error)
 	Create(data dto.InvoiceOutputCreateQueryData) (model.InvoiceOutput, error)
 	Update(data dto.InvoiceOutputCreateQueryData) (model.InvoiceOutput, error)
@@ -519,4 +520,10 @@ func (repo *invoiceOutputRepository) Import(data []dto.InvoiceOutputImportData) 
 
 		return nil
 	})
+}
+
+func(repo *invoiceOutputRepository) GetByDeliveryCode(deliveryCode string) (model.InvoiceOutput, error) {
+  result := model.InvoiceOutput{}
+  err := repo.db.Raw("SELECT * FROM invoice_outputs WHERE delivery_code = ?", deliveryCode).Scan(&result).Error
+  return result, err
 }
