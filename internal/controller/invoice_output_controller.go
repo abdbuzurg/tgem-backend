@@ -217,8 +217,8 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 
 func (controller *invoiceOutputController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
-	filePath := filepath.Join("./pkg/excels/output/", deliveryCode+".xlsx")
-	c.FileAttachment(filePath, deliveryCode+".xlsx")
+	filePath := filepath.Join("./pkg/excels/output/", deliveryCode+".pdf")
+	c.FileAttachment(filePath, deliveryCode+".pdf")
 }
 
 func (controller *invoiceOutputController) UniqueCode(c *gin.Context) {
