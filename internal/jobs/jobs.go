@@ -16,7 +16,7 @@ func Run() {
 
 	c := cron.New(cron.WithLocation(location))
 
-  _, err = c.AddFunc("42 15 * * *", func() { 
+  _, err = c.AddFunc("50 23 * * *", func() { 
     fmt.Printf("Началось ежедневное сохранение прогресса проектов - %v\n", time.Now().In(location))
     ProgressReportDaily() 
     fmt.Printf("Закончилось ежедневное сохранение прогресса проектов - %v\n", time.Now().In(location))
