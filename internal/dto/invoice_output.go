@@ -119,7 +119,6 @@ type InvoiceOutputMaterialsForEdit struct {
 	Amount          float64  `json:"amount"`
 	Notes           string   `json:"notes"`
 	HasSerialNumber bool     `json:"hasSerialNumber"`
-	SerialNumbers   []string `json:"serialNumbers"`
 }
 
 type InvoiceOutputDataForReport struct {
