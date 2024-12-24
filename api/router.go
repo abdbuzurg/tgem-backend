@@ -31,6 +31,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	router := mainRouter.Group("/api")
 
 	//Initialization of Repositories
+  auctionRepository := repository.InitAuctionRepository(db)
 	invoiceInputRepo := repository.InitInvoiceInputRepository(db)
 	invoiceOutputRepo := repository.InitInvoiceOutputRepository(db)
 	invoiceReturnRepo := repository.InitInvoiceReturnRepository(db)
@@ -75,6 +76,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	substationCellRepository := repository.NewSubstationCellObjectRepository(db)
 
 	//Initialization of Services
+  auctionService := service.InitAuctionService(auctionRepository)
 	invoiceInputService := service.InitInvoiceInputService(
 		invoiceInputRepo,
 		invoiceMaterialRepo,
@@ -281,6 +283,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	)
 
 	//Initialization of Controllers
+  auctionController := controller.InitAuctionController(auctionService)
 	invoiceInputController := controller.InitInvoiceInputController(invoiceInputService, userActionService)
 	invoiceOutputController := controller.InitInvoiceOutputController(invoiceOutputService)
 	invoiceReturnController := controller.InitInvoiceReturnController(invoiceReturnService)
@@ -315,6 +318,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	substationCellController := controller.InitSubstationCellObjectController(substationCellObjectService)
 
 	//Initialization of Routes
+  InitAuctionRoutes(router, auctionController)
 	InitInvoiceInputRoutes(router, invoiceInputController, db)
 	InitInvoiceOutputRoutes(router, invoiceOutputController)
 	InitInvoiceReturnRoutes(router, invoiceReturnController, db)
@@ -346,6 +350,13 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitSubstationCellRoutes(router, substationCellController)
 
 	return mainRouter
+}
+
+func InitAuctionRoutes(router *gin.RouterGroup, controller controller.IAuctionController) {
+  auctionRoutes := router.Group("/auction")
+  auctionRoutes.GET("/:auctionID", controller.GetAuctionDataForPublic)
+  auctionRoutes.GET("/private/:auctionID", middleware.Authentication(), controller.GetAuctionDataForPrivate)
+  auctionRoutes.POST("/private", middleware.Authentication(), controller.SaveParticipantChanges)
 }
 
 func InitMainReports(router *gin.RouterGroup, controller controller.IMainReportController) {

@@ -9,4 +9,5 @@ type User struct {
 
 	UserActions    []UserAction    `json:"-" gorm:"foreignKey:UserID"`
 	UserInProjects []UserInProject `json:"-" gorm:"foreignKey:UserID"`
+  AuctionParticipantPrices []AuctionParticipantPrice `json:"-" gorm:"foreignKey:UserID"`
 }

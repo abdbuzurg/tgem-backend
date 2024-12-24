@@ -90,5 +90,9 @@ func AutoMigrate(db *gorm.DB) {
 		model.WorkerAttendance{},
 		model.ProjectProgressMaterials{},
 		model.ProjectProgressOperations{},
+    model.Auction{},
+    model.AuctionPackage{},
+    model.AuctionItem{},
+    model.AuctionParticipantPrice{},
 	)
 }
