@@ -513,7 +513,7 @@ func (service *invoiceInputService) Import(filePath string, projectID uint, work
 			return fmt.Errorf("Нету данных в ячейке E%v: %v", index+1, err)
 		}
 
-		material, err := service.materialRepo.GetByName(materialName)
+		material, err := service.materialRepo.GetByName(projectID, materialName)
 		if err != nil {
 			f.Close()
 			os.Remove(filePath)

@@ -95,7 +95,7 @@ func (service *materialCostService) ImportTemplateFile(projectID uint) (string, 
 		f.SetCellStr(sheetName, "A"+fmt.Sprint(startingRow+index), material.Name)
 	}
 
-  currentTime := time.Now()
+	currentTime := time.Now()
 	temporaryFileName := fmt.Sprintf(
 		"Шаблон импорта Ценник Материал - %s.xlsx",
 		currentTime.Format("02-01-2006"),
@@ -103,7 +103,7 @@ func (service *materialCostService) ImportTemplateFile(projectID uint) (string, 
 	temporaryFilePath := filepath.Join("./pkg/excels/temp/", temporaryFileName)
 	if err := f.SaveAs(temporaryFilePath); err != nil {
 		return "", fmt.Errorf("Не удалось обновить шаблон с новыми данными: %v", err)
-	}	
+	}
 
 	f.Close()
 
@@ -144,7 +144,7 @@ func (service *materialCostService) Import(projectID uint, filepath string) erro
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке А%d: %v", index+1, err)
 		}
 
-		material, err := service.materialRepo.GetByName(materialName)
+		material, err := service.materialRepo.GetByName(projectID, materialName)
 		if err != nil {
 			f.Close()
 			os.Remove(filepath)
@@ -160,13 +160,17 @@ func (service *materialCostService) Import(projectID uint, filepath string) erro
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке B%d: %v", index+1, err)
 		}
 
-		if costPrime != "" {
-			materialCost.CostPrime, err = decimal.NewFromString(costPrime)
-			if err != nil {
-				f.Close()
-				os.Remove(filepath)
-				return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке B%d: %v", index+1, err)
-			}
+		if costPrime == "" {
+			f.Close()
+			os.Remove(filepath)
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке B%d: %v", index+1, err)
+		}
+
+		materialCost.CostPrime, err = decimal.NewFromString(costPrime)
+		if err != nil {
+			f.Close()
+			os.Remove(filepath)
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке B%d: %v", index+1, err)
 		}
 
 		costM19, err := f.GetCellValue(sheetName, "C"+fmt.Sprint(index+1))
@@ -196,17 +200,22 @@ func (service *materialCostService) Import(projectID uint, filepath string) erro
 			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке D%d: %v", index+1, err)
 		}
 
-		if costWithCustomer != "" {
-			materialCost.CostWithCustomer, err = decimal.NewFromString(costWithCustomer)
-			if err != nil {
-				f.Close()
-				os.Remove(filepath)
-				return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке D%d: %v", index+1, err)
-			}
+		if costWithCustomer == "" {
+			f.Close()
+			os.Remove(filepath)
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке D%d: %v", index+1, err)
+		}
+
+		materialCost.CostWithCustomer, err = decimal.NewFromString(costWithCustomer)
+		if err != nil {
+			f.Close()
+			os.Remove(filepath)
+			return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке D%d: %v", index+1, err)
 		}
 
 		materialCosts = append(materialCosts, materialCost)
 		index++
+
 	}
 
 	f.Close()

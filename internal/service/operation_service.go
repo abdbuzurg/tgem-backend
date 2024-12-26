@@ -164,7 +164,7 @@ func (service *operationService) Import(projectID uint, filepath string) error {
 		}
 
 		if materialName != "" {
-			material, err := service.materialRepo.GetByName(materialName)
+			material, err := service.materialRepo.GetByName(projectID, materialName)
 			if err != nil {
 				return fmt.Errorf("Ошибка в файле, неправильный формат данных в ячейке G%d: %v", index+1, err)
 			}

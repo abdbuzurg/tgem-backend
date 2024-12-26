@@ -27,7 +27,7 @@ type IMaterialRepository interface {
 	Update(data model.Material) (model.Material, error)
 	Delete(id uint) error
 	Count(filter model.Material) (int64, error)
-	GetByName(name string) (model.Material, error)
+	GetByName(projectID uint, name string) (model.Material, error)
 }
 
 func (repo *materialRepository) GetAll(projectID uint) ([]model.Material, error) {
@@ -113,9 +113,9 @@ func (repo *materialRepository) Count(filter model.Material) (int64, error) {
 	return count, err
 }
 
-func (repo *materialRepository) GetByName(name string) (model.Material, error) {
+func (repo *materialRepository) GetByName(projectID uint, name string) (model.Material, error) {
 	result := model.Material{}
-	err := repo.db.First(&result, "name = ?", name).Error
+	err := repo.db.First(&result, "name = ? AND project_id = ?", name, projectID).Error
 	return result, err
 }
 
