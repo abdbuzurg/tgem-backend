@@ -184,7 +184,6 @@ func (service *materialService) Export(projectID uint) (string, error) {
 	materialTempalteFilePath := filepath.Join("./pkg/excels/templates", "Шаблон для импорта материалов.xlsx")
 	f, err := excelize.OpenFile(materialTempalteFilePath)
 	if err != nil {
-		f.Close()
 		return "", fmt.Errorf("Не смог открыть файл: %v", err)
 	}
 	sheetName := "Материалы"

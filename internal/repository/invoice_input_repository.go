@@ -273,7 +273,6 @@ func (repo *invoiceInputRespository) ReportFilterData(filter dto.InvoiceInputRep
       INNER JOIN workers as released ON released.id = invoice_inputs.released_worker_id
       WHERE 
         invoice_inputs.project_id = ? AND
-        invoice_inputs.confirmed = true AND
         (nullif(?, '') IS NULL OR invoice_inputs.delivery_code = ?) AND
         (nullif(?, 0) IS NULL OR invoice_inputs.released_worker_id = ?) AND
         (nullif(?, 0) IS NULL OR invoice_inputs.warehouse_manager_worker_id = ?) AND
