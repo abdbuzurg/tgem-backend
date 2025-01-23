@@ -49,6 +49,7 @@ type IInvoiceInputController interface {
 	NewMaterialCost(c *gin.Context)
 	GetMaterialsForEdit(c *gin.Context)
 	Import(c *gin.Context)
+	GetParametersForSearch(c *gin.Context)
 }
 
 func (controller *invoiceInputController) GetAll(c *gin.Context) {
@@ -66,43 +67,92 @@ func (controller *invoiceInputController) GetAll(c *gin.Context) {
 func (controller *invoiceInputController) GetPaginated(c *gin.Context) {
 
 	projectID := c.GetUint("projectID")
-
 	pageStr := c.DefaultQuery("page", "1")
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page <= 0 {
-
 		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
 		return
-
 	}
 
 	limitStr := c.DefaultQuery("limit", "10")
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 {
-
 		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
 		return
-
 	}
 
-	filter := model.InvoiceInput{
+  deliveryCode := c.DefaultQuery("deliveryCode", "")
+
+	warehouseManagerWorkerIDStr := c.DefaultQuery("warehouseManagerWorkerID", "")
+	warehouseManagerWorkerID, err := strconv.Atoi(warehouseManagerWorkerIDStr)
+	if err != nil || warehouseManagerWorkerID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+	releasedWorkerIDStr := c.DefaultQuery("releasedWorkerID", "")
+	releasedWorkerID, err := strconv.Atoi(releasedWorkerIDStr)
+	if err != nil || releasedWorkerID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+		return
+	}
+
+  dateLayout := "Mon Jan 02 2006 03:04:05"
+
+  dateFromStr := c.DefaultQuery("dateFrom", "")
+  var dateFrom time.Time
+  if dateFromStr != "" {
+    dateFrom, err = time.Parse(dateLayout, dateFromStr)
+    if err != nil {
+      response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+      return
+    }
+  }
+
+  dateToStr := c.DefaultQuery("dateTo", "")
+  var dateTo time.Time
+  if dateToStr != "" {
+    dateTo, err = time.Parse(dateLayout, dateToStr)
+    if err != nil {
+      response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+    }
+  }
+
+	materialIDsStr := c.DefaultQuery("materials", "")
+	materialIDs := []uint{}
+	if materialIDsStr != "" {
+		chunks := strings.Split(materialIDsStr, ",")
+		for _, chunk := range chunks {
+			id, err := strconv.Atoi(chunk)
+			if err != nil || id <= 0 {
+				response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
+				return
+			}
+      
+      materialIDs =append(materialIDs, uint(id))
+		}
+	}
+
+	filter := dto.InvoiceInputSearchParameters{
 		ProjectID: projectID,
+    DeliveryCode: deliveryCode,
+    WarehouseManagerWorkerID: uint(warehouseManagerWorkerID),
+    ReleasedWorkerID: uint(releasedWorkerID),
+    DateFrom: dateFrom,
+    DateTo: dateTo,
+    Materials: materialIDs,
 	}
 
 	data, err := controller.invoiceInputService.GetPaginated(page, limit, filter)
 	if err != nil {
-
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
-
 	}
 
-	dataCount, err := controller.invoiceInputService.Count(projectID)
+	dataCount, err := controller.invoiceInputService.Count(filter)
 	if err != nil {
-
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
-
 	}
 
 	response.ResponsePaginatedData(c, data, dataCount)
@@ -401,4 +451,14 @@ func (controller *invoiceInputController) Import(c *gin.Context) {
 
 	response.ResponseSuccess(c, true)
 
+}
+
+func (controller *invoiceInputController) GetParametersForSearch(c *gin.Context) {
+	data, err := controller.invoiceInputService.GetParametersForSearch(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
 }

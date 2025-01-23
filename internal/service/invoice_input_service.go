@@ -52,14 +52,14 @@ func InitInvoiceInputService(
 
 type IInvoiceInputService interface {
 	GetAll() ([]model.InvoiceInput, error)
-	GetPaginated(page, limit int, data model.InvoiceInput) ([]dto.InvoiceInputPaginated, error)
+	GetPaginated(page, limit int, filter dto.InvoiceInputSearchParameters) ([]dto.InvoiceInputPaginated, error)
 	GetByID(id uint) (model.InvoiceInput, error)
 	GetInvoiceMaterialsWithoutSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithoutSerialNumberView, error)
 	GetInvoiceMaterialsWithSerialNumbers(id uint) ([]dto.InvoiceMaterialsWithSerialNumberView, error)
 	Create(data dto.InvoiceInput) (model.InvoiceInput, error)
 	Update(data dto.InvoiceInput) (model.InvoiceInput, error)
 	Delete(id uint) error
-	Count(projectID uint) (int64, error)
+	Count(filter dto.InvoiceInputSearchParameters) (int64, error)
 	Confirmation(id, projectID uint) error
 	UniqueCode(projectID uint) ([]dto.DataForSelect[string], error)
 	UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error)
@@ -69,14 +69,15 @@ type IInvoiceInputService interface {
 	NewMaterialAndItsCost(data dto.NewMaterialDataFromInvoiceInput) error
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
 	Import(filePath string, projectID uint, workerID uint) error
+  GetParametersForSearch(projectID uint) (dto.InvoiceInputParametersForSearch, error)
 }
 
 func (service *invoiceInputService) GetAll() ([]model.InvoiceInput, error) {
 	return service.invoiceInputRepo.GetAll()
 }
 
-func (service *invoiceInputService) GetPaginated(page, limit int, data model.InvoiceInput) ([]dto.InvoiceInputPaginated, error) {
-	return service.invoiceInputRepo.GetPaginatedFiltered(page, limit, data)
+func (service *invoiceInputService) GetPaginated(page, limit int, filter dto.InvoiceInputSearchParameters) ([]dto.InvoiceInputPaginated, error) {
+	return service.invoiceInputRepo.GetPaginatedFiltered(page, limit, filter)
 }
 
 func (service *invoiceInputService) GetByID(id uint) (model.InvoiceInput, error) {
@@ -248,8 +249,8 @@ func (service *invoiceInputService) Delete(id uint) error {
 	return service.invoiceInputRepo.Delete(id)
 }
 
-func (service *invoiceInputService) Count(projectID uint) (int64, error) {
-	return service.invoiceInputRepo.Count(projectID)
+func (service *invoiceInputService) Count(filter dto.InvoiceInputSearchParameters) (int64, error) {
+	return service.invoiceInputRepo.Count(filter)
 }
 
 func (service *invoiceInputService) Confirmation(id, projectID uint) error {
@@ -570,3 +571,32 @@ func (service *invoiceInputService) Import(filePath string, projectID uint, work
 
 	return service.invoiceInputRepo.Import(importData)
 }
+
+func(service *invoiceInputService) GetParametersForSearch(projectID uint) (dto.InvoiceInputParametersForSearch, error) {
+  deliveryCodes, err := service.invoiceInputRepo.GetAllDeliveryCodes(projectID)
+  if err != nil {
+    return dto.InvoiceInputParametersForSearch{}, err
+  }
+
+  warehouseManagers, err := service.invoiceInputRepo.GetAllWarehouseManagers(projectID)
+  if err != nil {
+    return dto.InvoiceInputParametersForSearch{}, err
+  }
+
+  releaseds, err := service.invoiceInputRepo.GetAllReleasedWorkers(projectID)
+  if err != nil {
+    return dto.InvoiceInputParametersForSearch{}, err
+  }
+
+  materialsInInvoice, err := service.invoiceInputRepo.GetAllMaterialsThatAreInInvoiceInput(projectID)
+  if err != nil {
+    return dto.InvoiceInputParametersForSearch{}, err
+  }
+
+  return dto.InvoiceInputParametersForSearch{
+    DeliveryCodes: deliveryCodes,
+    WarehouseManagers: warehouseManagers,
+    Releaseds: releaseds,
+    Materials: materialsInInvoice,
+  }, nil
+} 

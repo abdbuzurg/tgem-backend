@@ -21,12 +21,12 @@ func InitInvoiceInputRepository(db *gorm.DB) IInovoiceInputRepository {
 type IInovoiceInputRepository interface {
 	GetAll() ([]model.InvoiceInput, error)
 	GetPaginated(page, limit int) ([]model.InvoiceInput, error)
-	GetPaginatedFiltered(page, limit int, filter model.InvoiceInput) ([]dto.InvoiceInputPaginated, error)
+	GetPaginatedFiltered(page, limit int, filter dto.InvoiceInputSearchParameters) ([]dto.InvoiceInputPaginated, error)
 	GetByID(id uint) (model.InvoiceInput, error)
 	Create(data dto.InvoiceInputCreateQueryData) (model.InvoiceInput, error)
 	Update(data dto.InvoiceInputCreateQueryData) (model.InvoiceInput, error)
 	Delete(id uint) error
-	Count(projectID uint) (int64, error)
+	Count(filter dto.InvoiceInputSearchParameters) (int64, error)
 	UniqueCode(projectID uint) ([]dto.DataForSelect[string], error)
 	UniqueWarehouseManager(projectID uint) ([]dto.DataForSelect[uint], error)
 	UniqueReleased(projectID uint) ([]dto.DataForSelect[uint], error)
@@ -35,6 +35,10 @@ type IInovoiceInputRepository interface {
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceInputMaterialForEdit, error)
 	GetSerialNumbersForEdit(invoiceID uint, materialCostID uint) ([]string, error)
 	Import(data []dto.InvoiceInputImportData) error
+	GetAllDeliveryCodes(projectID uint) ([]string, error)
+	GetAllWarehouseManagers(projectID uint) ([]dto.DataForSelect[uint], error)
+	GetAllReleasedWorkers(projectID uint) ([]dto.DataForSelect[uint], error)
+	GetAllMaterialsThatAreInInvoiceInput(projectID uint) ([]dto.DataForSelect[uint], error)
 }
 
 func (repo *invoiceInputRespository) GetAll() ([]model.InvoiceInput, error) {
@@ -49,10 +53,11 @@ func (repo *invoiceInputRespository) GetPaginated(page, limit int) ([]model.Invo
 	return data, err
 }
 
-func (repo *invoiceInputRespository) GetPaginatedFiltered(page, limit int, filter model.InvoiceInput) ([]dto.InvoiceInputPaginated, error) {
+func (repo *invoiceInputRespository) GetPaginatedFiltered(page, limit int, filter dto.InvoiceInputSearchParameters) ([]dto.InvoiceInputPaginated, error) {
 	data := []dto.InvoiceInputPaginated{}
-	err := repo.db.
-		Raw(`
+	var err error
+	if len(filter.Materials) != 0 {
+		err = repo.db.Raw(`
       SELECT 
         invoice_inputs.id as id,
         invoice_inputs.confirmed as confirmation,
@@ -61,21 +66,68 @@ func (repo *invoiceInputRespository) GetPaginatedFiltered(page, limit int, filte
         released.name as released_name,
         invoice_inputs.date_of_invoice as date_of_invoice
       FROM invoice_inputs
-        INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_inputs.warehouse_manager_worker_id
-        INNER JOIN workers AS released ON released.id = invoice_inputs.released_worker_id
+      INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_inputs.warehouse_manager_worker_id
+      INNER JOIN workers AS released ON released.id = invoice_inputs.released_worker_id
+      WHERE 
+        invoice_inputs.project_id = ? AND
+        invoice_inputs.id IN (
+          SELECT invoice_materials.invoice_id
+          FROM invoice_materials
+          WHERE 
+            invoice_materials.project_id = ? AND
+            invoice_materials.invoice_type = 'input' AND
+            invoice_materials.material_cost_id IN (
+              SELECT material_costs.id
+              FROM material_costs
+              WHERE material_costs.material_id IN ?
+            ) 
+      )
+      ORDER BY invoice_inputs.id DESC 
+      LIMIT ? 
+      OFFSET ?;
+      `, filter.ProjectID,
+			filter.ProjectID,
+			filter.Materials,
+			limit, (page-1)*limit,
+		).Scan(&data).Error
+	} else {
+		dateFrom := filter.DateFrom.String()
+		dateFrom = dateFrom[:len(dateFrom)-10]
+		dateTo := filter.DateTo.String()
+		dateTo = dateTo[:len(dateTo)-10]
+		err = repo.db.
+			Raw(`
+      SELECT 
+        invoice_inputs.id as id,
+        invoice_inputs.confirmed as confirmation,
+        invoice_inputs.delivery_code as delivery_code,
+        warehouse_manager.name as warehouse_manager_name,
+        released.name as released_name,
+        invoice_inputs.date_of_invoice as date_of_invoice
+      FROM invoice_inputs
+      INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_inputs.warehouse_manager_worker_id
+      INNER JOIN workers AS released ON released.id = invoice_inputs.released_worker_id
       WHERE 
         invoice_inputs.project_id = ? AND
         (nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
         (nullif(?, 0) IS NULL OR released_worker_id = ?) AND
-        (nullif(?, '') IS NULL OR delivery_code = ?) ORDER BY invoice_inputs.id DESC LIMIT ? OFFSET ?;
+        (nullif(?, '') IS NULL OR delivery_code = ?) AND 
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= invoice_inputs.date_of_invoice) AND 
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR invoice_inputs.date_of_invoice <= ?)
+      ORDER BY invoice_inputs.id DESC 
+      LIMIT ? 
+      OFFSET ?;
     `,
-			filter.ProjectID,
-			filter.WarehouseManagerWorkerID, filter.WarehouseManagerWorkerID,
-			filter.ReleasedWorkerID, filter.ReleasedWorkerID,
-			filter.DeliveryCode, filter.DeliveryCode,
-			limit, (page-1)*limit,
-		).
-		Scan(&data).Error
+				filter.ProjectID,
+				filter.WarehouseManagerWorkerID, filter.WarehouseManagerWorkerID,
+				filter.ReleasedWorkerID, filter.ReleasedWorkerID,
+				filter.DeliveryCode, filter.DeliveryCode,
+				dateFrom, dateFrom,
+				dateTo, dateTo,
+				limit, (page-1)*limit,
+			).
+			Scan(&data).Error
+	}
 
 	return data, err
 }
@@ -200,9 +252,61 @@ func (repo *invoiceInputRespository) Delete(id uint) error {
 	})
 }
 
-func (repo *invoiceInputRespository) Count(projectID uint) (int64, error) {
+func (repo *invoiceInputRespository) Count(filter dto.InvoiceInputSearchParameters) (int64, error) {
 	var count int64
-	err := repo.db.Raw("SELECT COUNT(*) FROM invoice_inputs WHERE project_id = ?", projectID).Scan(&count).Error
+	var err error
+	if len(filter.Materials) > 0 {
+		err = repo.db.Raw(`
+      SELECT COUNT(*) 
+      FROM invoice_inputs
+      INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_inputs.warehouse_manager_worker_id
+      INNER JOIN workers AS released ON released.id = invoice_inputs.released_worker_id
+      WHERE 
+        invoice_inputs.project_id = ? AND
+        invoice_inputs.id IN (
+          SELECT invoice_materials.invoice_id
+          FROM invoice_materials
+          WHERE 
+            invoice_materials.project_id = ? AND
+            invoice_materials.invoice_type = 'input' AND
+            invoice_materials.material_cost_id IN (
+              SELECT material_costs.id
+              FROM material_costs
+              WHERE material_costs.material_id IN ?
+            ) 
+      )
+      `, filter.ProjectID,
+			filter.ProjectID,
+			filter.Materials,
+		).Scan(&count).Error
+	} else {
+		dateFrom := filter.DateFrom.String()
+		dateFrom = dateFrom[:len(dateFrom)-10]
+		dateTo := filter.DateTo.String()
+		dateTo = dateTo[:len(dateTo)-10]
+		err = repo.db.
+			Raw(`
+      SELECT COUNT(*) 
+      FROM invoice_inputs
+      INNER JOIN workers AS warehouse_manager ON warehouse_manager.id = invoice_inputs.warehouse_manager_worker_id
+      INNER JOIN workers AS released ON released.id = invoice_inputs.released_worker_id
+      WHERE 
+        invoice_inputs.project_id = ? AND
+        (nullif(?, 0) IS NULL OR warehouse_manager_worker_id = ?) AND
+        (nullif(?, 0) IS NULL OR released_worker_id = ?) AND
+        (nullif(?, '') IS NULL OR delivery_code = ?) AND 
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR ? <= invoice_inputs.date_of_invoice) AND 
+        (nullif(?, '0001-01-01 00:00:00') IS NULL OR invoice_inputs.date_of_invoice <= ?)
+    `,
+				filter.ProjectID,
+				filter.WarehouseManagerWorkerID, filter.WarehouseManagerWorkerID,
+				filter.ReleasedWorkerID, filter.ReleasedWorkerID,
+				filter.DeliveryCode, filter.DeliveryCode,
+				dateFrom, dateFrom,
+				dateTo, dateTo,
+			).
+      Scan(&count).Error
+	}
 	return count, err
 }
 
@@ -398,4 +502,54 @@ func (repo *invoiceInputRespository) Import(data []dto.InvoiceInputImportData) e
 
 		return nil
 	})
+}
+
+func (repo *invoiceInputRespository) GetAllDeliveryCodes(projectID uint) ([]string, error) {
+	result := []string{}
+	err := repo.db.Raw(`SELECT delivery_code FROM invoice_inputs WHERE project_id = ?`, projectID).Scan(&result).Error
+	return result, err
+}
+
+func (repo *invoiceInputRespository) GetAllWarehouseManagers(projectID uint) ([]dto.DataForSelect[uint], error) {
+	result := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+    SELECT DISTINCT 
+      workers.id as "value", 
+      workers.name as "label"
+    FROM invoice_inputs
+    INNER JOIN workers ON workers.id = invoice_inputs.warehouse_manager_worker_id
+    WHERE invoice_inputs.project_id = ?;
+    `, projectID).Scan(&result).Error
+
+	return result, err
+}
+
+func (repo *invoiceInputRespository) GetAllReleasedWorkers(projectID uint) ([]dto.DataForSelect[uint], error) {
+	result := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+    SELECT DISTINCT 
+      workers.id as "value", 
+      workers.name as "label"
+    FROM invoice_inputs
+    INNER JOIN workers ON workers.id = invoice_inputs.released_worker_id
+    WHERE invoice_inputs.project_id = ?;
+    `, projectID).Scan(&result).Error
+	return result, err
+}
+
+func (repo *invoiceInputRespository) GetAllMaterialsThatAreInInvoiceInput(projectID uint) ([]dto.DataForSelect[uint], error) {
+	result := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+    SELECT DISTINCT
+      materials.id as "value",
+      materials.name as "label"
+    FROM invoice_materials
+    INNER JOIN material_costs ON invoice_materials.material_cost_id = material_costs.id
+    INNER JOIN materials ON materials.id = material_costs.material_id
+    WHERE 
+      invoice_materials.project_id = ? AND
+      invoice_materials.invoice_type = 'input'
+    `, projectID).Scan(&result).Error
+
+	return result, err
 }

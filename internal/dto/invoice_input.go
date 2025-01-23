@@ -85,6 +85,23 @@ type InvoiceInputMaterialForEdit struct {
 }
 
 type InvoiceInputImportData struct {
-  Details model.InvoiceInput
-  Items []model.InvoiceMaterials
+	Details model.InvoiceInput
+	Items   []model.InvoiceMaterials
+}
+
+type InvoiceInputParametersForSearch struct {
+	DeliveryCodes     []string              `json:"deliveryCodes"`
+	WarehouseManagers []DataForSelect[uint] `json:"warehouseManagers"`
+	Releaseds         []DataForSelect[uint] `json:"releaseds"`
+	Materials         []DataForSelect[uint] `json:"materials"`
+}
+
+type InvoiceInputSearchParameters struct {
+	ProjectID                uint
+	DeliveryCode             string
+	WarehouseManagerWorkerID uint
+	ReleasedWorkerID         uint
+	DateFrom                 time.Time
+	DateTo                   time.Time
+	Materials                []uint
 }

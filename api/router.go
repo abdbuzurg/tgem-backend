@@ -516,6 +516,7 @@ func InitInvoiceInputRoutes(router *gin.RouterGroup, controller controller.IInvo
 	invoiceInputRoutes.GET("/:id/materials/without-serial-number", controller.GetInvoiceMaterialsWithoutSerialNumbers)
 	invoiceInputRoutes.GET("/:id/materials/with-serial-number", controller.GetInvoiceMaterialsWithSerialNumbers)
 	invoiceInputRoutes.GET("/invoice-materials/:id", controller.GetMaterialsForEdit)
+	invoiceInputRoutes.GET("/search-parameters", controller.GetParametersForSearch)
 	invoiceInputRoutes.POST("/", controller.Create)
 	invoiceInputRoutes.POST("/report", controller.Report)
 	invoiceInputRoutes.POST("/confirm/:id", controller.Confirmation)
