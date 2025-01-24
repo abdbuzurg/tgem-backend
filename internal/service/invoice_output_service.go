@@ -434,6 +434,14 @@ func (service *invoiceOutputService) Confirmation(id uint) error {
 			}
 		}
 
+		if materialsInWarehouse[materialInWarehouseIndex].Amount < invoiceMaterial.Amount {
+			material, err := service.materialRepo.GetByMaterialCostID(materialsInWarehouse[materialInWarehouseIndex].MaterialCostID)
+			if err != nil {
+				return fmt.Errorf("Ошибка при подсчете материала, система не смогла разпознать материал: %v", err)
+			}
+
+			return fmt.Errorf("Mатериал %v указано больше чем имеется на складе. Измените количество", material.Name)
+		}
 		materialsInWarehouse[materialInWarehouseIndex].Amount -= invoiceMaterial.Amount
 
 		materialInTeamIndex := -1

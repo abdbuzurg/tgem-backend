@@ -198,7 +198,7 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 
 	err = c.SaveUploadedFile(file, filePath)
 	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("cannot save file: %v", err))
+		response.ResponseError(c, fmt.Sprintf("Ошибка сохранения файла: %v", err))
 		return
 	}
 
@@ -207,7 +207,7 @@ func (controller *invoiceOutputController) Confirmation(c *gin.Context) {
 
 	err = controller.invoiceOutputService.Confirmation(uint(id))
 	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("cannot confirm invoice input with id %v: %v", id, err))
+    response.ResponseError(c, fmt.Sprintf("Ошибка подтверждения: %v", err))
 		os.Remove(filePath)
 		return
 	}

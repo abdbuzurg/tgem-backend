@@ -240,6 +240,7 @@ func (service *mainReportService) ProjectProgressByGivenDay(projectID uint, date
 	if err != nil {
 		return "", err
 	}
+  fmt.Println(materialData[0])
 
 	dataForMaterials := []dto.ProgressReportData{
 		{
