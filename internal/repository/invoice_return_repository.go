@@ -437,6 +437,6 @@ func (repo *invoiceReturnRepository) GetMaterialsForEdit(id uint, locationType s
 
 func(repo *invoiceReturnRepository) GetByDeliveryCode(deliveryCode string) (model.InvoiceReturn, error) {
   result := model.InvoiceReturn{}
-  err := repo.db.Raw(`SELECT * FROM invoice WHERE delivery_code = ?`, deliveryCode).Scan(&result).Error
+  err := repo.db.Raw(`SELECT * FROM invoice_returns WHERE delivery_code = ?`, deliveryCode).Scan(&result).Error
   return result, err
 }

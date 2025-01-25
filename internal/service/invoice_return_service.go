@@ -482,22 +482,63 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 		return "", err
 	}
 
-	templateFilePath := filepath.Join("./pkg/excels/report/", "Invoice Return Report.xlsx")
+	templateFilePath := filepath.Join("./pkg/excels/templates/", "Invoice Return Report.xlsx")
 	f, err := excelize.OpenFile(templateFilePath)
+  defer f.Close()
 	if err != nil {
 		return "", err
 	}
-	sheetName := "Sheet1"
 
+	sheetName := "Sheet1"
 	rowCount := 2
+
+	type InvoiceReturnReportData struct {
+		DeliveryCode      string
+		InvoiceReturnType string
+		Returner          string
+		DateOfInvoice     time.Time
+		MaterialName      string
+		MaterialUnit      string
+		Amount            float64
+		Price             float64
+		IsDefected        string
+		Notes             string
+	}
+
+	reportData := []InvoiceReturnReportData{}
 	for _, invoice := range invoices {
-		invoiceMaterialRepo, err := service.invoiceMaterialsRepo.GetByInvoice(projectID, invoice.ID, "output")
+		invoiceMaterialRepo, err := service.invoiceMaterialsRepo.GetByInvoice(projectID, invoice.ID, "return")
 		if err != nil {
 			return "", err
 		}
 
-		fmt.Println(invoiceMaterialRepo)
 		for _, invoiceMaterial := range invoiceMaterialRepo {
+			oneEntry := InvoiceReturnReportData{
+				DeliveryCode:  invoice.DeliveryCode,
+				DateOfInvoice: invoice.DateOfInvoice,
+        Amount: invoiceMaterial.Amount,
+			}
+
+			if invoice.ReturnerType == "team" {
+				team, err := service.teamRepo.GetByID(invoice.ReturnerID)
+				if err != nil {
+					return "", err
+				}
+
+				oneEntry.InvoiceReturnType = "Бригада"
+				oneEntry.Returner = team.Number
+			}
+
+			if invoice.ReturnerType == "object" {
+				object, err := service.objectRepo.GetByID(invoice.ReturnerID)
+				if err != nil {
+					return "", err
+				}
+
+				oneEntry.InvoiceReturnType = "Бригада"
+				oneEntry.Returner = object.Name
+			}
+
 			materialCost, err := service.materialCostRepo.GetByID(invoiceMaterial.MaterialCostID)
 			if err != nil {
 				return "", nil
@@ -508,41 +549,36 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 				return "", nil
 			}
 
-			f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), invoice.DeliveryCode)
-
-			if invoice.ReturnerType == "team" {
-				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
-
-				team, err := service.teamRepo.GetByID(invoice.ReturnerID)
-				if err != nil {
-					return "", err
-				}
-
-				f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), team.Number)
+			oneEntry.MaterialName = material.Name
+			oneEntry.MaterialUnit = material.Unit
+			oneEntry.Price, _ = materialCost.CostM19.Float64()
+			if invoiceMaterial.IsDefected {
+				oneEntry.IsDefected = "Да"
+			} else {
+				oneEntry.IsDefected = "Нет"
 			}
+			oneEntry.Notes = invoiceMaterial.Notes
 
-			if invoice.ReturnerType == "object" {
-				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), "Бригада")
-
-				object, err := service.objectRepo.GetByID(invoice.ReturnerID)
-				if err != nil {
-					return "", err
-				}
-
-				f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), object.Name)
-			}
-
-			dateOfInvoice := invoice.DateOfInvoice.String()
-			dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
-			f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
-
-			f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), material.Name)
-			f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), material.Unit)
-			f.SetCellValue(sheetName, "G"+fmt.Sprint(rowCount), invoiceMaterial.Amount)
-			f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), materialCost.CostM19)
-			f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), invoiceMaterial.Notes)
-			rowCount++
+			reportData = append(reportData, oneEntry)
 		}
+	}
+
+	for _, oneEntry := range reportData {
+		f.SetCellValue(sheetName, "A"+fmt.Sprint(rowCount), oneEntry.DeliveryCode)
+		f.SetCellValue(sheetName, "B"+fmt.Sprint(rowCount), oneEntry.InvoiceReturnType)
+		f.SetCellValue(sheetName, "C"+fmt.Sprint(rowCount), oneEntry.Returner)
+
+		dateOfInvoice := oneEntry.DateOfInvoice.String()
+		dateOfInvoice = dateOfInvoice[:len(dateOfInvoice)-10]
+		f.SetCellValue(sheetName, "D"+fmt.Sprint(rowCount), dateOfInvoice)
+
+		f.SetCellValue(sheetName, "E"+fmt.Sprint(rowCount), oneEntry.MaterialName)
+		f.SetCellValue(sheetName, "F"+fmt.Sprint(rowCount), oneEntry.MaterialUnit)
+		f.SetCellValue(sheetName, "G"+fmt.Sprint(rowCount), oneEntry.Amount)
+		f.SetCellValue(sheetName, "H"+fmt.Sprint(rowCount), oneEntry.Price)
+		f.SetCellValue(sheetName, "I"+fmt.Sprint(rowCount), oneEntry.IsDefected)
+		f.SetCellValue(sheetName, "J"+fmt.Sprint(rowCount), oneEntry.Notes)
+		rowCount++
 	}
 
 	currentTime := time.Now()
@@ -554,9 +590,6 @@ func (service *invoiceReturnService) Report(filter dto.InvoiceReturnReportFilter
 	tempFilePath := filepath.Join("./pkg/excels/temp/", fileName)
 
 	f.SaveAs(tempFilePath)
-	if err := f.Close(); err != nil {
-		fmt.Println(err)
-	}
 
 	return fileName, nil
 }
