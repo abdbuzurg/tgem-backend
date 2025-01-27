@@ -157,7 +157,6 @@ func (repo *substationCellObjectRepository) Update(data dto.SubstationCellObject
 	}
 
 	err := repo.db.Transaction(func(tx *gorm.DB) error {
-
 		if err := tx.Model(&model.STVT_Object{}).Where("id = ?", substationCell.ID).Updates(&substationCell).Error; err != nil {
 			return err
 		}
@@ -218,7 +217,7 @@ func (repo *substationCellObjectRepository) Update(data dto.SubstationCellObject
 		if data.SubstationObjectID != 0 {
 			nourashes := model.SubstationCellNourashesSubstationObject{
 				SubstationObjectID:     data.SubstationObjectID,
-				SubstationCellObjectID: substationCell.ID,
+				SubstationCellObjectID: object.ID,
 			}
 			if err := tx.Create(&nourashes).Error; err != nil {
 				return err
