@@ -15,6 +15,7 @@ import (
 func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	mainRouter := gin.Default()
+  mainRouter.MaxMultipartMemory = 400 << 20
 
 	mainRouter.Use(gin.Recovery())
 
