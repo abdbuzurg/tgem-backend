@@ -254,13 +254,32 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.Invoi
 
 	}
 
+	correctInvoiceMaterials := []model.InvoiceMaterials{}
+	for _, entry := range invoiceMaterialForCreate {
+		if len(correctInvoiceMaterials) == 0 {
+			correctInvoiceMaterials = append(correctInvoiceMaterials, entry)
+			continue
+		}
+
+    indentical := false
+		for _, correctEntry := range correctInvoiceMaterials {
+			if entry.MaterialCostID == correctEntry.MaterialCostID {
+				indentical = true
+			}
+		}
+
+    if !(indentical) {
+      correctInvoiceMaterials = append(correctInvoiceMaterials, entry)
+    }
+	}
+
 	if err := service.GenerateExcelFile(data); err != nil {
 		return model.InvoiceOutput{}, err
 	}
 
 	invoiceOutput, err := service.invoiceOutputRepo.Create(dto.InvoiceOutputCreateQueryData{
 		Invoice:               data.Details,
-		InvoiceMaterials:      invoiceMaterialForCreate,
+		InvoiceMaterials:      correctInvoiceMaterials,
 		SerialNumberMovements: serialNumberMovements,
 	})
 	if err != nil {
