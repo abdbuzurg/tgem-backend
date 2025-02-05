@@ -5,8 +5,10 @@ import (
 	"backend-v2/internal/repository"
 	"backend-v2/model"
 	"backend-v2/pkg/utils"
+	"errors"
 	"fmt"
 	"os"
+
 	// "os/exec"
 	"path/filepath"
 	// "runtime"
@@ -261,16 +263,16 @@ func (service *invoiceOutputService) Create(data dto.InvoiceOutput) (model.Invoi
 			continue
 		}
 
-    indentical := false
+		indentical := false
 		for _, correctEntry := range correctInvoiceMaterials {
 			if entry.MaterialCostID == correctEntry.MaterialCostID {
 				indentical = true
 			}
 		}
 
-    if !(indentical) {
-      correctInvoiceMaterials = append(correctInvoiceMaterials, entry)
-    }
+		if !(indentical) {
+			correctInvoiceMaterials = append(correctInvoiceMaterials, entry)
+		}
 	}
 
 	if err := service.GenerateExcelFile(data); err != nil {
@@ -383,7 +385,7 @@ func (service *invoiceOutputService) Update(data dto.InvoiceOutput) (model.Invoi
 	}
 
 	excelFilePath := filepath.Join("./pkg/excels/output/", data.Details.DeliveryCode+".xlsx")
-	if err := os.Remove(excelFilePath); err != nil {
+	if err := os.Remove(excelFilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return model.InvoiceOutput{}, err
 	}
 
@@ -459,7 +461,12 @@ func (service *invoiceOutputService) Confirmation(id uint) error {
 				return fmt.Errorf("Ошибка при подсчете материала, система не смогла разпознать материал: %v", err)
 			}
 
-			return fmt.Errorf("Mатериал %v указано больше чем имеется на складе. Измените количество", material.Name)
+			materialCost, err := service.materialCostRepo.GetByID(materialsInWarehouse[materialInWarehouseIndex].MaterialCostID)
+			if err != nil {
+				return fmt.Errorf("Ошибка при подсчете материала, система не смогла разпознать ценник материалa: %v", err)
+			}
+
+			return fmt.Errorf("Mатериал <<%v>> c ценником %v - указано больше чем имеется на складе. Измените количество", material.Name, materialCost.CostM19)
 		}
 		materialsInWarehouse[materialInWarehouseIndex].Amount -= invoiceMaterial.Amount
 
