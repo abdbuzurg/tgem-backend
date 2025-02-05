@@ -15,7 +15,7 @@ import (
 func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	mainRouter := gin.Default()
-  mainRouter.MaxMultipartMemory = 400 << 20
+	mainRouter.MaxMultipartMemory = 400 << 20
 
 	mainRouter.Use(gin.Recovery())
 
@@ -32,7 +32,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	router := mainRouter.Group("/api")
 
 	//Initialization of Repositories
-  auctionRepository := repository.InitAuctionRepository(db)
+	auctionRepository := repository.InitAuctionRepository(db)
 	invoiceInputRepo := repository.InitInvoiceInputRepository(db)
 	invoiceOutputRepo := repository.InitInvoiceOutputRepository(db)
 	invoiceReturnRepo := repository.InitInvoiceReturnRepository(db)
@@ -75,9 +75,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	workerAttendanceRepo := repository.InitWorkerAttendanceRepository(db)
 	mainReportRepository := repository.InitMainReportRepository(db)
 	substationCellRepository := repository.NewSubstationCellObjectRepository(db)
+	statisticsRepository := repository.NewStatisticsRepository(db)
 
 	//Initialization of Services
-  auctionService := service.InitAuctionService(auctionRepository)
+	auctionService := service.InitAuctionService(auctionRepository)
 	invoiceInputService := service.InitInvoiceInputService(
 		invoiceInputRepo,
 		invoiceMaterialRepo,
@@ -282,9 +283,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		teamRepo,
 		substationObjectRepo,
 	)
+	statisticsService := service.NewStatisticsService(statisticsRepository, workerRepo)
 
 	//Initialization of Controllers
-  auctionController := controller.InitAuctionController(auctionService)
+	auctionController := controller.InitAuctionController(auctionService)
 	invoiceInputController := controller.InitInvoiceInputController(invoiceInputService, userActionService)
 	invoiceOutputController := controller.InitInvoiceOutputController(invoiceOutputService)
 	invoiceReturnController := controller.InitInvoiceReturnController(invoiceReturnService)
@@ -317,9 +319,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	workerAttendanceController := controller.InitWorkerAttendanceController(workerAttendanceService)
 	mainReportController := controller.InitMainReportController(mainReportService)
 	substationCellController := controller.InitSubstationCellObjectController(substationCellObjectService)
+	statisticsController := controller.NewStatisticsController(statisticsService)
 
 	//Initialization of Routes
-  InitAuctionRoutes(router, auctionController)
+	InitAuctionRoutes(router, auctionController)
 	InitInvoiceInputRoutes(router, invoiceInputController, db)
 	InitInvoiceOutputRoutes(router, invoiceOutputController)
 	InitInvoiceReturnRoutes(router, invoiceReturnController, db)
@@ -349,15 +352,26 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	InitWorkerAttendanceRoutes(router, workerAttendanceController)
 	InitMainReports(router, mainReportController)
 	InitSubstationCellRoutes(router, substationCellController)
+	InitStatisticsRoutes(router, statisticsController)
 
 	return mainRouter
 }
 
+func InitStatisticsRoutes(router *gin.RouterGroup, controller controller.IStatisticsController) {
+	statRoutes := router.Group("/statistics")
+	statRoutes.Use(
+		middleware.Authentication(),
+	)
+	statRoutes.GET("/invoice-count", controller.InvoiceCountStat)
+	statRoutes.GET("/invoice-input-creator", controller.InvoiceInputCreatorStat)
+	statRoutes.GET("/invoice-output-creator", controller.InvoiceOutputCreatorStat)
+}
+
 func InitAuctionRoutes(router *gin.RouterGroup, controller controller.IAuctionController) {
-  auctionRoutes := router.Group("/auction")
-  auctionRoutes.GET("/:auctionID", controller.GetAuctionDataForPublic)
-  auctionRoutes.GET("/private/:auctionID", middleware.Authentication(), controller.GetAuctionDataForPrivate)
-  auctionRoutes.POST("/private", middleware.Authentication(), controller.SaveParticipantChanges)
+	auctionRoutes := router.Group("/auction")
+	auctionRoutes.GET("/:auctionID", controller.GetAuctionDataForPublic)
+	auctionRoutes.GET("/private/:auctionID", middleware.Authentication(), controller.GetAuctionDataForPrivate)
+	auctionRoutes.POST("/private", middleware.Authentication(), controller.SaveParticipantChanges)
 }
 
 func InitMainReports(router *gin.RouterGroup, controller controller.IMainReportController) {
