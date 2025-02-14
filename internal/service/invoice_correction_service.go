@@ -212,6 +212,8 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 		return "", err
 	}
 
+  fmt.Println(invoices)
+
 	templateFilePath := filepath.Join("./pkg/excels/templates/", "Object Spenditure Report.xlsx")
 	f, err := excelize.OpenFile(templateFilePath)
 	if err != nil {
@@ -245,6 +247,8 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 			f.SetCellFloat(sheetName, "K"+fmt.Sprint(rowCount+index), invoiceMaterial.InvoiceMaterialAmount, 2, 64)
 			f.SetCellStr(sheetName, "L"+fmt.Sprint(rowCount+index), invoiceMaterial.InvoiceMaterialNotes)
 		}
+
+    rowCount += len(invoiceMaterials)
 	}
 
 	currentTime := time.Now()
