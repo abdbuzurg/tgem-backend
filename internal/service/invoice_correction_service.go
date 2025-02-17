@@ -137,6 +137,10 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 
 			invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
 			index++
+
+      if index == len(materialInfoSorted) {
+        return model.InvoiceObject{}, fmt.Errorf("Количество материала '%v' указано больше чем имеет бригада", invoiceMaterial.MaterialName)
+      }
 		}
 	}
 
