@@ -365,6 +365,8 @@ func InitStatisticsRoutes(router *gin.RouterGroup, controller controller.IStatis
 	statRoutes.GET("/invoice-count", controller.InvoiceCountStat)
 	statRoutes.GET("/invoice-input-creator", controller.InvoiceInputCreatorStat)
 	statRoutes.GET("/invoice-output-creator", controller.InvoiceOutputCreatorStat)
+  statRoutes.GET("/material/invoice/:materialID", controller.MaterialInInvoice)
+  statRoutes.GET("/material/location/:materialID", controller.MaterialInLocations)
 }
 
 func InitAuctionRoutes(router *gin.RouterGroup, controller controller.IAuctionController) {
