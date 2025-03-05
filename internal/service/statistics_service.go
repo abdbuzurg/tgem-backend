@@ -125,6 +125,7 @@ func (service *statisticsService) CountMaterialInInvoices(materialID uint) ([]dt
 		{ID: 3, Value: 0, Label: "В процессе корректировки"},
 		{ID: 4, Value: 0, Label: "Прошел корректировку"},
 		{ID: 5, Value: 0, Label: "Списание"},
+		{ID: 6, Value: 0, Label: "Отпуск вне проекта"},
 	}
 
 	materialInInvoices, err := service.statRepo.CountMaterialInInvoices(materialID)
@@ -152,6 +153,10 @@ func (service *statisticsService) CountMaterialInInvoices(materialID uint) ([]dt
 		case "writeoff":
 			result[5].Value += materialInInvoice.Amount
 			break
+		case "output-out-of-project":
+			result[6].Value += materialInInvoice.Amount
+			break
+
 		default:
 			fmt.Println("Unknown InvoiceType")
 		}
@@ -170,6 +175,7 @@ func (service *statisticsService) LocationMaterial(materialID uint) ([]dto.PieCh
 		{ID: 5, Value: 0, Label: "Потеря Бригады"},
 		{ID: 6, Value: 0, Label: "Списание Объекта"},
 		{ID: 7, Value: 0, Label: "Потеря Объекта"},
+		{ID: 8, Value: 0, Label: "Вышло из проекта"},
 	}
 
 	locationsOfMaterial, err := service.statRepo.CountMaterialInLocations(materialID)
@@ -202,6 +208,9 @@ func (service *statisticsService) LocationMaterial(materialID uint) ([]dto.PieCh
 			break
 		case "loss-object":
 			result[7].Value += locationOfMaterial.Amount
+			break
+		case "out-of-project":
+			result[8].Value += locationOfMaterial.Amount
 			break
 		default:
 			fmt.Println("Unknown Storage")
