@@ -272,6 +272,13 @@ func (controller *invoiceOutputOutOfProjectController) Report(c *gin.Context) {
 
 func (controller *invoiceOutputOutOfProjectController) GetDocument(c *gin.Context) {
 	deliveryCode := c.Param("deliveryCode")
-	filePath := filepath.Join("./pkg/excels/output/", deliveryCode+".xlsx")
-	c.FileAttachment(filePath, deliveryCode+".xlsx")
+
+  extension, err := controller.invoiceOutputOutOfProjectService.GetDocument(deliveryCode)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	filePath := filepath.Join("./pkg/excels/output/", deliveryCode+extension)
+	c.FileAttachment(filePath, deliveryCode+extension)
 }

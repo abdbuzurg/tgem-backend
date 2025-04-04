@@ -30,6 +30,7 @@ type IInvoiceOutputOutOfProjectRepository interface {
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
 	GetUniqueNameOfProjects(projectID uint) ([]string, error)
 	ReportFilterData(filter dto.InvoiceOutputOutOfProjectReportFilter) ([]dto.InvoiceOutputOutOfProjectReportData, error)
+	GetByDeliveryCode(deliveryCode string) (model.InvoiceOutputOutOfProject, error)
 }
 
 func (repo *invoiceOutputOutOfProjectRepository) GetPaginated(page, limit int, filter dto.InvoiceOutputOutOfProjectSearchParameters) ([]dto.InvoiceOutputOutOfProjectPaginated, error) {
@@ -231,7 +232,7 @@ func (repo *invoiceOutputOutOfProjectRepository) ReportFilterData(filter dto.Inv
 	dateFrom = dateFrom[:len(dateFrom)-10]
 	dateTo := filter.DateTo.String()
 	dateTo = dateTo[:len(dateTo)-10]
-  fmt.Println(dateFrom, dateTo)
+	fmt.Println(dateFrom, dateTo)
 	err := repo.db.Raw(`
     SELECT 
       invoice_output_out_of_projects.id as id,
@@ -253,5 +254,11 @@ func (repo *invoiceOutputOutOfProjectRepository) ReportFilterData(filter dto.Inv
 		dateTo, dateTo,
 	).Scan(&result).Error
 
+	return result, err
+}
+
+func (repo *invoiceOutputOutOfProjectRepository) GetByDeliveryCode(deliveryCode string) (model.InvoiceOutputOutOfProject, error) {
+	result := model.InvoiceOutputOutOfProject{}
+	err := repo.db.Raw("SELECT * FROM invoice_output_out_of_projects WHERE delivery_code = ?", deliveryCode).Scan(&result).Error
 	return result, err
 }

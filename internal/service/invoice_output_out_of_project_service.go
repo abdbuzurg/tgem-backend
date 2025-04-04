@@ -59,6 +59,7 @@ type IInvoiceOutputOutOfProjectService interface {
 	GetMaterialsForEdit(id uint) ([]dto.InvoiceOutputMaterialsForEdit, error)
 	GetUniqueNameOfProjects(projectID uint) ([]string, error)
 	Report(filter dto.InvoiceOutputOutOfProjectReportFilter) (string, error)
+	GetDocument(deliveryCode string) (string, error)
 }
 
 func (service *invoiceOutputOutOfProjectService) GetPaginated(page, limit int, filter dto.InvoiceOutputOutOfProjectSearchParameters) ([]dto.InvoiceOutputOutOfProjectPaginated, error) {
@@ -470,6 +471,12 @@ func (service *invoiceOutputOutOfProjectService) GenerateExcelFile(details model
 		},
 	})
 
+	f.SetCellValue(sheetName, "C1", fmt.Sprintf(`НАКЛАДНАЯ 
+№ %s
+от %s года       
+на отпуск материала 
+`, details.DeliveryCode, utils.DateConverter(details.DateOfInvoice)))
+
 	for index, oneEntry := range items {
 		material, err := service.materialsRepo.GetByMaterialCostID(oneEntry.MaterialCostID)
 		if err != nil {
@@ -531,4 +538,17 @@ func (service *invoiceOutputOutOfProjectService) GenerateExcelFile(details model
 	// }
 
 	return nil
+}
+
+func (service *invoiceOutputOutOfProjectService) GetDocument(deliveryCode string) (string, error) {
+	invoiceOutput, err := service.invoiceOutputOutOfProjectRepo.GetByDeliveryCode(deliveryCode)
+	if err != nil {
+		return "", err
+	}
+
+	if invoiceOutput.Confirmation {
+		return ".pdf", nil
+	} else {
+		return ".xlsx", nil
+	}
 }
