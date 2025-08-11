@@ -6,6 +6,8 @@ import (
 	"backend-v2/model"
 	"backend-v2/pkg/response"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -33,6 +35,7 @@ type IWorkerController interface {
 	GetTemplateFile(c *gin.Context)
 	Import(c *gin.Context)
 	GetWorkerInformationForSearch(c *gin.Context)
+	Export(c *gin.Context)
 }
 
 func (controller *workerController) GetAll(c *gin.Context) {
@@ -61,12 +64,12 @@ func (controller *workerController) GetPaginated(c *gin.Context) {
 	}
 
 	filter := dto.WorkerSearchParameters{
-		ProjectID: c.GetUint("projectID"),
-    Name: c.DefaultQuery("name", ""),
-    JobTitleInProject: c.DefaultQuery("jobTitleInProject", ""),
-    JobTitleInCompany: c.DefaultQuery("jobTitleInCompany", ""),
-    MobileNumber: c.DefaultQuery("mobileNumber", ""),
-    CompanyWorkerID: c.DefaultQuery("companyWorkerID", ""),
+		ProjectID:         c.GetUint("projectID"),
+		Name:              c.DefaultQuery("name", ""),
+		JobTitleInProject: c.DefaultQuery("jobTitleInProject", ""),
+		JobTitleInCompany: c.DefaultQuery("jobTitleInCompany", ""),
+		MobileNumber:      c.DefaultQuery("mobileNumber", ""),
+		CompanyWorkerID:   c.DefaultQuery("companyWorkerID", ""),
 	}
 
 	data, err := controller.workerService.GetPaginated(page, limit, filter)
@@ -205,4 +208,18 @@ func (controller *workerController) GetWorkerInformationForSearch(c *gin.Context
 	}
 
 	response.ResponseSuccess(c, data)
+}
+
+func (controller *workerController) Export(c *gin.Context) {
+	projectID := c.GetUint("projectID")
+
+	exportFileName, err := controller.workerService.Export(projectID)
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
+		return
+	}
+
+	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
+	c.FileAttachment(exportFilePath, exportFileName)
+	os.Remove(exportFileName)
 }

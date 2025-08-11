@@ -64,7 +64,7 @@ func (repo *workerRepository) GetPaginatedFiltered(page, limit int, filter dto.W
 			filter.MobileNumber, filter.MobileNumber,
 			filter.JobTitleInCompany, filter.JobTitleInCompany,
 			filter.JobTitleInProject, filter.JobTitleInProject,
-      filter.CompanyWorkerID, filter.CompanyWorkerID,
+			filter.CompanyWorkerID, filter.CompanyWorkerID,
 			limit, (page-1)*limit,
 		).Scan(&data).Error
 

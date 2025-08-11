@@ -44,10 +44,10 @@ func InitDB() (*gorm.DB, error) {
 
 func AutoMigrate(db *gorm.DB) {
 	db.AutoMigrate(
-		model.District{},
 		model.Role{},
 		model.Resource{},
 		model.Project{},
+		model.District{},
 		model.Worker{},
 		model.User{},
 		model.UserAction{},
@@ -83,16 +83,16 @@ func AutoMigrate(db *gorm.DB) {
 		model.SIP_Object{},
 		model.STVT_Object{},
 		model.Substation_Object{},
-    model.SubstationCellObject{},
+		model.SubstationCellObject{},
 		model.TP_Object{},
 		model.TPNourashesObjects{},
-    model.SubstationCellNourashesSubstationObject{},
+		model.SubstationCellNourashesSubstationObject{},
 		model.WorkerAttendance{},
 		model.ProjectProgressMaterials{},
 		model.ProjectProgressOperations{},
-    model.Auction{},
-    model.AuctionPackage{},
-    model.AuctionItem{},
-    model.AuctionParticipantPrice{},
+		model.Auction{},
+		model.AuctionPackage{},
+		model.AuctionItem{},
+		model.AuctionParticipantPrice{},
 	)
 }

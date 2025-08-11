@@ -6,6 +6,7 @@ import (
 	"backend-v2/model"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -31,6 +32,7 @@ type IWorkerService interface {
 	Count(filter dto.WorkerSearchParameters) (int64, error)
 	Import(filepath string, projectID uint) error
 	GetWorkerInformationForSearch(projectID uint) (dto.WorkerInformationForSearch, error)
+	Export(projectID uint) (string, error)
 }
 
 func (service *workerService) GetAll(projectID uint) ([]model.Worker, error) {
@@ -154,5 +156,37 @@ func (service *workerService) Import(filepath string, projectID uint) error {
 }
 
 func (service *workerService) GetWorkerInformationForSearch(projectID uint) (dto.WorkerInformationForSearch, error) {
-  return service.workerRepo.GetFullWorkerInformationForSearch(projectID)
+	return service.workerRepo.GetFullWorkerInformationForSearch(projectID)
+}
+
+func (service *workerService) Export(projectID uint) (string, error) {
+	workers, err := service.workerRepo.GetAll(projectID)
+	if err != nil {
+		return "", err
+	}
+
+	materialTempalteFilePath := filepath.Join("./pkg/excels/templates", "Шаблон для импорта Рабочего Персонала.xlsx")
+	f, err := excelize.OpenFile(materialTempalteFilePath)
+	if err != nil {
+		f.Close()
+		return "", fmt.Errorf("Не смог открыть файл: %v", err)
+	}
+	sheetName := "Импорт"
+	startingRow := 2
+
+	for index, worker := range workers {
+		f.SetCellStr(sheetName, "A"+fmt.Sprint(startingRow+index), worker.Name)
+		f.SetCellStr(sheetName, "B"+fmt.Sprint(startingRow+index), worker.JobTitleInProject)
+		f.SetCellStr(sheetName, "C"+fmt.Sprint(startingRow+index), worker.MobileNumber)
+		f.SetCellStr(sheetName, "D"+fmt.Sprint(startingRow+index), worker.JobTitleInCompany)
+		f.SetCellStr(sheetName, "E"+fmt.Sprint(startingRow+index), worker.CompanyWorkerID)
+	}
+
+	exportFileName := "Экспорт Рабочего Персонала.xlsx"
+	exportFilePath := filepath.Join("./pkg/excels/temp/", exportFileName)
+	if err := f.SaveAs(exportFilePath); err != nil {
+		return "", err
+	}
+
+	return exportFileName, nil
 }

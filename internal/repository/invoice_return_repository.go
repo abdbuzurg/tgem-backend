@@ -23,7 +23,7 @@ type IInvoiceReturnRepository interface {
 	GetByID(id uint) (model.InvoiceReturn, error)
 	GetPaginatedTeam(page, limit int, projectID uint) ([]dto.InvoiceReturnTeamPaginatedQueryData, error)
 	GetPaginatedObject(page, limit int, projectID uint) ([]dto.InvoiceReturnObjectPaginatedQueryData, error)
-  GetByDeliveryCode(deliveryCode string) (model.InvoiceReturn, error)
+	GetByDeliveryCode(deliveryCode string) (model.InvoiceReturn, error)
 	Create(data dto.InvoiceReturnCreateQueryData) (model.InvoiceReturn, error)
 	Update(data dto.InvoiceReturnCreateQueryData) (model.InvoiceReturn, error)
 	Delete(id uint) error
@@ -435,8 +435,8 @@ func (repo *invoiceReturnRepository) GetMaterialsForEdit(id uint, locationType s
 	return result, err
 }
 
-func(repo *invoiceReturnRepository) GetByDeliveryCode(deliveryCode string) (model.InvoiceReturn, error) {
-  result := model.InvoiceReturn{}
-  err := repo.db.Raw(`SELECT * FROM invoice_returns WHERE delivery_code = ?`, deliveryCode).Scan(&result).Error
-  return result, err
+func (repo *invoiceReturnRepository) GetByDeliveryCode(deliveryCode string) (model.InvoiceReturn, error) {
+	result := model.InvoiceReturn{}
+	err := repo.db.Raw(`SELECT * FROM invoice_returns WHERE delivery_code = ?`, deliveryCode).Scan(&result).Error
+	return result, err
 }

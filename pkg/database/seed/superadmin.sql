@@ -9,17 +9,25 @@ WHERE NOT EXISTS (
   WHERE roles.name = values_tobe_inserted.name AND roles.description = values_tobe_inserted.description
 );
 
-INSERT INTO workers(name, job_title, mobile_number)
+INSERT INTO workers(
+  name, job_title_in_company, job_title_in_project, mobile_number
+)
 SELECT * 
-FROM (VALUES
-  ('Суперадмин', 'Главный администратор системы', '+9929999999')
-) AS values_tobe_inserted(name, job_title, mobile_number)
-WHERE NOT EXISTS (
+FROM (VALUES(
+  'Суперадмин', 
+  'Главный администратор системы', 
+  'Главный администратор системы', 
+  '+9929999999'
+  )
+) AS values_tobe_inserted(
+  name, job_title_in_company, job_title_in_project, mobile_number
+) WHERE NOT EXISTS (
   SELECT *
   FROM workers
   WHERE 
     workers.name = values_tobe_inserted.name 
-    AND workers.job_title = values_tobe_inserted.job_title
+    AND workers.job_title_in_company = values_tobe_inserted.job_title_in_company
+    AND workers.job_title_in_project = values_tobe_inserted.job_title_in_project
     AND workers.mobile_number = values_tobe_inserted.mobile_number
 );
 
