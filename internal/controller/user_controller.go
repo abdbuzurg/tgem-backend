@@ -131,19 +131,19 @@ func (controller *userController) Create(c *gin.Context) {
 }
 
 func (controller *userController) Update(c *gin.Context) {
-	var updateData model.User
+	var updateData dto.NewUserData
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		response.ResponseError(c, fmt.Sprintf("Invalid data recieved by server: %v", err))
 		return
 	}
 
-	data, err := controller.userService.Update(updateData)
+	err := controller.userService.Update(updateData)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Could not perform the updation of User: %v", err))
 		return
 	}
 
-	response.ResponseSuccess(c, data)
+	response.ResponseSuccess(c, true)
 }
 
 func (controller *userController) Delete(c *gin.Context) {

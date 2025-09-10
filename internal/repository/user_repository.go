@@ -46,9 +46,9 @@ func (repo *userRepository) GetPaginatedFiltered(page, limit int, filter model.U
 		Raw(`SELECT * FROM users WHERE
 			(nullif(?, '') IS NULL OR worker_id = ?) AND
 			(nullif(?, '') IS NULL OR username = ?) ORDER BY id DESC LIMIT ? OFFSET ?`,
-			filter.WorkerID, filter.WorkerID, 
-      filter.Username, filter.Username, 
-      limit, (page-1)*limit,
+			filter.WorkerID, filter.WorkerID,
+			filter.Username, filter.Username,
+			limit, (page-1)*limit,
 		).
 		Scan(&data).Error
 
@@ -67,7 +67,7 @@ func (repo *userRepository) Create(data model.User) (model.User, error) {
 }
 
 func (repo *userRepository) Update(data model.User) (model.User, error) {
-	err := repo.db.Model(&model.User{}).Select("*").Updates(&data).Error
+	err := repo.db.Model(&model.User{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
 	return data, err
 }
 

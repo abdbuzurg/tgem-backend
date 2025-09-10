@@ -45,7 +45,7 @@ type IUserService interface {
 	GetPaginated(page, limit int, data model.User) ([]dto.UserPaginated, error)
 	GetByID(id uint) (model.User, error)
 	Create(data dto.NewUserData) error
-	Update(data model.User) (model.User, error)
+	Update(data dto.NewUserData) error
 	Delete(id uint) error
 	Count() (int64, error)
 	Login(data dto.LoginData) (dto.LoginResponse, error)
@@ -128,8 +128,26 @@ func (service *userService) Create(data dto.NewUserData) error {
 	return nil
 }
 
-func (service *userService) Update(data model.User) (model.User, error) {
-	return service.userRepo.Update(data)
+func (service *userService) Update(data dto.NewUserData) error {
+
+	hashedPassword, err := security.Hash(data.UserData.Password)
+	if err != nil {
+		return err
+	}
+
+	data.UserData.Password = string(hashedPassword)
+
+	user, err := service.userRepo.Update(data.UserData)
+	if err != nil {
+		return err
+	}
+
+	err = service.userInProjectRepo.UpdateUserInProjectsWithGivenArray(data.Projects, user.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (service *userService) Delete(id uint) error {

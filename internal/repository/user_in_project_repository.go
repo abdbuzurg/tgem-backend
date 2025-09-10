@@ -20,6 +20,7 @@ type IUserInProjectRepository interface {
 	GetByUserID(userID uint) ([]model.UserInProject, error)
 	AddUserToProjects(userID uint, projectIDs []uint) error
 	GetProjectNamesByUserID(userID uint) ([]string, error)
+	UpdateUserInProjectsWithGivenArray(projectIDs []uint, userID uint) error
 }
 
 func (repo *userInProjectRepository) GetByUserID(userID uint) ([]model.UserInProject, error) {
@@ -54,4 +55,28 @@ func (repo *userInProjectRepository) GetProjectNamesByUserID(userID uint) ([]str
   `, userID).Scan(&result).Error
 
 	return result, err
+}
+
+func (repo *userInProjectRepository) UpdateUserInProjectsWithGivenArray(projectIDs []uint, userID uint) error {
+	err := repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`DELETE FROM user_in_projects WHERE user_id = ?`, userID).Error; err != nil {
+			return err
+		}
+
+		userInProjects := []model.UserInProject{}
+		for _, projectID := range projectIDs {
+			userInProjects = append(userInProjects, model.UserInProject{
+				ProjectID: projectID,
+				UserID:    userID,
+			})
+		}
+
+		if err := tx.CreateInBatches(&userInProjects, 10).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	return err
 }
