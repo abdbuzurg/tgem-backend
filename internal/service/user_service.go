@@ -130,19 +130,26 @@ func (service *userService) Create(data dto.NewUserData) error {
 
 func (service *userService) Update(data dto.NewUserData) error {
 
-	hashedPassword, err := security.Hash(data.UserData.Password)
+	var encryptedPassword string
+	if data.UserData.Password != "" {
+		hashedPassword, err := security.Hash(data.UserData.Password)
+		if err != nil {
+			return err
+		}
+
+		encryptedPassword = string(hashedPassword)
+	} else {
+		encryptedPassword = ""
+	}
+
+	data.UserData.Password = encryptedPassword
+
+	_, err := service.userRepo.Update(data.UserData)
 	if err != nil {
 		return err
 	}
 
-	data.UserData.Password = string(hashedPassword)
-
-	user, err := service.userRepo.Update(data.UserData)
-	if err != nil {
-		return err
-	}
-
-	err = service.userInProjectRepo.UpdateUserInProjectsWithGivenArray(data.Projects, user.ID)
+	err = service.userInProjectRepo.UpdateUserInProjectsWithGivenArray(data.Projects, data.UserData.ID)
 	if err != nil {
 		return err
 	}

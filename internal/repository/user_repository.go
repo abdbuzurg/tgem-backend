@@ -67,7 +67,15 @@ func (repo *userRepository) Create(data model.User) (model.User, error) {
 }
 
 func (repo *userRepository) Update(data model.User) (model.User, error) {
-	err := repo.db.Model(&model.User{}).Select("*").Where("id = ?", data.ID).Updates(&data).Error
+	err := repo.db.Exec(`
+		UPDATE users
+		SET 
+			worker_id = ?,
+			username = ?,
+			password = coalesce(nullif(?, ''), password),
+			role_id = ?
+		WHERE id = ?;
+		`, data.WorkerID, data.Username, data.Password, data.RoleID, data.ID).Error
 	return data, err
 }
 
