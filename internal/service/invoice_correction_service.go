@@ -65,20 +65,20 @@ func (service *invoiceCorrectionService) GetInvoiceMaterialsByInvoiceObjectID(id
 		return []dto.InvoiceCorrectionMaterialsData{}, err
 	}
 
-  result := []dto.InvoiceCorrectionMaterialsData{}
-  resultIndex := 0
+	result := []dto.InvoiceCorrectionMaterialsData{}
+	resultIndex := 0
 	for index, entry := range data {
 		if index == 0 {
-      result = append(result, entry)
-      continue
+			result = append(result, entry)
+			continue
 		}
 
-    if entry.MaterialID == result[resultIndex].MaterialID {
-      result[resultIndex].MaterialAmount += entry.MaterialAmount
-    } else {
-      result = append(result, entry)
-      resultIndex++
-    }
+		if entry.MaterialID == result[resultIndex].MaterialID {
+			result[resultIndex].MaterialAmount += entry.MaterialAmount
+		} else {
+			result = append(result, entry)
+			resultIndex++
+		}
 	}
 
 	return result, nil
@@ -114,6 +114,7 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 		index := 0
 		for invoiceMaterial.MaterialAmount > 0 {
 			if len(materialInfoSorted) == 0 {
+				fmt.Println(len(materialInfoSorted))
 				return model.InvoiceObject{}, fmt.Errorf("Ошибка корректировки: количество материала внутри корректировки превышает количество материала у бригады")
 			}
 			invoiceMaterialCreate := model.InvoiceMaterials{
@@ -137,10 +138,6 @@ func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate
 
 			invoiceMaterialForCreate = append(invoiceMaterialForCreate, invoiceMaterialCreate)
 			index++
-
-      if index == len(materialInfoSorted) {
-        return model.InvoiceObject{}, fmt.Errorf("Количество материала '%v' указано больше чем имеет бригада", invoiceMaterial.MaterialName)
-      }
 		}
 	}
 
@@ -216,7 +213,7 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 		return "", err
 	}
 
-  fmt.Println(invoices)
+	fmt.Println(invoices)
 
 	templateFilePath := filepath.Join("./pkg/excels/templates/", "Object Spenditure Report.xlsx")
 	f, err := excelize.OpenFile(templateFilePath)
@@ -252,7 +249,7 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 			f.SetCellStr(sheetName, "L"+fmt.Sprint(rowCount+index), invoiceMaterial.InvoiceMaterialNotes)
 		}
 
-    rowCount += len(invoiceMaterials)
+		rowCount += len(invoiceMaterials)
 	}
 
 	currentTime := time.Now()
