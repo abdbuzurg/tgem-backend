@@ -77,6 +77,17 @@ func (repo *projectRepository) Create(data model.Project) (model.Project, error)
 			return err
 		}
 
+		invoiceCounts := []model.InvoiceCount{
+			{ProjectID: data.ID, InvoiceType: "input", Count: 0},
+			{ProjectID: data.ID, InvoiceType: "output", Count: 0},
+			{ProjectID: data.ID, InvoiceType: "return", Count: 0},
+			{ProjectID: data.ID, InvoiceType: "writeoff", Count: 0},
+		}
+
+		if err := repo.db.Create(&invoiceCounts).Error; err != nil {
+			return nil
+		}
+
 		return nil
 	})
 	return data, err

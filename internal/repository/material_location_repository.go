@@ -210,7 +210,7 @@ func (repo *materialLocationRepository) GetUniqueMaterialsFromLocation(
 	projectID, locationID uint,
 	locationType string,
 ) ([]model.Material, error) {
-  data := []model.Material{}
+	data := []model.Material{}
 	err := repo.db.Raw(`
     SELECT DISTINCT 
       materials.unit,
@@ -450,4 +450,8 @@ func (repo *materialLocationRepository) GetByLocationType(locationType string) (
 	}
 
 	return result, err
+}
+
+func (repo *materialLocationRepository) GetOperationsInProject(projectID uint) error {
+	return nil
 }

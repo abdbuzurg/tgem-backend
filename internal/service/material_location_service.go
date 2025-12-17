@@ -223,6 +223,18 @@ func (service *materialLocationService) BalanceReport(projectID uint, data dto.R
 			}
 		}
 
+		if data.Type == "object" {
+			operationSheetName := "Услуги"
+			_, err := f.NewSheet(operationSheetName)
+			if err != nil {
+				return "", fmt.Errorf("Ошибка создание нового листа: %v", err)
+			}
+
+			f.SetCellStr(operationSheetName, "A1", "Имя")
+			f.SetCellStr(operationSheetName, "B1", "Код")
+			
+		}
+
 		f.SetCellStr(sheetName, "A"+fmt.Sprint(rowCount), entry.MaterialCode)
 		f.SetCellStr(sheetName, "B"+fmt.Sprint(rowCount), entry.MaterialName)
 		f.SetCellStr(sheetName, "C"+fmt.Sprint(rowCount), entry.MaterialUnit)
