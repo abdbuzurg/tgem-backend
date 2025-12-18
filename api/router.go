@@ -448,6 +448,7 @@ func InitInvoiceCorrectionRoutes(router *gin.RouterGroup, controller controller.
 	invoiceCorrectionRoutes.GET("unique/object", controller.UniqueObject)
 	invoiceCorrectionRoutes.POST("/report", controller.Report)
 	invoiceCorrectionRoutes.POST("/", controller.Create)
+	invoiceCorrectionRoutes.GET("/search-parameters", controller.GetParametersForSearch)
 }
 
 func InitInvoiceObjectRoutes(router *gin.RouterGroup, controller controller.IInvoiceObjectController, db *gorm.DB) {

@@ -35,6 +35,7 @@ type IInvoiceCorrectionController interface {
 	Report(c *gin.Context)
 	GetPaginated(c *gin.Context)
 	GetOperationsByInvoiceObjectID(c *gin.Context)
+	GetParametersForSearch(c *gin.Context)
 }
 
 func (controller *invoiceCorrectionController) GetPaginated(c *gin.Context) {
@@ -52,15 +53,32 @@ func (controller *invoiceCorrectionController) GetPaginated(c *gin.Context) {
 		return
 	}
 
-	projectID := c.GetUint("projectID")
+	teamIDStr := c.DefaultQuery("teamID", "0")
+	teamID, err := strconv.Atoi(teamIDStr)
+	if err != nil || teamID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query paramter provided for teamID: %v", err))
+		return
+	}
 
-	data, err := controller.invoiceCorrectionService.GetPaginated(page, limit, projectID)
+	objectIDStr := c.DefaultQuery("objectID", "0")
+	objectID, err := strconv.Atoi(objectIDStr)
+	if err != nil || objectID < 0 {
+		response.ResponseError(c, fmt.Sprintf("Wrong query paramter provided for objectID: %v", err))
+	}
+
+	filter := dto.InvoiceCorrectionPaginatedParamters{
+		ProjectID: c.GetUint("projectID"),
+		TeamID:    uint(teamID),
+		ObjectID:  uint(objectID),
+	}
+
+	data, err := controller.invoiceCorrectionService.GetPaginated(page, limit, filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 
-	dataCount, err := controller.invoiceCorrectionService.Count(projectID)
+	dataCount, err := controller.invoiceCorrectionService.Count(filter)
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
@@ -221,6 +239,16 @@ func (controller *invoiceCorrectionController) GetOperationsByInvoiceObjectID(c 
 	data, err := controller.invoiceCorrectionService.GetOperationsByInvoiceObjectID(uint(id))
 	if err != nil {
 		response.ResponseError(c, fmt.Sprintf("Internal server error: %v", err))
+		return
+	}
+
+	response.ResponseSuccess(c, data)
+}
+
+func (controller *invoiceCorrectionController) GetParametersForSearch(c *gin.Context) {
+	data, err := controller.invoiceCorrectionService.GetParametersForSearch(c.GetUint("projectID"))
+	if err != nil {
+		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))
 		return
 	}
 

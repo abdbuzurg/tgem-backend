@@ -34,7 +34,7 @@ func InitInvoiceCorrectionService(
 }
 
 type IInvoiceCorrectionService interface {
-	GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error)
+	GetPaginated(page, limit int, filter dto.InvoiceCorrectionPaginatedParamters) ([]dto.InvoiceCorrectionPaginated, error)
 	GetAll(projectID uint) ([]dto.InvoiceCorrectionPaginated, error)
 	GetTotalAmounInLocationByTeamName(projectID, materialID uint, teamNumber string) (float64, error)
 	GetInvoiceMaterialsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionMaterialsData, error)
@@ -43,12 +43,13 @@ type IInvoiceCorrectionService interface {
 	UniqueObject(projectID uint) ([]dto.ObjectDataForSelect, error)
 	UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error)
 	Report(filter dto.InvoiceCorrectionReportFilter) (string, error)
-	Count(projectID uint) (int64, error)
+	Count(filter dto.InvoiceCorrectionPaginatedParamters) (int64, error)
 	GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error)
+	GetParametersForSearch(projectID uint) (dto.InvoiceCorrectionSearchData, error)
 }
 
-func (service *invoiceCorrectionService) GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error) {
-	return service.invoiceCorrectionRepo.GetPaginated(page, limit, projectID)
+func (service *invoiceCorrectionService) GetPaginated(page, limit int, filter dto.InvoiceCorrectionPaginatedParamters) ([]dto.InvoiceCorrectionPaginated, error) {
+	return service.invoiceCorrectionRepo.GetPaginatedFiltered(page, limit, filter)
 }
 
 func (service *invoiceCorrectionService) GetAll(projectID uint) ([]dto.InvoiceCorrectionPaginated, error) {
@@ -88,8 +89,8 @@ func (service *invoiceCorrectionService) GetSerialNumberOfMaterialInTeam(project
 	return service.invoiceCorrectionRepo.GetSerialNumberOfMaterialInTeam(projectID, materialID, teamID)
 }
 
-func (service *invoiceCorrectionService) Count(projectID uint) (int64, error) {
-	return service.invoiceCorrectionRepo.Count(projectID)
+func (service *invoiceCorrectionService) Count(filter dto.InvoiceCorrectionPaginatedParamters) (int64, error) {
+	return service.invoiceCorrectionRepo.Count(filter)
 }
 
 func (service *invoiceCorrectionService) Create(data dto.InvoiceCorrectionCreate) (model.InvoiceObject, error) {
@@ -271,4 +272,21 @@ func (service *invoiceCorrectionService) Report(filter dto.InvoiceCorrectionRepo
 
 func (service *invoiceCorrectionService) GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error) {
 	return service.invoiceCorrectionRepo.GetOperationsByInvoiceObjectID(id)
+}
+
+func (service *invoiceCorrectionService) GetParametersForSearch(projectID uint) (dto.InvoiceCorrectionSearchData, error) {
+	teams, err := service.invoiceCorrectionRepo.GetTeamsInInvoiceCorrection(projectID)
+	if err != nil {
+		return dto.InvoiceCorrectionSearchData{}, err
+	}
+
+	objects, err := service.invoiceCorrectionRepo.GetObjectsInInvoiceCorrection(projectID)
+	if err != nil {
+		return dto.InvoiceCorrectionSearchData{}, err
+	}
+
+	return dto.InvoiceCorrectionSearchData{
+		Teams:   teams,
+		Objects: objects,
+	}, nil
 }

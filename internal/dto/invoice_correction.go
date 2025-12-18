@@ -18,10 +18,16 @@ type InvoiceCorrectionPaginated struct {
 	SupervisorName      string    `json:"supervisorName"`
 	ObjectName          string    `json:"objectName"`
 	ObjectType          string    `json:"objectType"`
-	TeamNumber          string    `json:"teamNumber"`
+	TeamLeaderName      string    `json:"teamLeaderName"`
 	TeamID              uint      `json:"teamID"`
 	DateOfInvoice       time.Time `json:"dateOfInvoice"`
 	ConfirmedByOperator bool      `json:"confirmedByOperator"`
+}
+
+type InvoiceCorrectionPaginatedParamters struct {
+	ProjectID uint `json:"projectID"`
+	TeamID    uint `json:"teamID"`
+	ObjectID  uint `json:"objectID"`
 }
 
 type InvoiceCorrectionCreateDetails struct {
@@ -70,4 +76,9 @@ type InvoiceCorrectionOperationsData struct {
 	OperationID   uint    `json:"operationID"`
 	Amount        float64 `json:"amount"`
 	MaterialName  string  `json:"materialName"`
+}
+
+type InvoiceCorrectionSearchData struct {
+	Teams   []DataForSelect[uint] `json:"teams"`
+	Objects []DataForSelect[uint] `json:"objects"`
 }

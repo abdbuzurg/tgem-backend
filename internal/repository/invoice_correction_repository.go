@@ -19,40 +19,47 @@ func InitInvoiceCorrectionRepository(db *gorm.DB) IInvoiceCorrectionRepository {
 }
 
 type IInvoiceCorrectionRepository interface {
-	GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error)
+	GetPaginatedFiltered(page, limit int, filter dto.InvoiceCorrectionPaginatedParamters) ([]dto.InvoiceCorrectionPaginated, error)
 	GetInvoiceMaterialsDataByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionMaterialsData, error)
 	GetSerialNumberOfMaterialInTeam(projectID uint, materialID uint, teamID uint) ([]string, error)
 	Create(data dto.InvoiceCorrectionCreateQuery) (model.InvoiceObject, error)
 	UniqueTeam(projectID uint) ([]dto.DataForSelect[uint], error)
 	UniqueObject(projectID uint) ([]dto.ObjectDataForSelect, error)
 	ReportFilterData(filter dto.InvoiceCorrectionReportFilter) ([]dto.InvoiceCorrectionReportData, error)
-	Count(projectID uint) (int64, error)
+	Count(filter dto.InvoiceCorrectionPaginatedParamters) (int64, error)
 	GetOperationsByInvoiceObjectID(id uint) ([]dto.InvoiceCorrectionOperationsData, error)
+	GetTeamsInInvoiceCorrection(projectID uint) ([]dto.DataForSelect[uint], error)
+	GetObjectsInInvoiceCorrection(projectID uint) ([]dto.DataForSelect[uint], error)
 }
 
-func (repo *invoiceCorrectionRepository) GetPaginated(page, limit int, projectID uint) ([]dto.InvoiceCorrectionPaginated, error) {
+func (repo *invoiceCorrectionRepository) GetPaginatedFiltered(page, limit int, filter dto.InvoiceCorrectionPaginatedParamters) ([]dto.InvoiceCorrectionPaginated, error) {
 	data := []dto.InvoiceCorrectionPaginated{}
 	err := repo.db.Raw(`
-    SELECT 
-      invoice_objects.id as id,
-      workers.name as supervisor_name,
-      objects.name as object_name,
-      objects.type as object_type,
-      teams.id as team_id,
-      teams.number as team_number,
-      invoice_objects.date_of_invoice as date_of_invoice,
-      invoice_objects.delivery_code as delivery_code,
-      invoice_objects.confirmed_by_operator as confirmed_by_operator  
-
-    FROM invoice_objects
-      INNER JOIN workers ON workers.id = invoice_objects.supervisor_worker_id
-      INNER JOIN objects ON objects.id = invoice_objects.object_id
-      INNER JOIN teams ON teams.id = invoice_objects.team_id
-    WHERE
-      invoice_objects.project_id = ? AND
-      invoice_objects.confirmed_by_operator = false
-    ORDER BY invoice_objects.id DESC LIMIT ? OFFSET ?;
-    `, projectID, limit, (page-1)*limit).Scan(&data).Error
+    SELECT
+      io.id                    AS id,
+      w.name                   AS supervisor_name,
+      o.name                   AS object_name,
+      o."type"                 AS object_type,
+      io.team_id               AS team_id,
+      io.date_of_invoice       AS date_of_invoice,
+      io.delivery_code         AS delivery_code,
+      io.confirmed_by_operator AS confirmed_by_operator,
+      w2.name                  AS team_leader_name
+    FROM invoice_objects AS io
+    JOIN workers      AS w  ON w.id = io.supervisor_worker_id
+    JOIN "objects"    AS o  ON o.id = io.object_id
+    JOIN team_leaders AS tl ON tl.team_id = io.team_id
+    JOIN workers      AS w2 ON w2.id = tl.leader_worker_id
+    WHERE io.project_id = ?
+      AND io.confirmed_by_operator = FALSE
+      AND (?  = 0 OR io.team_id  = ?)
+      AND (? = 0 OR io.object_id = ?)
+    ORDER BY io.id DESC
+    LIMIT ? OFFSET ?;`,
+		filter.ProjectID,
+		filter.TeamID, filter.TeamID,
+		filter.ObjectID, filter.ObjectID,
+		limit, (page-1)*limit).Scan(&data).Error
 
 	return data, err
 
@@ -221,14 +228,20 @@ func (repo *invoiceCorrectionRepository) ReportFilterData(filter dto.InvoiceCorr
 	return data, err
 }
 
-func (repo *invoiceCorrectionRepository) Count(projectID uint) (int64, error) {
+func (repo *invoiceCorrectionRepository) Count(filter dto.InvoiceCorrectionPaginatedParamters) (int64, error) {
 	var count int64
 	err := repo.db.Raw(`
     SELECT COUNT(*) 
-    FROM invoice_objects 
+    FROM invoice_objects  
     WHERE 
       confirmed_by_operator = false AND
-      project_id = ?`, projectID).Scan(&count).Error
+      project_id = ?
+      AND (?  = 0 OR team_id  = ?)
+      AND (? = 0 OR object_id = ?)
+    `, filter.ProjectID,
+		filter.TeamID, filter.TeamID,
+		filter.ObjectID, filter.ObjectID,
+	).Scan(&count).Error
 	return count, err
 }
 
@@ -250,4 +263,39 @@ func (repo *invoiceCorrectionRepository) GetOperationsByInvoiceObjectID(id uint)
     `, id).Scan(&result).Error
 
 	return result, err
+}
+
+func (repo *invoiceCorrectionRepository) GetTeamsInInvoiceCorrection(projectID uint) ([]dto.DataForSelect[uint], error) {
+	teams := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+    SELECT 
+	    w."name" || ' (' || t."number" || ')' AS label,
+	    t.id AS "value"
+    FROM teams t
+    INNER JOIN team_leaders t2 ON t2.team_id = t.id
+    INNER JOIN workers w ON w.id = t2.leader_worker_id
+    WHERE t.id IN (
+	    SELECT distinct team_id
+	    FROM invoice_objects i 
+	    WHERE i.project_id  = ?
+    )
+	  `, projectID).Scan(&teams).Error
+	return teams, err
+}
+
+func (repo *invoiceCorrectionRepository) GetObjectsInInvoiceCorrection(projectID uint) ([]dto.DataForSelect[uint], error) {
+	objects := []dto.DataForSelect[uint]{}
+	err := repo.db.Raw(`
+    SELECT 
+	    o."name" AS label,
+	    o.id AS "value"
+    FROM objects o
+    WHERE o.id IN (
+	    SELECT DISTINCT object_id
+	    FROM invoice_objects i 
+	    WHERE i.project_id  = ?
+    )
+	  `, projectID).Scan(&objects).Error
+
+	return objects, err
 }
