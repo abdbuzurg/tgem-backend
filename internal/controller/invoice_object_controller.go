@@ -6,7 +6,6 @@ import (
 	"backend-v2/pkg/response"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -162,15 +161,7 @@ func (controller *invoiceObjectController) Create(c *gin.Context) {
 	projectID := c.GetUint("projectID")
 	data.Details.ProjectID = projectID
 
-	location, err := time.LoadLocation("Asia/Dushanbe")
-	if err != nil {
-		response.ResponseError(c, fmt.Sprintf("Неверное тело запроса: %v", err))
-		return
-	}
-	date := time.Now().In(location)
-	data.Details.DateOfInvoice = date
-
-	_, err = controller.invoiceObjectService.Create(data)
+	_, err := controller.invoiceObjectService.Create(data)
 	if err != nil {
 
 		response.ResponseError(c, fmt.Sprintf("Внутренняя ошибка сервера: %v", err))

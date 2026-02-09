@@ -16,6 +16,8 @@ type InvoiceCorrectionPaginated struct {
 	ID                  uint      `json:"id"`
 	DeliveryCode        string    `json:"deliveryCode"`
 	SupervisorName      string    `json:"supervisorName"`
+	DistrictID          uint      `json:"districtID"`
+	DistrictName        string    `json:"districtName"`
 	ObjectName          string    `json:"objectName"`
 	ObjectType          string    `json:"objectType"`
 	TeamLeaderName      string    `json:"teamLeaderName"`
@@ -62,6 +64,7 @@ type InvoiceCorrectionReportFilter struct {
 type InvoiceCorrectionReportData struct {
 	ID               uint
 	DeliveryCode     string
+	DistrictName     string
 	ObjectName       string
 	ObjectType       string
 	TeamNumber       string

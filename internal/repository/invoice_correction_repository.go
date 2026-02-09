@@ -38,6 +38,8 @@ func (repo *invoiceCorrectionRepository) GetPaginatedFiltered(page, limit int, f
     SELECT
       io.id                    AS id,
       w.name                   AS supervisor_name,
+      io.district_id           AS district_id,
+      d.name                   AS district_name,
       o.name                   AS object_name,
       o."type"                 AS object_type,
       io.team_id               AS team_id,
@@ -47,6 +49,7 @@ func (repo *invoiceCorrectionRepository) GetPaginatedFiltered(page, limit int, f
       w2.name                  AS team_leader_name
     FROM invoice_objects AS io
     JOIN workers      AS w  ON w.id = io.supervisor_worker_id
+    LEFT JOIN districts    AS d  ON d.id = io.district_id
     JOIN "objects"    AS o  ON o.id = io.object_id
     JOIN team_leaders AS tl ON tl.team_id = io.team_id
     JOIN workers      AS w2 ON w2.id = tl.leader_worker_id
@@ -195,6 +198,7 @@ func (repo *invoiceCorrectionRepository) ReportFilterData(filter dto.InvoiceCorr
       SELECT 
         invoice_objects.id as id,
         invoice_objects.delivery_code as delivery_code,
+        districts.name as district_name,
         objects.name as object_name,
         objects.type as object_type,
         teams.number as team_number,
@@ -203,6 +207,7 @@ func (repo *invoiceCorrectionRepository) ReportFilterData(filter dto.InvoiceCorr
         operator.name as operator_name,
         invoice_objects.date_of_correction as date_of_correction
       FROM invoice_objects
+      LEFT JOIN districts ON districts.id = invoice_objects.district_id
       INNER JOIN objects ON objects.id = invoice_objects.object_id
       INNER JOIN teams ON teams.id = invoice_objects.team_id
       INNER JOIN team_leaders ON team_leaders.team_id = teams.id

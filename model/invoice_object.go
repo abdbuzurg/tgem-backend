@@ -4,6 +4,7 @@ import "time"
 
 type InvoiceObject struct {
 	ID                  uint      `gorm:"primaryKey" json:"id"`
+	DistrictID          uint      `json:"districtID"`
 	DeliveryCode        string    `json:"deliveryCode"`
 	ProjectID           uint      `json:"projectID"`
 	SupervisorWorkerID  uint      `json:"supervisorWorkerID"`
@@ -13,5 +14,5 @@ type InvoiceObject struct {
 	ConfirmedByOperator bool      `json:"confirmedByOperator"`
 	DateOfCorrection    time.Time `json:"dateOfCorrection"`
 
-  InvoiceObjectOperators []InvoiceObjectOperator `json:"-" gorm:"foreignKey:InvoiceObjectID"`
+	InvoiceObjectOperators []InvoiceObjectOperator `json:"-" gorm:"foreignKey:InvoiceObjectID"`
 }

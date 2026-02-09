@@ -9,6 +9,8 @@ type InvoiceObjectPaginated struct {
 	ID                  uint      `json:"id"`
 	DeliveryCode        string    `json:"deliveryCode"`
 	SupervisorName      string    `json:"supervisorName"`
+	DistrictID          uint      `json:"districtID"`
+	DistrictName        string    `json:"districtName"`
 	ObjectName          string    `json:"objectName"`
 	ObjectType          string    `json:"objectType"`
 	TeamNumber          string    `json:"teamNumber"`

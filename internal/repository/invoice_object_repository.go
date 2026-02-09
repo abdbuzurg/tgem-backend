@@ -35,6 +35,8 @@ func (repo *invoiceObjectRepository) GetInvoiceObjectDescriptiveDataByID(id uint
     SELECT 
       invoice_objects.id as id,
       workers.name as supervisor_name,
+      invoice_objects.district_id as district_id,
+      districts.name as district_name,
       objects.name as object_name,
       objects.type as object_type,
       teams.number as team_number,
@@ -43,6 +45,7 @@ func (repo *invoiceObjectRepository) GetInvoiceObjectDescriptiveDataByID(id uint
       invoice_objects.confirmed_by_operator as confirmed_by_operator  
     FROM invoice_objects
       INNER JOIN workers ON workers.id = invoice_objects.supervisor_worker_id
+      LEFT JOIN districts ON districts.id = invoice_objects.district_id
       INNER JOIN objects ON objects.id = invoice_objects.object_id
       INNER JOIN teams ON teams.id = invoice_objects.team_id
     WHERE
@@ -109,6 +112,8 @@ func (repo *invoiceObjectRepository) GetPaginated(page, limit int, projectID uin
     SELECT 
       invoice_objects.id as id,
       workers.name as supervisor_name,
+      invoice_objects.district_id as district_id,
+      districts.name as district_name,
       objects.name as object_name,
       objects.type as object_type,
       teams.number as team_number,
@@ -118,6 +123,7 @@ func (repo *invoiceObjectRepository) GetPaginated(page, limit int, projectID uin
 
     FROM invoice_objects
       INNER JOIN workers ON workers.id = invoice_objects.supervisor_worker_id
+      LEFT JOIN districts ON districts.id = invoice_objects.district_id
       INNER JOIN objects ON objects.id = invoice_objects.object_id
       INNER JOIN teams ON teams.id = invoice_objects.team_id
     WHERE
@@ -145,6 +151,8 @@ func (repo *invoiceObjectRepository) GetForCorrection(projectID uint) ([]dto.Inv
     SELECT 
       invoice_objects.id as id,
       workers.name as supervisor_name,
+      invoice_objects.district_id as district_id,
+      districts.name as district_name,
       objects.name as object_name,
       teams.id as team_id,
       teams.number as team_number,
@@ -154,6 +162,7 @@ func (repo *invoiceObjectRepository) GetForCorrection(projectID uint) ([]dto.Inv
 
     FROM invoice_objects
       INNER JOIN workers ON workers.id = invoice_objects.supervisor_worker_id
+      LEFT JOIN districts ON districts.id = invoice_objects.district_id
       INNER JOIN objects ON objects.id = invoice_objects.object_id
       INNER JOIN teams ON teams.id = invoice_objects.team_id
     WHERE

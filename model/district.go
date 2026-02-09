@@ -6,4 +6,5 @@ type District struct {
 	ProjectID uint   `json:"projectID"`
 
 	InvoiceOutput []InvoiceOutput `json:"-" gorm:"foreignKey:DistrictID"`
+	InvoiceObject []InvoiceObject `json:"-" gorm:"foreignKey:DistrictID"`
 }

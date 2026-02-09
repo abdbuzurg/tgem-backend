@@ -36,14 +36,16 @@ func InitDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	AutoMigrate(db)
+	if err := AutoMigrate(db); err != nil {
+		return nil, err
+	}
 	InitialMigration(db)
 
 	return db, nil
 }
 
-func AutoMigrate(db *gorm.DB) {
-	db.AutoMigrate(
+func AutoMigrate(db *gorm.DB) error {
+	return db.AutoMigrate(
 		model.Role{},
 		model.Resource{},
 		model.Project{},
