@@ -25,7 +25,7 @@ type IInvoiceOutputRepository interface {
 	GetByID(id uint) (model.InvoiceOutput, error)
 	GetUnconfirmedByObjectInvoices() ([]model.InvoiceOutput, error)
 	GetAvailableMaterialsInWarehouse(projectID uint) ([]dto.AvailableMaterialsInWarehouse, error)
-  GetByDeliveryCode(deliveryCode string) (model.InvoiceOutput, error)
+	GetByDeliveryCode(deliveryCode string) (model.InvoiceOutput, error)
 	GetDataForExcel(id uint) (dto.InvoiceOutputDataForExcelQueryResult, error)
 	Create(data dto.InvoiceOutputCreateQueryData) (model.InvoiceOutput, error)
 	Update(data dto.InvoiceOutputCreateQueryData) (model.InvoiceOutput, error)
@@ -267,12 +267,7 @@ func (repo *invoiceOutputRepository) UniqueDistrict(projectID uint) ([]dto.DataF
       SELECT 
         districts.id as "value",
         districts.name as "label"
-      FROM districts
-      WHERE districts.id IN (
-        SELECT DISTINCT(invoice_outputs.district_id)
-        FROM invoice_outputs
-        WHERE invoice_outputs.project_id = ?
-      )
+      FROM districts WHERE districts.project_id = ?;
     `, projectID).Scan(&data).Error
 	return data, err
 }
@@ -522,8 +517,8 @@ func (repo *invoiceOutputRepository) Import(data []dto.InvoiceOutputImportData) 
 	})
 }
 
-func(repo *invoiceOutputRepository) GetByDeliveryCode(deliveryCode string) (model.InvoiceOutput, error) {
-  result := model.InvoiceOutput{}
-  err := repo.db.Raw("SELECT * FROM invoice_outputs WHERE delivery_code = ?", deliveryCode).Scan(&result).Error
-  return result, err
+func (repo *invoiceOutputRepository) GetByDeliveryCode(deliveryCode string) (model.InvoiceOutput, error) {
+	result := model.InvoiceOutput{}
+	err := repo.db.Raw("SELECT * FROM invoice_outputs WHERE delivery_code = ?", deliveryCode).Scan(&result).Error
+	return result, err
 }
